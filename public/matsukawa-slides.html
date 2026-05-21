@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>松川村教育委員会 様｜自由進度学習支援システム ご提案スライド</title>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+            background: #1a202c;
+            color: #1f2937;
+            overflow: hidden;
+        }
+
+        /* スライドコンテナ */
+        .slide-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            background: white;
+            overflow: auto;
+        }
+
+        .slide.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .slide-inner {
+            width: 100%;
+            min-height: 100%;
+            padding: 60px 80px 100px 80px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 背景バリエーション */
+        .bg-hero {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #60a5fa 100%);
+            color: white;
+        }
+        .bg-light {
+            background: #f9fafb;
+        }
+        .bg-dark {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: white;
+        }
+        .bg-problem {
+            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        }
+        .bg-solution {
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+        }
+        .bg-warm {
+            background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 30%, #fff7ed 100%);
+        }
+
+        /* ナビゲーション */
+        .nav-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(10px);
+            padding: 10px 20px;
+            border-radius: 50px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 100;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .nav-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .nav-btn:hover {
+            background: #2563eb;
+            transform: scale(1.1);
+        }
+        .nav-btn:disabled {
+            background: #6b7280;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .slide-counter {
+            color: white;
+            font-weight: 600;
+            font-size: 0.9rem;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        /* 進捗バー */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #3b82f6, #60a5fa);
+            z-index: 101;
+            transition: width 0.4s ease;
+        }
+
+        /* スライド番号表示 */
+        .slide-number-display {
+            position: absolute;
+            bottom: 30px;
+            right: 40px;
+            color: #9ca3af;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        .bg-hero .slide-number-display,
+        .bg-dark .slide-number-display {
+            color: rgba(255,255,255,0.6);
+        }
+
+        /* タイトル表示スタイル */
+        .slide-title {
+            font-size: 2.8rem;
+            font-weight: 800;
+            line-height: 1.3;
+            margin-bottom: 20px;
+        }
+        .slide-subtitle {
+            font-size: 1.3rem;
+            color: #6b7280;
+            margin-bottom: 30px;
+            font-weight: 500;
+        }
+        .bg-hero .slide-subtitle,
+        .bg-dark .slide-subtitle { color: rgba(255,255,255,0.85); }
+
+        .section-number {
+            display: inline-block;
+            background: #3b82f6;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1rem;
+            margin-bottom: 20px;
+        }
+
+        /* 大きなキーワード */
+        .big-keyword {
+            font-size: 4.5rem;
+            font-weight: 900;
+            line-height: 1.1;
+            color: #1e3a8a;
+        }
+        .big-number {
+            font-size: 6rem;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        /* カード */
+        .info-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+            transition: transform 0.3s;
+        }
+        .info-card:hover { transform: translateY(-4px); }
+
+        /* キーボードヘルプ */
+        .keyboard-help {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            z-index: 99;
+            opacity: 0.5;
+            transition: opacity 0.3s;
+        }
+        .keyboard-help:hover { opacity: 1; }
+
+        /* 印刷対応 */
+        @media print {
+            html, body { overflow: visible; background: white; }
+            .slide-container { overflow: visible; height: auto; width: auto; }
+            .slide {
+                display: flex !important;
+                opacity: 1 !important;
+                position: relative;
+                page-break-after: always;
+                width: 100%;
+                height: 100vh;
+                min-height: 900px;
+            }
+            .nav-controls, .keyboard-help, .progress-bar { display: none !important; }
+        }
+
+        /* サブテキスト */
+        .bullet-lg {
+            font-size: 1.4rem;
+            line-height: 1.9;
+        }
+
+        /* グラデーションテキスト */
+        .gradient-text {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body>
+
+<!-- 進捗バー -->
+<div class="progress-bar" id="progressBar" style="width:0%"></div>
+
+<!-- キーボードヘルプ -->
+<div class="keyboard-help">
+    <i class="fas fa-keyboard mr-1"></i>
+    ← → キーで移動 | Esc で印刷
+</div>
+
+<!-- スライドコンテナ -->
+<div class="slide-container">
+
+    <!-- =========== SLIDE 1: 表紙 =========== -->
+    <div class="slide bg-hero active" id="slide1">
+        <div class="slide-inner items-center justify-center text-center">
+            <div class="mb-6">
+                <i class="fas fa-mountain text-6xl text-yellow-300 mb-4"></i>
+                <p class="text-xl opacity-90">長野県北安曇郡</p>
+            </div>
+            <h1 class="text-6xl font-black mb-4">松川村教育委員会 様</h1>
+            <div class="py-8 my-8 border-t-2 border-b-2 border-white/40 w-full max-w-4xl">
+                <p class="text-3xl font-bold mb-4 text-yellow-300">
+                    子ども一人ひとりに、最適な学びを
+                </p>
+                <h2 class="text-5xl font-black leading-tight">
+                    自由進度学習支援システム<br>
+                    <span class="text-yellow-300">導入のご提案</span>
+                </h2>
+                <p class="mt-6 text-xl opacity-90">
+                    AIと教師が協働する、次世代の個別最適化学習
+                </p>
+            </div>
+            <div class="mt-8 text-lg opacity-80">
+                <p>2026年4月</p>
+                <p class="mt-2">自由進度学習支援システム 事務局</p>
+            </div>
+        </div>
+        <div class="slide-number-display">1 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 2: 本日お伝えしたいこと =========== -->
+    <div class="slide bg-light" id="slide2">
+        <div class="slide-inner">
+            <span class="section-number">本日の流れ</span>
+            <h2 class="slide-title">本日、お伝えしたいこと</h2>
+            <p class="slide-subtitle">約30〜45分でご説明いたします</p>
+
+            <div class="grid grid-cols-2 gap-6 mt-6 flex-1">
+                <div class="info-card border-l-4 border-red-500">
+                    <div class="flex items-center mb-3">
+                        <span class="text-3xl font-bold text-red-500 mr-3">1</span>
+                        <h3 class="text-2xl font-bold">なぜ、今 必要なのか</h3>
+                    </div>
+                    <p class="text-gray-600">教育現場が直面する課題と国の方針</p>
+                </div>
+                <div class="info-card border-l-4 border-green-500">
+                    <div class="flex items-center mb-3">
+                        <span class="text-3xl font-bold text-green-500 mr-3">2</span>
+                        <h3 class="text-2xl font-bold">どんなシステムか</h3>
+                    </div>
+                    <p class="text-gray-600">自由進度学習を支える具体的な仕組み</p>
+                </div>
+                <div class="info-card border-l-4 border-purple-500">
+                    <div class="flex items-center mb-3">
+                        <span class="text-3xl font-bold text-purple-500 mr-3">3</span>
+                        <h3 class="text-2xl font-bold">誰にどんな良いことが</h3>
+                    </div>
+                    <p class="text-gray-600">子ども・先生・保護者・松川村への効果</p>
+                </div>
+                <div class="info-card border-l-4 border-orange-500">
+                    <div class="flex items-center mb-3">
+                        <span class="text-3xl font-bold text-orange-500 mr-3">4</span>
+                        <h3 class="text-2xl font-bold">いくらで、どう始めるか</h3>
+                    </div>
+                    <p class="text-gray-600">費用・補助金・無理のない導入計画</p>
+                </div>
+            </div>
+
+            <div class="mt-8 bg-blue-50 border-l-4 border-blue-500 p-6 rounded">
+                <p class="text-lg text-gray-800">
+                    <i class="fas fa-hand-paper text-blue-500 mr-2"></i>
+                    <strong>本日、即決をお願いするものではありません。</strong>まずは知っていただき、ご質問・ご検討いただくことを目的としております。
+                </p>
+            </div>
+        </div>
+        <div class="slide-number-display">2 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 3: 教育現場の課題 =========== -->
+    <div class="slide bg-problem" id="slide3">
+        <div class="slide-inner">
+            <span class="section-number" style="background:#dc2626;">1. 課題</span>
+            <h2 class="slide-title">教育現場が直面する<br>4つの大きな課題</h2>
+            <p class="slide-subtitle">全国の学校で、そして松川村でも…</p>
+
+            <div class="grid grid-cols-2 gap-6 mt-4 flex-1">
+                <div class="info-card border-t-4 border-red-500">
+                    <i class="fas fa-users-slash text-4xl text-red-500 mb-3"></i>
+                    <h3 class="text-xl font-bold mb-2">① 一斉授業の限界</h3>
+                    <p class="text-gray-700">同じ教室の中で、理解の早い子は退屈し、ゆっくりな子は置いていかれる。<strong class="text-red-600">「全員に最適」が難しい</strong>構造的な問題。</p>
+                </div>
+                <div class="info-card border-t-4 border-red-500">
+                    <i class="fas fa-clock text-4xl text-red-500 mb-3"></i>
+                    <h3 class="text-xl font-bold mb-2">② 先生の多忙化</h3>
+                    <p class="text-gray-700">月平均<strong class="text-red-600">残業80時間以上</strong>。採点・教材作成・記録などで、本来の指導に使える時間が少ない。</p>
+                </div>
+                <div class="info-card border-t-4 border-red-500">
+                    <i class="fas fa-heart-broken text-4xl text-red-500 mb-3"></i>
+                    <h3 class="text-xl font-bold mb-2">③ 不登校児童の増加</h3>
+                    <p class="text-gray-700">全国で<strong class="text-red-600">30万人超</strong>が不登校。学校に行けない間の学習の空白が、復帰の大きな壁に。</p>
+                </div>
+                <div class="info-card border-t-4 border-red-500">
+                    <i class="fas fa-eye-slash text-4xl text-red-500 mb-3"></i>
+                    <h3 class="text-xl font-bold mb-2">④ つまずきが見えない</h3>
+                    <p class="text-gray-700">テスト結果だけでは「どこで・なぜ」つまずいたかわからない。<strong class="text-red-600">感覚頼み</strong>の指導に限界。</p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-number-display">3 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 4: 国の方針 =========== -->
+    <div class="slide bg-light" id="slide4">
+        <div class="slide-inner">
+            <span class="section-number" style="background:#4f46e5;">1. 課題</span>
+            <h2 class="slide-title">国（文部科学省）も、<br>「個別最適な学び」を強く推進</h2>
+
+            <div class="grid grid-cols-3 gap-6 mt-8 flex-1">
+                <div class="info-card text-center">
+                    <div class="text-5xl mb-4">📚</div>
+                    <h3 class="text-xl font-bold mb-2 text-indigo-700">個別最適な学び</h3>
+                    <p class="text-gray-600">新学習指導要領の柱。<br>一人ひとりに応じた学びへ。</p>
+                </div>
+                <div class="info-card text-center">
+                    <div class="text-5xl mb-4">💻</div>
+                    <h3 class="text-xl font-bold mb-2 text-indigo-700">GIGAスクール構想</h3>
+                    <p class="text-gray-600">1人1台端末は<br><strong>既に整備済み</strong>。<br>「どう活かすか」が課題。</p>
+                </div>
+                <div class="info-card text-center">
+                    <div class="text-5xl mb-4">🌐</div>
+                    <h3 class="text-xl font-bold mb-2 text-indigo-700">EdTech推進</h3>
+                    <p class="text-gray-600">デジタル教育技術の活用を<br><strong>補助金で強力支援</strong>。</p>
+                </div>
+            </div>
+
+            <div class="mt-10 bg-indigo-600 text-white rounded-xl p-6 text-center">
+                <p class="text-2xl font-bold">
+                    <i class="fas fa-check-circle mr-2"></i>
+                    本システムは、これら国の方針<strong class="text-yellow-300">すべてに完全対応</strong>しています
+                </p>
+            </div>
+        </div>
+        <div class="slide-number-display">4 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 5: なぜ松川村から =========== -->
+    <div class="slide bg-warm" id="slide5">
+        <div class="slide-inner">
+            <span class="section-number" style="background:#ea580c;">1. 課題</span>
+            <h2 class="slide-title">なぜ、松川村から<br>始めていただきたいのか</h2>
+
+            <div class="grid grid-cols-2 gap-8 mt-6 flex-1">
+                <div>
+                    <div class="info-card mb-4">
+                        <h3 class="text-xl font-bold mb-2 text-orange-700">
+                            <i class="fas fa-star mr-2"></i>最適な規模
+                        </h3>
+                        <p class="text-gray-700">小学校1校・中学校1校という規模は、<strong>きめ細かな導入・検証</strong>に最適。村全体で一貫した教育モデルを構築できます。</p>
+                    </div>
+                    <div class="info-card mb-4">
+                        <h3 class="text-xl font-bold mb-2 text-orange-700">
+                            <i class="fas fa-heart mr-2"></i>教育への思い
+                        </h3>
+                        <p class="text-gray-700">松川村が大切にされてきた<strong>「一人ひとりを大切にする教育」</strong>の理念と、本システムの目指す方向が完全に一致します。</p>
+                    </div>
+                </div>
+                <div>
+                    <div class="info-card mb-4">
+                        <h3 class="text-xl font-bold mb-2 text-orange-700">
+                            <i class="fas fa-trophy mr-2"></i>先行者利益
+                        </h3>
+                        <p class="text-gray-700"><strong>「最初に成功させた自治体」</strong>として全国モデルになる。視察・研修受入、メディア露出で村のブランド価値が飛躍的に向上。</p>
+                    </div>
+                    <div class="info-card">
+                        <h3 class="text-xl font-bold mb-2 text-orange-700">
+                            <i class="fas fa-seedling mr-2"></i>地域活性化
+                        </h3>
+                        <p class="text-gray-700">「教育で選ばれる村」は<strong>若い世代の移住定住</strong>の大きな決め手に。人口減少対策としても有効です。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="slide-number-display">5 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 6: 解決策の紹介 =========== -->
+    <div class="slide bg-dark" id="slide6">
+        <div class="slide-inner items-center justify-center text-center">
+            <span class="section-number" style="background:#10b981;">2. 解決策</span>
+            <p class="text-2xl opacity-80 mb-6">私たちからのご提案</p>
+            <h2 class="text-7xl font-black mb-6">
+                自由進度学習<br>
+                <span class="text-green-400">支援システム</span>
+            </h2>
+            <p class="text-2xl mt-4 opacity-90 max-w-4xl">
+                子ども一人ひとりが、自分のペースで、<br>
+                確かな力を身につけるための仕組み
+            </p>
+            <div class="grid grid-cols-3 gap-6 mt-16 w-full max-w-5xl">
+                <div class="bg-white/10 backdrop-blur rounded-xl p-6 border border-white/20">
+                    <i class="fas fa-check-circle text-3xl text-green-400 mb-2"></i>
+                    <p class="font-bold text-lg">完成済み</p>
+                    <p class="text-sm opacity-80">すぐに導入可能</p>
+                </div>
+                <div class="bg-white/10 backdrop-blur rounded-xl p-6 border border-white/20">
+                    <i class="fas fa-hands-helping text-3xl text-green-400 mb-2"></i>
+                    <p class="font-bold text-lg">実績あり</p>
+                    <p class="text-sm opacity-80">複数校で実運用</p>
+                </div>
+                <div class="bg-white/10 backdrop-blur rounded-xl p-6 border border-white/20">
+                    <i class="fas fa-shield-alt text-3xl text-green-400 mb-2"></i>
+                    <p class="font-bold text-lg">安全性確保</p>
+                    <p class="text-sm opacity-80">第三者監査済</p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-number-display">6 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 7: 3つのコース =========== -->
+    <div class="slide bg-solution" id="slide7">
+        <div class="slide-inner">
+            <span class="section-number" style="background:#10b981;">2. 解決策</span>
+            <h2 class="slide-title">子どもに合わせた<br>「3つのコース」で学ぶ</h2>
+            <p class="slide-subtitle">同じクラスでも、子どもごとに違う教材で学習できます</p>
+
+            <div class="grid grid-cols-3 gap-6 mt-6 flex-1">
+                <div class="bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-2xl p-8 shadow-2xl">
+                    <div class="text-7xl text-center mb-4">🌱</div>
+                    <h3 class="text-3xl font-bold mb-2 text-center">じっくり<br>コース</h3>
+                    <p class="text-center opacity-90 mb-4">基礎をていねいに</p>
+                    <ul class="text-sm space-y-2 mt-6">
+                        <li>✓ スモールステップ</li>
+                        <li>✓ たくさんのヒント</li>
+                        <li>✓ 繰り返し練習</li>
+                        <li>✓ 達成感を積み重ね</li>
+                    </ul>
+                </div>
+                <div class="bg-gradient-to-b from-green-400 to-green-600 text-white rounded-2xl p-8 shadow-2xl transform scale-105">
+                    <div class="text-7xl text-center mb-4">🌿</div>
+                    <h3 class="text-3xl font-bold mb-2 text-center">しっかり<br>コース</h3>
+                    <p class="text-center opacity-90 mb-4">標準的なペース</p>
+                    <ul class="text-sm space-y-2 mt-6">
+                        <li>✓ バランスよく</li>
+                        <li>✓ 標準的な問題</li>
+                        <li>✓ 適度な挑戦</li>
+                        <li>✓ 基礎力の定着</li>
+                    </ul>
+                </div>
+                <div class="bg-gradient-to-b from-purple-400 to-purple-600 text-white rounded-2xl p-8 shadow-2xl">
+                    <div class="text-7xl text-center mb-4">🌳</div>
+                    <h3 class="text-3xl font-bold mb-2 text-center">ぐんぐん<br>コース</h3>
+                    <p class="text-center opacity-90 mb-4">発展的な挑戦</p>
+                    <ul class="text-sm space-y-2 mt-6">
+                        <li>✓ 応用問題</li>
+                        <li>✓ 思考力重視</li>
+                        <li>✓ 探究型学習</li>
+                        <li>✓ さらに高みへ</li>
+                    </ul>
+                </div>
+            </div>
+
+            <p class="mt-6 text-center text-lg text-gray-700">
+                <i class="fas fa-lightbulb text-yellow-500 mr-2"></i>
+                子どもは自分のコースを自分で選べる。先生は全体を見守りながら、必要な子に集中支援。
+            </p>
+        </div>
+        <div class="slide-number-display">7 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 8: 4つの助け =========== -->
+    <div class="slide bg-light" id="slide8">
+        <div class="slide-inner">
+            <span class="section-number" style="background:#10b981;">2. 解決策</span>
+            <h2 class="slide-title">困ったときは「4つの助け」</h2>
+            <p class="slide-subtitle">子どもが「わからない」と感じた瞬間に、すぐ助けを得られる</p>
+
+            <div class="grid grid-cols-2 gap-6 mt-6 flex-1">
+                <div class="bg-yellow-50 rounded-2xl p-6 border-2 border-yellow-300 flex items-start">
+                    <div class="text-6xl mr-4">💡</div>
+                    <div>
+                        <h3 class="text-2xl font-bold mb-2 text-yellow-800">① ヒントカード</h3>
+                        <p class="text-gray-700">答えを教えるのではなく、<strong>考えるヒント</strong>を3段階で提示。子ども自身が答えにたどり着けます。</p>
+                    </div>
+                </div>
+                <div class="bg-blue-50 rounded-2xl p-6 border-2 border-blue-300 flex items-start">
+                    <div class="text-6xl mr-4">🤖</div>
+                    <div>
+                        <h3 class="text-2xl font-bold mb-2 text-blue-800">② AI先生</h3>
+                        <p class="text-gray-700">対話型AIが温かい言葉で<strong>「一緒に考える」サポート</strong>。24時間いつでも質問OK。</p>
+                    </div>
+                </div>
+                <div class="bg-green-50 rounded-2xl p-6 border-2 border-green-300 flex items-start">
+                    <div class="text-6xl mr-4">👨‍🏫</div>
+                    <div>
+                        <h3 class="text-2xl font-bold mb-2 text-green-800">③ 先生を呼ぶ</h3>
+                        <p class="text-gray-700">本当に先生の支援が必要な時、<strong>ボタン1つで要請</strong>。先生の画面に通知されます。</p>
+                    </div>
+                </div>
+                <div class="bg-pink-50 rounded-2xl p-6 border-2 border-pink-300 flex items-start">
+                    <div class="text-6xl mr-4">👥</div>
+                    <div>
+                        <h3 class="text-2xl font-bold mb-2 text-pink-800">④ 友達に聞く</h3>
+                        <p class="text-gray-700">子ども同士の<strong>助け合い</strong>を促進。教えることで教える側の理解も深まります。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="slide-number-display">8 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 9: システムの仕組み =========== -->
+    <div class="slide bg-light" id="slide9">
+        <div class="slide-inner">
+            <span class="section-number" style="background:#10b981;">2. 解決策</span>
+            <h2 class="slide-title">システム全体の仕組み</h2>
+            <p class="slide-subtitle">AIは「先生の代わり」ではなく「先生の助手」です</p>
+
+            <div class="flex items-center justify-between mt-10 gap-6 flex-1">
+                <!-- 児童 -->
+                <div class="flex-1 text-center">
+                    <div class="bg-blue-500 text-white rounded-3xl p-8 shadow-xl">
+                        <i class="fas fa-child text-7xl mb-4"></i>
+                        <h3 class="text-2xl font-bold mb-2">児童・生徒</h3>
+                        <p class="text-sm opacity-90">タブレットで学習<br>自分のペースで進める</p>
+                    </div>
+                </div>
+
+                <!-- 矢印 -->
+                <div class="text-4xl text-gray-400">
+                    <i class="fas fa-arrows-left-right"></i>
+                </div>
+
+                <!-- AI -->
+                <div class="flex-1 text-center">
+                    <div class="bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-3xl p-8 shadow-xl">
+                        <i class="fas fa-brain text-7xl mb-4"></i>
+                        <h3 class="text-2xl font-bold mb-2">AI 学習支援</h3>
+                        <p class="text-sm opacity-90">理解度分析<br>問題生成・推薦</p>
+                    </div>
+                </div>
+
+                <!-- 矢印 -->
+                <div class="text-4xl text-gray-400">
+                    <i class="fas fa-arrows-left-right"></i>
+                </div>
+
+                <!-- 先生 -->
+                <div class="flex-1 text-center">
+                    <div class="bg-green-500 text-white rounded-3xl p-8 shadow-xl">
+                        <i class="fas fa-chalkboard-teacher text-7xl mb-4"></i>
+                        <h3 class="text-2xl font-bold mb-2">先生</h3>
+                        <p class="text-sm opacity-90">全員の様子を把握<br>必要な子に集中支援</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-10 bg-gray-900 text-white rounded-2xl p-6 text-center">
+                <p class="text-xl">
+                    <i class="fas fa-shield-alt text-green-400 mr-2"></i>
+                    <strong>最終的な指導判断は、必ず先生が行います。</strong>AIはあくまで情報提供と補助の役割です。
+                </p>
+            </div>
+        </div>
+        <div class="slide-number-display">9 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 10: 主な機能 =========== -->
+    <div class="slide bg-light" id="slide10">
+        <div class="slide-inner">
+            <span class="section-number" style="background:#10b981;">2. 解決策</span>
+            <h2 class="slide-title">主な機能 ― 豊富な実装機能</h2>
+            <p class="slide-subtitle">教育現場で本当に必要な機能を網羅</p>
+
+            <div class="grid grid-cols-4 gap-4 mt-6 flex-1">
+                <div class="info-card text-center">
+                    <i class="fas fa-id-card text-3xl text-blue-500 mb-2"></i>
+                    <p class="font-bold text-sm">学習カード</p>
+                </div>
+                <div class="info-card text-center">
+                    <i class="fas fa-volume-up text-3xl text-blue-500 mb-2"></i>
+                    <p class="font-bold text-sm">音声読み上げ</p>
+                </div>
+                <div class="info-card text-center">
+                    <i class="fas fa-pen text-3xl text-blue-500 mb-2"></i>
+                    <p class="font-bold text-sm">手書き・音声入力</p>
+                </div>
+                <div class="info-card text-center">
+                    <i class="fas fa-folder-open text-3xl text-blue-500 mb-2"></i>
+                    <p class="font-bold text-sm">ポートフォリオ</p>
+                </div>
+                <div class="info-card text-center">
+                    <i class="fas fa-home text-3xl text-green-500 mb-2"></i>
+                    <p class="font-bold text-sm">自宅学習</p>
+                </div>
+                <div class="info-card text-center">
+                    <i class="fas fa-book text-3xl text-green-500 mb-2"></i>
+                    <p class="font-bold text-sm">紙教材併用</p>
+                </div>
+                <div class="info-card text-center">
+                    <i class="fas fa-tv text-3xl text-green-500 mb-2"></i>
+                    <p class="font-bold text-sm">進捗ボード</p>
+                </div>
+                <div class="info-card text-center">
+                    <i class="fas fa-bell text-3xl text-green-500 mb-2"></i>
+                    <p class="font-bold text-sm">要支援アラート</p>
+                </div>
+                <div class="info-card text-center">
+                    <i class="fas fa-magic text-3xl text-purple-500 mb-2"></i>
+                    <p class="font-bold text-sm">AI問題自動生成</p>
+                </div>
+                <div class="info-card text-center">
+                    <i class="fas fa-file-alt text-3xl text-purple-500 mb-2"></i>
+                    <p class="font-bold text-sm">個人レポート</p>
+                </div>
+                <div class="info-card text-center">
+                    <i class="fas fa-clipboard-list text-3xl text-purple-500 mb-2"></i>
+                    <p class="font-bold text-sm">指導記録自動化</p>
+                </div>
+                <div class="info-card text-center">
+                    <i class="fas fa-language text-3xl text-purple-500 mb-2"></i>
+                    <p class="font-bold text-sm">多言語対応</p>
+                </div>
+            </div>
+
+            <div class="mt-6 bg-blue-50 rounded-xl p-5 text-center">
+                <p class="text-lg text-gray-800">
+                    <i class="fas fa-cogs text-blue-600 mr-2"></i>
+                    <strong>学習指導要領の3,807単元</strong>に対応した自動問題生成（主要5社の教科書に準拠）
+                </p>
+            </div>
+        </div>
+        <div class="slide-number-display">10 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 11: 子どもへのメリット =========== -->
+    <div class="slide bg-light" id="slide11">
+        <div class="slide-inner">
+            <span class="section-number" style="background:#8b5cf6;">3. メリット</span>
+            <h2 class="slide-title">
+                <i class="fas fa-child text-blue-500 mr-3"></i>
+                子どもたちへのメリット
+            </h2>
+
+            <div class="grid grid-cols-2 gap-6 mt-8 flex-1">
+                <div class="info-card bg-gradient-to-br from-blue-50 to-white border-l-4 border-blue-500">
+                    <h3 class="text-xl font-bold mb-2 text-blue-800">
+                        <i class="fas fa-smile mr-2"></i>「できた！」が増える
+                    </h3>
+                    <p class="text-gray-700">自分のペースで進めるから、<strong>置き去りにされない・退屈しない</strong>。一人ひとりが達成感を積み重ねられます。</p>
+                </div>
+                <div class="info-card bg-gradient-to-br from-blue-50 to-white border-l-4 border-blue-500">
+                    <h3 class="text-xl font-bold mb-2 text-blue-800">
+                        <i class="fas fa-heart mr-2"></i>自己肯定感が育つ
+                    </h3>
+                    <p class="text-gray-700">小さな成功体験の積み重ねが<strong>「自分にはできる」</strong>という感覚（自己効力感）を育てます。</p>
+                </div>
+                <div class="info-card bg-gradient-to-br from-blue-50 to-white border-l-4 border-blue-500">
+                    <h3 class="text-xl font-bold mb-2 text-blue-800">
+                        <i class="fas fa-lightbulb mr-2"></i>自分で考える力
+                    </h3>
+                    <p class="text-gray-700">ヒントを使って自分で答えにたどり着く経験が、<strong>主体的・自立的な学び</strong>の力を育てます。</p>
+                </div>
+                <div class="info-card bg-gradient-to-br from-blue-50 to-white border-l-4 border-blue-500">
+                    <h3 class="text-xl font-bold mb-2 text-blue-800">
+                        <i class="fas fa-universal-access mr-2"></i>特性に合わせた支援
+                    </h3>
+                    <p class="text-gray-700">音声読み上げ・手書き入力など、<strong>一人ひとりの特性</strong>に配慮したユニバーサルデザイン。</p>
+                </div>
+            </div>
+
+            <div class="mt-8 bg-blue-600 text-white rounded-2xl p-6 text-center">
+                <p class="text-2xl font-bold">
+                    <i class="fas fa-star text-yellow-300 mr-2"></i>
+                    目指すのは、<span class="text-yellow-300">全ての子どもが学びを楽しめる教室</span>
+                </p>
+            </div>
+        </div>
+        <div class="slide-number-display">11 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 12: 先生へのメリット =========== -->
+    <div class="slide bg-light" id="slide12">
+        <div class="slide-inner">
+            <span class="section-number" style="background:#8b5cf6;">3. メリット</span>
+            <h2 class="slide-title">
+                <i class="fas fa-chalkboard-teacher text-green-500 mr-3"></i>
+                先生方へのメリット
+            </h2>
+
+            <div class="grid grid-cols-2 gap-6 mt-8 flex-1">
+                <div class="info-card bg-gradient-to-br from-green-50 to-white border-l-4 border-green-500">
+                    <h3 class="text-xl font-bold mb-2 text-green-800">
+                        <i class="fas fa-clock mr-2"></i>残業時間を大幅削減
+                    </h3>
+                    <p class="text-gray-700">問題作成・採点・記録作成を<strong>AIが自動化</strong>。残業時間を40〜50%削減する設計です。</p>
+                </div>
+                <div class="info-card bg-gradient-to-br from-green-50 to-white border-l-4 border-green-500">
+                    <h3 class="text-xl font-bold mb-2 text-green-800">
+                        <i class="fas fa-eye mr-2"></i>全員の様子がひと目で
+                    </h3>
+                    <p class="text-gray-700">進捗ボードで<strong>クラス全員の状況をリアルタイム把握</strong>。誰がつまずいているか一目瞭然。</p>
+                </div>
+                <div class="info-card bg-gradient-to-br from-green-50 to-white border-l-4 border-green-500">
+                    <h3 class="text-xl font-bold mb-2 text-green-800">
+                        <i class="fas fa-bullseye mr-2"></i>本当に必要な子に集中
+                    </h3>
+                    <p class="text-gray-700">全員に同じ対応をせずとも、<strong>支援が必要な子に時間をかけられる</strong>。個別指導の実現。</p>
+                </div>
+                <div class="info-card bg-gradient-to-br from-green-50 to-white border-l-4 border-green-500">
+                    <h3 class="text-xl font-bold mb-2 text-green-800">
+                        <i class="fas fa-file-alt mr-2"></i>保護者面談・所見が楽に
+                    </h3>
+                    <p class="text-gray-700">AIが<strong>個別レポートを自動生成</strong>。面談資料・所見作成の負担が大幅軽減。</p>
+                </div>
+            </div>
+
+            <div class="mt-8 bg-green-600 text-white rounded-2xl p-6 text-center">
+                <p class="text-2xl font-bold">
+                    <i class="fas fa-heart text-pink-300 mr-2"></i>
+                    先生が、本来やりたかった<span class="text-yellow-300">「子どもとの関わり」</span>に集中できる
+                </p>
+            </div>
+        </div>
+        <div class="slide-number-display">12 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 13: 保護者・村へのメリット =========== -->
+    <div class="slide bg-light" id="slide13">
+        <div class="slide-inner">
+            <span class="section-number" style="background:#8b5cf6;">3. メリット</span>
+            <h2 class="slide-title">保護者・松川村への<br>メリット</h2>
+
+            <div class="grid grid-cols-2 gap-8 mt-6 flex-1">
+                <!-- 保護者 -->
+                <div>
+                    <div class="bg-pink-100 rounded-2xl p-6 mb-4">
+                        <h3 class="text-2xl font-bold mb-4 text-pink-800">
+                            <i class="fas fa-home mr-2"></i>保護者の方々へ
+                        </h3>
+                        <div class="space-y-3">
+                            <div class="flex items-start">
+                                <i class="fas fa-check-circle text-pink-600 text-xl mr-3 mt-1"></i>
+                                <p class="text-gray-700"><strong>お子さまの学習の様子</strong>が家庭からわかる</p>
+                            </div>
+                            <div class="flex items-start">
+                                <i class="fas fa-check-circle text-pink-600 text-xl mr-3 mt-1"></i>
+                                <p class="text-gray-700"><strong>成長がグラフで見える</strong>から、家庭での声かけがしやすい</p>
+                            </div>
+                            <div class="flex items-start">
+                                <i class="fas fa-check-circle text-pink-600 text-xl mr-3 mt-1"></i>
+                                <p class="text-gray-700">不登校でも<strong>学習の継続</strong>が可能</p>
+                            </div>
+                            <div class="flex items-start">
+                                <i class="fas fa-check-circle text-pink-600 text-xl mr-3 mt-1"></i>
+                                <p class="text-gray-700">「何がわからないか」が<strong>具体的に把握</strong>できる</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 松川村 -->
+                <div>
+                    <div class="bg-indigo-100 rounded-2xl p-6 mb-4">
+                        <h3 class="text-2xl font-bold mb-4 text-indigo-800">
+                            <i class="fas fa-mountain mr-2"></i>松川村への効果
+                        </h3>
+                        <div class="space-y-3">
+                            <div class="flex items-start">
+                                <i class="fas fa-check-circle text-indigo-600 text-xl mr-3 mt-1"></i>
+                                <p class="text-gray-700"><strong>「教育先進地」</strong>としての知名度向上</p>
+                            </div>
+                            <div class="flex items-start">
+                                <i class="fas fa-check-circle text-indigo-600 text-xl mr-3 mt-1"></i>
+                                <p class="text-gray-700">全国からの<strong>視察・研修受入</strong>で交流人口増</p>
+                            </div>
+                            <div class="flex items-start">
+                                <i class="fas fa-check-circle text-indigo-600 text-xl mr-3 mt-1"></i>
+                                <p class="text-gray-700">メディア露出で<strong>広告換算年数百万円</strong></p>
+                            </div>
+                            <div class="flex items-start">
+                                <i class="fas fa-check-circle text-indigo-600 text-xl mr-3 mt-1"></i>
+                                <p class="text-gray-700">若い世代の<strong>移住・定住促進</strong></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-2xl p-5 text-center">
+                <p class="text-xl font-bold">
+                    子ども・先生・保護者・村、<span class="text-yellow-300">「四方よし」</span>の教育改革
+                </p>
+            </div>
+        </div>
+        <div class="slide-number-display">13 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 14: 期待される効果（数字） =========== -->
+    <div class="slide bg-light" id="slide14">
+        <div class="slide-inner">
+            <span class="section-number" style="background:#f59e0b;">4. 効果</span>
+            <h2 class="slide-title">期待される効果 ― 数字で見る</h2>
+            <p class="slide-subtitle">国内外の類似事例・教育理論から算出</p>
+
+            <div class="grid grid-cols-4 gap-4 mt-8">
+                <div class="bg-gradient-to-br from-green-400 to-green-600 text-white rounded-2xl p-6 text-center shadow-xl">
+                    <div class="text-5xl font-black mb-2">+30<span class="text-3xl">〜</span>40<span class="text-2xl">%</span></div>
+                    <p class="font-bold">児童の理解度向上</p>
+                </div>
+                <div class="bg-gradient-to-br from-blue-400 to-blue-600 text-white rounded-2xl p-6 text-center shadow-xl">
+                    <div class="text-5xl font-black mb-2">-40<span class="text-3xl">〜</span>50<span class="text-2xl">%</span></div>
+                    <p class="font-bold">先生の残業時間</p>
+                </div>
+                <div class="bg-gradient-to-br from-purple-400 to-purple-600 text-white rounded-2xl p-6 text-center shadow-xl">
+                    <div class="text-5xl font-black mb-2">+60<span class="text-3xl">〜</span>70<span class="text-2xl">%</span></div>
+                    <p class="font-bold">不登校児の復帰率</p>
+                </div>
+                <div class="bg-gradient-to-br from-pink-400 to-pink-600 text-white rounded-2xl p-6 text-center shadow-xl">
+                    <div class="text-5xl font-black mb-2">+80<span class="text-2xl">%</span></div>
+                    <p class="font-bold">保護者満足度</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-6 mt-8 shadow-lg flex-1" style="max-height: 400px;">
+                <h3 class="font-bold text-lg mb-2 text-gray-700">導入前後の比較イメージ（導入前=100）</h3>
+                <div style="position: relative; height: 280px;">
+                    <canvas id="effectChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="slide-number-display">14 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 15: 安全性 =========== -->
+    <div class="slide bg-light" id="slide15">
+        <div class="slide-inner">
+            <span class="section-number" style="background:#dc2626;">5. 安全性</span>
+            <h2 class="slide-title">
+                <i class="fas fa-shield-alt text-red-600 mr-3"></i>
+                個人情報保護は最優先事項
+            </h2>
+            <p class="slide-subtitle">金融機関と同等レベルのセキュリティを実装</p>
+
+            <div class="grid grid-cols-3 gap-5 mt-6 flex-1">
+                <div class="info-card border-t-4 border-red-500">
+                    <i class="fas fa-lock text-3xl text-red-500 mb-2"></i>
+                    <h3 class="font-bold text-lg mb-1">AES-256 暗号化</h3>
+                    <p class="text-sm text-gray-600">氏名・連絡先は国際標準の強力な暗号化方式で保護</p>
+                </div>
+                <div class="info-card border-t-4 border-red-500">
+                    <i class="fas fa-user-shield text-3xl text-red-500 mb-2"></i>
+                    <h3 class="font-bold text-lg mb-1">権限管理（RBAC）</h3>
+                    <p class="text-sm text-gray-600">必要最小限の権限のみ。他の子のデータは見えません</p>
+                </div>
+                <div class="info-card border-t-4 border-red-500">
+                    <i class="fas fa-key text-3xl text-red-500 mb-2"></i>
+                    <h3 class="font-bold text-lg mb-1">強固なパスワード</h3>
+                    <p class="text-sm text-gray-600">PBKDF2方式。失敗5回で15分ロック</p>
+                </div>
+                <div class="info-card border-t-4 border-red-500">
+                    <i class="fas fa-database text-3xl text-red-500 mb-2"></i>
+                    <h3 class="font-bold text-lg mb-1">自動バックアップ</h3>
+                    <p class="text-sm text-gray-600">日次で自動。データ消失の心配なし</p>
+                </div>
+                <div class="info-card border-t-4 border-red-500">
+                    <i class="fas fa-flag text-3xl text-red-500 mb-2"></i>
+                    <h3 class="font-bold text-lg mb-1">国内データ保管</h3>
+                    <p class="text-sm text-gray-600">日本国内のデータセンターに保管</p>
+                </div>
+                <div class="info-card border-t-4 border-red-500">
+                    <i class="fas fa-clipboard-check text-3xl text-red-500 mb-2"></i>
+                    <h3 class="font-bold text-lg mb-1">法令完全準拠</h3>
+                    <p class="text-sm text-gray-600">個人情報保護法・文科省GIGAガイドライン</p>
+                </div>
+            </div>
+
+            <div class="mt-6 bg-red-900 text-white rounded-2xl p-5 text-center">
+                <p class="text-lg">
+                    <i class="fas fa-certificate mr-2 text-yellow-300"></i>
+                    <strong>第三者セキュリティレビュー実施済み</strong> ― 指摘事項全対応完了
+                </p>
+            </div>
+        </div>
+        <div class="slide-number-display">15 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 16: 導入費用 =========== -->
+    <div class="slide bg-light" id="slide16">
+        <div class="slide-inner">
+            <span class="section-number" style="background:#eab308;">6. 費用</span>
+            <h2 class="slide-title">小規模から始められる費用設計</h2>
+            <p class="slide-subtitle">松川村の規模（小中各1校）に合わせた無理のない予算</p>
+
+            <div class="overflow-hidden rounded-2xl shadow-xl mt-6 flex-1">
+                <table class="w-full bg-white">
+                    <thead class="bg-yellow-600 text-white">
+                        <tr>
+                            <th class="p-4 text-left text-lg">プラン</th>
+                            <th class="p-4 text-center text-lg">対象</th>
+                            <th class="p-4 text-center text-lg">初年度</th>
+                            <th class="p-4 text-center text-lg">2年目以降</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b">
+                            <td class="p-5 bg-blue-50">
+                                <div class="font-bold text-blue-800 text-lg">STEP 1</div>
+                                <div class="text-sm text-gray-600">試験導入プラン</div>
+                            </td>
+                            <td class="p-5 text-center">1クラス<br>(1教科・1学年)</td>
+                            <td class="p-5 text-center font-bold text-2xl text-blue-700">約 30万円</td>
+                            <td class="p-5 text-center font-bold text-lg">約 20万円</td>
+                        </tr>
+                        <tr class="border-b bg-green-50">
+                            <td class="p-5">
+                                <div class="font-bold text-green-800 text-lg flex items-center">
+                                    STEP 2 <span class="ml-2 text-xs bg-green-600 text-white px-2 py-1 rounded">推奨</span>
+                                </div>
+                                <div class="text-sm text-gray-600">学校単位プラン</div>
+                            </td>
+                            <td class="p-5 text-center">1校全体<br>(全学年・全教科)</td>
+                            <td class="p-5 text-center font-bold text-2xl text-green-700">約 80万円</td>
+                            <td class="p-5 text-center font-bold text-lg">約 50万円</td>
+                        </tr>
+                        <tr>
+                            <td class="p-5 bg-purple-50">
+                                <div class="font-bold text-purple-800 text-lg">STEP 3</div>
+                                <div class="text-sm text-gray-600">村全体プラン</div>
+                            </td>
+                            <td class="p-5 text-center">小中学校<br>両校全体</td>
+                            <td class="p-5 text-center font-bold text-2xl text-purple-700">約 150万円</td>
+                            <td class="p-5 text-center font-bold text-lg">約 90万円</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-6 bg-yellow-100 rounded-xl p-4 border-l-4 border-yellow-500">
+                <p class="text-base text-gray-800">
+                    <i class="fas fa-info-circle text-yellow-600 mr-2"></i>
+                    上記は参考価格です。児童生徒数・機能要望に応じて詳細見積もり致します。初年度は研修・初期設定費用を含みます。
+                </p>
+            </div>
+        </div>
+        <div class="slide-number-display">16 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 17: 補助金活用 =========== -->
+    <div class="slide bg-solution" id="slide17">
+        <div class="slide-inner">
+            <span class="section-number" style="background:#eab308;">6. 費用</span>
+            <h2 class="slide-title">
+                <i class="fas fa-gift text-green-600 mr-3"></i>
+                補助金活用で、村の実質負担を最小化
+            </h2>
+            <p class="slide-subtitle">当方で補助金申請の資料作成・手続きを全面サポート</p>
+
+            <div class="grid grid-cols-2 gap-5 mt-6">
+                <div class="info-card border-l-4 border-green-500">
+                    <h3 class="font-bold text-xl mb-2 text-green-800">① GIGAスクール関連補助金</h3>
+                    <p class="text-gray-700">1人1台端末の活用促進予算。教育委員会経由で申請可能。</p>
+                </div>
+                <div class="info-card border-l-4 border-green-500">
+                    <h3 class="font-bold text-xl mb-2 text-green-800">② EdTech導入補助金</h3>
+                    <p class="text-gray-700">経産省補助金。補助率<strong class="text-red-600">1/2〜2/3</strong>。実質負担を半額以下に。</p>
+                </div>
+                <div class="info-card border-l-4 border-green-500">
+                    <h3 class="font-bold text-xl mb-2 text-green-800">③ 長野県教育ICT予算</h3>
+                    <p class="text-gray-700">長野県独自の教育DX推進予算の活用も可能。</p>
+                </div>
+                <div class="info-card border-l-4 border-green-500">
+                    <h3 class="font-bold text-xl mb-2 text-green-800">④ 地方創生交付金</h3>
+                    <p class="text-gray-700">「教育による地域活性化」として申請可能なケースも。</p>
+                </div>
+            </div>
+
+            <div class="mt-8 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-2xl p-8 text-center">
+                <p class="text-xl opacity-90 mb-2">補助金を活用すれば…</p>
+                <p class="text-5xl font-black mb-2">
+                    年間 <span class="text-yellow-300">10万円</span> 程度から
+                </p>
+                <p class="text-xl opacity-90">試験導入（STEP1）をスタート可能！</p>
+            </div>
+        </div>
+        <div class="slide-number-display">17 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 18: ROI =========== -->
+    <div class="slide bg-light" id="slide18">
+        <div class="slide-inner">
+            <span class="section-number" style="background:#eab308;">6. 費用</span>
+            <h2 class="slide-title">費用対効果（2年間の試算）</h2>
+            <p class="slide-subtitle">STEP3（村全体プラン）を2年導入した場合</p>
+
+            <div class="flex gap-6 mt-8 flex-1 items-center">
+                <!-- 投資額 -->
+                <div class="flex-1 text-center">
+                    <p class="text-gray-500 text-lg mb-3">投資額</p>
+                    <div class="bg-gray-200 rounded-2xl p-8 shadow-lg">
+                        <p class="text-5xl font-black text-gray-700">240<span class="text-2xl">万円</span></p>
+                        <p class="text-sm text-gray-600 mt-2">(2年合計)</p>
+                    </div>
+                </div>
+
+                <div class="text-5xl text-blue-600">
+                    <i class="fas fa-arrow-right"></i>
+                </div>
+
+                <!-- 効果 -->
+                <div class="flex-1">
+                    <p class="text-gray-500 text-lg mb-3 text-center">推定効果</p>
+                    <div class="bg-green-500 text-white rounded-2xl p-6 shadow-lg">
+                        <table class="w-full text-sm">
+                            <tr><td class="py-1">学力向上の経済価値</td><td class="text-right font-bold">+ 500万円</td></tr>
+                            <tr class="border-t border-white/30"><td class="py-1">メディア露出・広告換算</td><td class="text-right font-bold">+ 1,000万円</td></tr>
+                            <tr class="border-t border-white/30"><td class="py-1">視察受入等の収益</td><td class="text-right font-bold">+ 100万円</td></tr>
+                            <tr class="border-t border-white/30"><td class="py-1">残業削減の人件費換算</td><td class="text-right font-bold">+ 300万円</td></tr>
+                            <tr class="border-t-2 border-white bg-white/20">
+                                <td class="py-2 font-bold">合計効果</td>
+                                <td class="text-right py-2 font-black text-2xl">約 1,900万円</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 text-white rounded-2xl p-8 text-center shadow-2xl">
+                <p class="text-xl mb-2 opacity-90">投資対効果（ROI）</p>
+                <p class="text-7xl font-black">
+                    <i class="fas fa-chart-line mr-3"></i>
+                    約 <span class="text-yellow-200">8倍</span>
+                </p>
+            </div>
+        </div>
+        <div class="slide-number-display">18 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 19: 導入計画 =========== -->
+    <div class="slide bg-light" id="slide19">
+        <div class="slide-inner">
+            <span class="section-number" style="background:#4f46e5;">7. 計画</span>
+            <h2 class="slide-title">3段階の、無理のない導入計画</h2>
+            <p class="slide-subtitle">小さく始めて、効果を確認しながら広げていく</p>
+
+            <div class="space-y-4 mt-6 flex-1">
+                <!-- STEP 1 -->
+                <div class="bg-white rounded-2xl shadow-lg p-5 border-l-8 border-blue-500 flex items-center gap-5">
+                    <div class="flex-shrink-0 w-24 h-24 bg-blue-500 text-white rounded-2xl flex flex-col items-center justify-center font-black">
+                        <div class="text-3xl">1</div>
+                        <div class="text-xs mt-1">1〜3ヶ月</div>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-xl font-bold mb-1 text-blue-800">STEP 1 ：試験導入</h3>
+                        <p class="text-gray-700">1クラス・1教科で、先生1〜2名にご協力いただく。キックオフ→研修→試験運用→中間レビュー→効果測定</p>
+                    </div>
+                </div>
+
+                <!-- STEP 2 -->
+                <div class="bg-white rounded-2xl shadow-lg p-5 border-l-8 border-green-500 flex items-center gap-5">
+                    <div class="flex-shrink-0 w-24 h-24 bg-green-500 text-white rounded-2xl flex flex-col items-center justify-center font-black">
+                        <div class="text-3xl">2</div>
+                        <div class="text-xs mt-1">4〜12ヶ月</div>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-xl font-bold mb-1 text-green-800">STEP 2 ：学校単位での本格導入</h3>
+                        <p class="text-gray-700">効果確認後、学校全体に展開。全教員研修→全学年全教科へ順次展開→保護者説明会→月次レビュー</p>
+                    </div>
+                </div>
+
+                <!-- STEP 3 -->
+                <div class="bg-white rounded-2xl shadow-lg p-5 border-l-8 border-yellow-500 flex items-center gap-5">
+                    <div class="flex-shrink-0 w-24 h-24 bg-yellow-500 text-white rounded-2xl flex flex-col items-center justify-center font-black">
+                        <div class="text-3xl">3</div>
+                        <div class="text-xs mt-1">2年目〜</div>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-xl font-bold mb-1 text-yellow-800">STEP 3 ：村全体への展開・全国発信</h3>
+                        <p class="text-gray-700">小中学校両校で展開。視察受入プログラム→学会発表・メディア発信→他自治体への横展開支援</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 bg-red-50 rounded-xl p-4 border-l-4 border-red-500">
+                <p class="text-base text-gray-800">
+                    <i class="fas fa-hand-paper text-red-600 mr-2"></i>
+                    <strong>各STEP完了時に、次のステップへ進むか自由に判断できます。</strong>長期契約による縛りはありません。
+                </p>
+            </div>
+        </div>
+        <div class="slide-number-display">19 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 20: サポート体制 =========== -->
+    <div class="slide bg-light" id="slide20">
+        <div class="slide-inner">
+            <span class="section-number" style="background:#0d9488;">8. サポート</span>
+            <h2 class="slide-title">導入後も、ずっと安心のサポート</h2>
+            <p class="slide-subtitle">「入れて終わり」にはしません</p>
+
+            <div class="grid grid-cols-3 gap-5 mt-8 flex-1">
+                <div class="info-card border-t-4 border-teal-500 text-center">
+                    <i class="fas fa-headset text-4xl text-teal-600 mb-3"></i>
+                    <h3 class="font-bold text-lg mb-2">平日ヘルプデスク</h3>
+                    <p class="text-sm text-gray-600">電話・メール・チャット<br>平日9〜17時 常時対応</p>
+                </div>
+                <div class="info-card border-t-4 border-teal-500 text-center">
+                    <i class="fas fa-chalkboard text-4xl text-teal-600 mb-3"></i>
+                    <h3 class="font-bold text-lg mb-2">定期研修</h3>
+                    <p class="text-sm text-gray-600">導入時2回＋四半期ごと<br>オンライン対応可</p>
+                </div>
+                <div class="info-card border-t-4 border-teal-500 text-center">
+                    <i class="fas fa-chart-bar text-4xl text-teal-600 mb-3"></i>
+                    <h3 class="font-bold text-lg mb-2">月次レポート</h3>
+                    <p class="text-sm text-gray-600">活用状況・効果測定<br>自動で毎月提出</p>
+                </div>
+                <div class="info-card border-t-4 border-teal-500 text-center">
+                    <i class="fas fa-wrench text-4xl text-teal-600 mb-3"></i>
+                    <h3 class="font-bold text-lg mb-2">機能改善</h3>
+                    <p class="text-sm text-gray-600">現場の先生のご要望を<br>継続的に反映</p>
+                </div>
+                <div class="info-card border-t-4 border-teal-500 text-center">
+                    <i class="fas fa-user-tie text-4xl text-teal-600 mb-3"></i>
+                    <h3 class="font-bold text-lg mb-2">専任担当者</h3>
+                    <p class="text-sm text-gray-600">松川村担当を配置<br>一貫した窓口対応</p>
+                </div>
+                <div class="info-card border-t-4 border-teal-500 text-center">
+                    <i class="fas fa-book-open text-4xl text-teal-600 mb-3"></i>
+                    <h3 class="font-bold text-lg mb-2">マニュアル・動画</h3>
+                    <p class="text-sm text-gray-600">わかりやすい操作ガイド<br>動画もご用意</p>
+                </div>
+            </div>
+
+            <div class="mt-6 bg-teal-700 text-white rounded-2xl p-5 text-center">
+                <p class="text-xl font-bold">
+                    <i class="fas fa-handshake mr-2"></i>
+                    「共に育てる」パートナーシップ ― 松川村の教育パートナーとして
+                </p>
+            </div>
+        </div>
+        <div class="slide-number-display">20 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 21: デモ体験 =========== -->
+    <div class="slide bg-dark" id="slide21">
+        <div class="slide-inner items-center justify-center text-center">
+            <span class="section-number" style="background:#06b6d4;">9. デモ</span>
+            <i class="fas fa-laptop-code text-6xl text-cyan-400 mb-6"></i>
+            <h2 class="text-5xl font-black mb-4">今すぐ、体験できます</h2>
+            <p class="text-2xl mb-8 opacity-90">本システムは<strong class="text-yellow-300">すでに稼働中</strong>の実用システムです</p>
+
+            <div class="bg-white/10 backdrop-blur rounded-2xl p-8 border border-white/30 mb-8 max-w-4xl w-full">
+                <p class="text-lg mb-3 opacity-80">デモサイトURL</p>
+                <p class="text-3xl font-bold text-cyan-300 break-all">
+                    jiyushindo-gakushu.pages.dev
+                </p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-6 max-w-4xl w-full">
+                <div class="bg-green-500/20 backdrop-blur rounded-2xl p-6 border border-green-400/50">
+                    <h3 class="text-2xl font-bold mb-3 text-green-300">
+                        <i class="fas fa-chalkboard-teacher mr-2"></i>先生の画面
+                    </h3>
+                    <div class="bg-black/30 rounded p-3 font-mono text-sm text-left">
+                        <p>メール: demo@school.jp</p>
+                        <p>パスワード: 123</p>
+                    </div>
+                </div>
+                <div class="bg-blue-500/20 backdrop-blur rounded-2xl p-6 border border-blue-400/50">
+                    <h3 class="text-2xl font-bold mb-3 text-blue-300">
+                        <i class="fas fa-child mr-2"></i>児童の画面
+                    </h3>
+                    <div class="bg-black/30 rounded p-3 font-mono text-sm text-left">
+                        <p>メール: student1@school.jp</p>
+                        <p>パスワード: 123</p>
+                    </div>
+                </div>
+            </div>
+
+            <p class="mt-8 text-lg opacity-80">
+                <i class="fas fa-map-marker-alt text-yellow-300 mr-2"></i>
+                松川村役場での対面デモ・ご説明会も承ります
+            </p>
+        </div>
+        <div class="slide-number-display">21 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 22: よくある質問 =========== -->
+    <div class="slide bg-light" id="slide22">
+        <div class="slide-inner">
+            <span class="section-number" style="background:#ec4899;">10. Q&A</span>
+            <h2 class="slide-title">よくいただくご質問</h2>
+
+            <div class="grid grid-cols-2 gap-4 mt-6 flex-1">
+                <div class="info-card">
+                    <p class="font-bold text-pink-700 mb-2">Q. ITが苦手な先生でも使えますか？</p>
+                    <p class="text-sm text-gray-700">A. スマホアプリ同様のわかりやすい設計。研修2回＋マニュアル＋ヘルプデスクでしっかりサポート。</p>
+                </div>
+                <div class="info-card">
+                    <p class="font-bold text-pink-700 mb-2">Q. AIに教育を任せて大丈夫？</p>
+                    <p class="text-sm text-gray-700">A. AIは「先生の代わり」ではなく「助手」。最終判断は必ず先生が行います。</p>
+                </div>
+                <div class="info-card">
+                    <p class="font-bold text-pink-700 mb-2">Q. タブレットばかりにならない？</p>
+                    <p class="text-sm text-gray-700">A. 紙教材・友達との対話・先生との関わりを前提設計。従来の学びを補完する仕組みです。</p>
+                </div>
+                <div class="info-card">
+                    <p class="font-bold text-pink-700 mb-2">Q. 個人情報漏洩が心配です。</p>
+                    <p class="text-sm text-gray-700">A. AES-256暗号化・国内サーバー・第三者監査済み。文科省ガイドライン完全準拠。</p>
+                </div>
+                <div class="info-card">
+                    <p class="font-bold text-pink-700 mb-2">Q. 既存の教科書と併用できる？</p>
+                    <p class="text-sm text-gray-700">A. 可能です。主要5社の教科書・3,807単元に対応。既存教材の「+α」として使えます。</p>
+                </div>
+                <div class="info-card">
+                    <p class="font-bold text-pink-700 mb-2">Q. 途中でやめられますか？</p>
+                    <p class="text-sm text-gray-700">A. 契約は1年単位。長期縛りはなく、各STEP区切りで継続判断いただけます。</p>
+                </div>
+                <div class="info-card">
+                    <p class="font-bold text-pink-700 mb-2">Q. 保護者の理解は得られる？</p>
+                    <p class="text-sm text-gray-700">A. 当方で説明会・資料をご用意。保護者にとってのメリットも大きく、高支持が期待できます。</p>
+                </div>
+                <div class="info-card">
+                    <p class="font-bold text-pink-700 mb-2">Q. ネット環境が弱い家庭は？</p>
+                    <p class="text-sm text-gray-700">A. オフラインモード完備。学校で同期すれば家庭でネットなしでも学習継続可能。</p>
+                </div>
+            </div>
+
+            <p class="text-center mt-4 text-gray-600">
+                <i class="fas fa-comments mr-2"></i>他のご質問は本日、遠慮なくお寄せください
+            </p>
+        </div>
+        <div class="slide-number-display">22 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 23: 次のステップ =========== -->
+    <div class="slide bg-hero" id="slide23">
+        <div class="slide-inner">
+            <span class="section-number" style="background:white;color:#1e3a8a;">11. 次のステップ</span>
+            <h2 class="slide-title">次のステップ<br>― ご判断いただきたいこと</h2>
+            <p class="slide-subtitle">どれを選んでも「次の会話の入り口」です。決定ではありません。</p>
+
+            <div class="space-y-4 mt-8 flex-1">
+                <div class="bg-white text-gray-800 rounded-2xl p-6 shadow-xl flex items-start gap-5">
+                    <div class="flex-shrink-0 w-16 h-16 bg-blue-600 text-white rounded-full flex items-center justify-center text-3xl font-black">A</div>
+                    <div class="flex-1">
+                        <h3 class="text-2xl font-bold mb-1">対面での詳細説明・デモ会</h3>
+                        <p class="text-gray-600">2時間程度の説明会を実施。校長先生・教員の皆様もお招きいただけます。</p>
+                        <p class="text-sm text-blue-600 mt-1 font-bold">→ 日程調整のご連絡をお待ちします</p>
+                    </div>
+                </div>
+                <div class="bg-white text-gray-800 rounded-2xl p-6 shadow-xl flex items-start gap-5">
+                    <div class="flex-shrink-0 w-16 h-16 bg-green-600 text-white rounded-full flex items-center justify-center text-3xl font-black">B</div>
+                    <div class="flex-1">
+                        <h3 class="text-2xl font-bold mb-1">STEP1（試験導入）のご検討</h3>
+                        <p class="text-gray-600">1クラス試験導入の具体相談へ。補助金活用を含めた最適プランをご提案します。</p>
+                        <p class="text-sm text-green-600 mt-1 font-bold">→ 詳細見積もりと契約書雛形をご用意</p>
+                    </div>
+                </div>
+                <div class="bg-white text-gray-800 rounded-2xl p-6 shadow-xl flex items-start gap-5">
+                    <div class="flex-shrink-0 w-16 h-16 bg-purple-600 text-white rounded-full flex items-center justify-center text-3xl font-black">C</div>
+                    <div class="flex-1">
+                        <h3 class="text-2xl font-bold mb-1">追加の資料・情報のご請求</h3>
+                        <p class="text-gray-600">技術仕様書・セキュリティレビュー報告書・他自治体事例集等、ご希望に応じてお送りします。</p>
+                        <p class="text-sm text-purple-600 mt-1 font-bold">→ ご希望の資料名をお知らせください</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="slide-number-display">23 / 24</div>
+    </div>
+
+    <!-- =========== SLIDE 24: クロージング =========== -->
+    <div class="slide bg-dark" id="slide24">
+        <div class="slide-inner items-center justify-center text-center">
+            <i class="fas fa-seedling text-7xl text-green-400 mb-8"></i>
+            <h2 class="text-5xl font-black mb-6">
+                松川村の子どもたちの<br>
+                <span class="text-yellow-300">未来のために</span>
+            </h2>
+            <div class="text-xl leading-loose mb-8 max-w-4xl opacity-90">
+                <p>一人ひとりの子どもが「自分にはできる」と感じられる学び。</p>
+                <p>先生が本当に大切な「子どもとの関わり」に時間を使える教育現場。</p>
+                <p>そして、松川村が「教育で選ばれる村」として全国に知られる未来。</p>
+            </div>
+            <p class="text-3xl font-bold mb-12 text-yellow-300">
+                この未来を、松川村の皆様と共に創りたい
+            </p>
+            <div class="bg-white/10 backdrop-blur rounded-2xl p-8 border-2 border-white/30 max-w-2xl w-full">
+                <p class="text-lg opacity-80 mb-2">ご検討のほど、何卒よろしくお願い申し上げます</p>
+                <p class="text-2xl font-bold mb-1">自由進度学習支援システム 事務局</p>
+                <p class="text-sm opacity-80">2026年4月</p>
+            </div>
+            <p class="mt-8 text-sm opacity-60">
+                <i class="fas fa-link mr-1"></i>
+                詳細な提案書：/matsukawa-proposal.html
+            </p>
+        </div>
+        <div class="slide-number-display">24 / 24</div>
+    </div>
+
+</div>
+
+<!-- ナビゲーション -->
+<div class="nav-controls">
+    <button class="nav-btn" id="firstBtn" onclick="goToSlide(1)" title="最初へ">
+        <i class="fas fa-step-backward"></i>
+    </button>
+    <button class="nav-btn" id="prevBtn" onclick="prevSlide()" title="前へ">
+        <i class="fas fa-chevron-left"></i>
+    </button>
+    <span class="slide-counter" id="slideCounter">1 / 24</span>
+    <button class="nav-btn" id="nextBtn" onclick="nextSlide()" title="次へ">
+        <i class="fas fa-chevron-right"></i>
+    </button>
+    <button class="nav-btn" id="lastBtn" onclick="goToSlide(24)" title="最後へ">
+        <i class="fas fa-step-forward"></i>
+    </button>
+    <button class="nav-btn" onclick="window.print()" title="印刷" style="background:#6b7280;">
+        <i class="fas fa-print"></i>
+    </button>
+</div>
+
+<script>
+const TOTAL_SLIDES = 24;
+let currentSlide = 1;
+let effectChartInstance = null;
+
+function showSlide(num) {
+    document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+    const target = document.getElementById('slide' + num);
+    if (target) {
+        target.classList.add('active');
+        target.scrollTop = 0;
+    }
+    document.getElementById('slideCounter').textContent = num + ' / ' + TOTAL_SLIDES;
+    document.getElementById('progressBar').style.width = (num / TOTAL_SLIDES * 100) + '%';
+    document.getElementById('prevBtn').disabled = (num === 1);
+    document.getElementById('firstBtn').disabled = (num === 1);
+    document.getElementById('nextBtn').disabled = (num === TOTAL_SLIDES);
+    document.getElementById('lastBtn').disabled = (num === TOTAL_SLIDES);
+    currentSlide = num;
+
+    // スライド14のチャートを初期化
+    if (num === 14 && !effectChartInstance) {
+        initEffectChart();
+    }
+}
+
+function nextSlide() {
+    if (currentSlide < TOTAL_SLIDES) showSlide(currentSlide + 1);
+}
+function prevSlide() {
+    if (currentSlide > 1) showSlide(currentSlide - 1);
+}
+function goToSlide(num) {
+    if (num >= 1 && num <= TOTAL_SLIDES) showSlide(num);
+}
+
+// キーボード操作
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        e.preventDefault();
+        nextSlide();
+    } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        prevSlide();
+    } else if (e.key === 'Home') {
+        e.preventDefault();
+        goToSlide(1);
+    } else if (e.key === 'End') {
+        e.preventDefault();
+        goToSlide(TOTAL_SLIDES);
+    } else if (e.key === 'Escape') {
+        window.print();
+    }
+});
+
+// タッチスワイプ
+let touchStartX = 0;
+document.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; });
+document.addEventListener('touchend', e => {
+    const diff = touchStartX - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 50) {
+        diff > 0 ? nextSlide() : prevSlide();
+    }
+});
+
+// 効果グラフ
+function initEffectChart() {
+    const ctx = document.getElementById('effectChart');
+    if (!ctx) return;
+    effectChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['児童の理解度', '先生の残業時間', '不登校児の学習継続率', '保護者満足度'],
+            datasets: [
+                {
+                    label: '導入前',
+                    data: [100, 100, 30, 60],
+                    backgroundColor: 'rgba(156, 163, 175, 0.7)',
+                },
+                {
+                    label: '導入後',
+                    data: [135, 55, 85, 90],
+                    backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'top', labels: { font: { size: 14 } } }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+// 初期表示
+showSlide(1);
+</script>
+
+</body>
+</html>

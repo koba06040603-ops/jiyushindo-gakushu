@@ -17,7 +17,23 @@
  */
 
 import { Context } from 'hono';
-import { encryptPII, decryptPII } from './crypto-utils';
+import { encryptPII, decryptPII, generateNameHash, generateEmailHash } from './crypto-utils';
+
+/**
+ * 🔒 v4.1: 氏名を安全に復号するヘルパー
+ * - enc: で始まる暗号文なら復号
+ * - ENCRYPTION_KEY 未設定などのエラー時は元の文字列を返す
+ */
+async function safeDecryptName(value: any, env: any): Promise<string> {
+  if (!value) return '';
+  const str = String(value);
+  if (!str.startsWith('enc:')) return str;
+  try {
+    return await decryptPII(str, env);
+  } catch {
+    return str;
+  }
+}
 
 // =============================================================================
 // セッション設定
@@ -271,11 +287,14 @@ export async function authMiddleware(c: Context, next: () => Promise<void>) {
       }
     } catch { /* ENCRYPTION_KEY未設定時はそのまま */ }
     
+    // 🔒 v4.1: 暗号化された氏名を復号（SE米田氏 追加指摘対応）
+    const fullName = await safeDecryptName(session.full_name, c.env);
+    
     // ユーザー情報をコンテキストにセット（全系統で統一形式）
     const userInfo: AuthUser = {
       user_id: session.user_id,
       username: session.username || '',
-      full_name: session.full_name || '',
+      full_name: fullName,
       email,
       role: session.user_role || 'student',
       user_type: session.user_role || 'student',
@@ -437,6 +456,9 @@ export async function login(c: Context) {
       }
     } catch { /* ENCRYPTION_KEY未設定時はそのまま返す */ }
     
+    // 🔒 v4.1: 暗号化された氏名を復号してレスポンスに返す
+    const decryptedName = await safeDecryptName(user.full_name, c.env);
+    
     return c.json({
       success: true,
       session_token: sessionToken,
@@ -447,8 +469,8 @@ export async function login(c: Context) {
       user: {
         id: user.user_id,
         user_id: user.user_id,
-        name: user.full_name,
-        full_name: user.full_name,
+        name: decryptedName,
+        full_name: decryptedName,
         username: user.username,
         email: decryptedEmail,
         role: user.user_role,
@@ -538,9 +560,7 @@ export async function registerUser(c: Context) {
     let emailHash = '';
     try {
       if (email) {
-        // 検索用ハッシュ生成（平文emailのSHA-256）
-        const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(email.toLowerCase().trim()));
-        emailHash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+        emailHash = await generateEmailHash(email);
       }
       if (emailToStore && c.env) {
         emailToStore = await encryptPII(emailToStore, c.env);
@@ -549,11 +569,39 @@ export async function registerUser(c: Context) {
       console.warn('⚠️ PII暗号化スキップ（ENCRYPTION_KEY未設定の可能性）:', encErr);
     }
     
-    // ユーザー作成
-    const result = await DB.prepare(`
-      INSERT INTO auth_users (username, email, email_hash, password_hash, full_name, user_role, school_id, is_active, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
-    `).bind(usernameToUse, emailToStore, emailHash, passwordHash, name, actualRole, schoolId).run();
+    // 🔒 v4.1: 氏名(full_name)も AES-256-GCMで暗号化して保存
+    // full_name_hash: SHA-256ハッシュ（管理者が氏名で検索するため）
+    let nameToStore = name;
+    let nameHash = '';
+    try {
+      if (name) {
+        nameHash = await generateNameHash(name);
+      }
+      if (nameToStore && c.env) {
+        nameToStore = await encryptPII(nameToStore, c.env);
+      }
+    } catch (encErr) {
+      console.warn('⚠️ 氏名暗号化スキップ（ENCRYPTION_KEY未設定の可能性）:', encErr);
+    }
+    
+    // ユーザー作成（full_name_hash カラムがあれば使用、なければ従来通り）
+    let result;
+    try {
+      result = await DB.prepare(`
+        INSERT INTO auth_users (username, email, email_hash, password_hash, full_name, full_name_hash, user_role, school_id, is_active, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
+      `).bind(usernameToUse, emailToStore, emailHash, passwordHash, nameToStore, nameHash, actualRole, schoolId).run();
+    } catch (e: any) {
+      // full_name_hash カラムがまだ無い環境へのフォールバック
+      if (String(e.message || '').includes('no column named full_name_hash')) {
+        result = await DB.prepare(`
+          INSERT INTO auth_users (username, email, email_hash, password_hash, full_name, user_role, school_id, is_active, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
+        `).bind(usernameToUse, emailToStore, emailHash, passwordHash, nameToStore, actualRole, schoolId).run();
+      } else {
+        throw e;
+      }
+    }
     
     const userId = result.meta.last_row_id;
     
@@ -671,6 +719,9 @@ export async function refreshSession(c: Context) {
       }
     } catch {}
     
+    // 🔒 v4.1: 暗号化された氏名を復号
+    const refreshName = await safeDecryptName(session.full_name, c.env);
+    
     return c.json({
       success: true,
       session_token: newSessionToken,
@@ -679,8 +730,8 @@ export async function refreshSession(c: Context) {
       user: {
         id: session.user_id,
         user_id: session.user_id,
-        name: session.full_name,
-        full_name: session.full_name,
+        name: refreshName,
+        full_name: refreshName,
         username: session.username,
         email: refreshEmail,
         role: session.user_role,
@@ -785,12 +836,15 @@ export async function verifySession(c: Context) {
       }
     } catch {}
     
+    // 🔒 v4.1: 暗号化された氏名を復号
+    const verifyName = await safeDecryptName(session.full_name, c.env);
+    
     return c.json({
       success: true,
       user: {
         user_id: session.user_id,
         username: session.username,
-        full_name: session.full_name,
+        full_name: verifyName,
         email: verifyEmail,
         role: session.user_role,
         school_id: session.school_id
@@ -845,6 +899,7 @@ export async function generateInvitationCode(c: Context) {
 
 /**
  * 招待コード一覧取得（admin のみ）
+ * 🔒 v4.1: created_by_name（作成者氏名）の復号に対応
  */
 export async function listInvitationCodes(c: Context) {
   const { DB } = c.env as { DB: D1Database };
@@ -857,9 +912,18 @@ export async function listInvitationCodes(c: Context) {
       ORDER BY ic.created_at DESC
     `).all();
     
+    // 🔒 v4.1: 各コードの created_by_name を復号
+    const results = (codes.results || []) as any[];
+    const decrypted = await Promise.all(results.map(async (row) => {
+      if (row.created_by_name) {
+        row.created_by_name = await safeDecryptName(row.created_by_name, c.env);
+      }
+      return row;
+    }));
+    
     return c.json({
       success: true,
-      codes: codes.results || []
+      codes: decrypted
     });
   } catch (error: any) {
     console.error('招待コード一覧取得エラー:', error);

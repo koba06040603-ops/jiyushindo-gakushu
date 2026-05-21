@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>振り返り実践ガイド｜メタ認知を育てる5段階フレーム（松川中学校版）</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 14mm 13mm; }
+  html, body { font-family: "Hiragino Mincho ProN", "Yu Mincho", "MS PMincho", serif; color: #1f2937; background: #f3f4f6; }
+  body { font-size: 10pt; line-height: 1.55; }
+  .sans { font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif; }
+
+  .a4-page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 8mm auto;
+    background: white;
+    padding: 14mm 13mm;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    page-break-after: always;
+    box-sizing: border-box;
+    position: relative;
+  }
+  .a4-page:last-child { page-break-after: auto; }
+
+  h1.doc-title {
+    font-family: "Hiragino Mincho ProN", serif;
+    font-size: 19pt; font-weight: 800; color: #1e3a8a;
+    text-align: center; letter-spacing: 0.04em;
+    border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 6px;
+  }
+  h1.doc-subtitle {
+    font-size: 10.5pt; text-align: center; color: #475569; margin-bottom: 14px; font-weight: normal;
+  }
+  h2.sec {
+    font-family: "Hiragino Kaku Gothic ProN", sans-serif;
+    font-size: 12.5pt; font-weight: 800; color: #1e3a8a;
+    border-left: 5px solid #1e40af; padding-left: 10px;
+    margin: 14px 0 8px; background: #eff6ff; padding-top: 3px; padding-bottom: 3px;
+  }
+  h3.sub {
+    font-family: "Hiragino Kaku Gothic ProN", sans-serif;
+    font-size: 11pt; font-weight: 700; color: #1e40af;
+    margin: 10px 0 4px;
+  }
+  h4.sub2 {
+    font-family: "Hiragino Kaku Gothic ProN", sans-serif;
+    font-size: 10pt; font-weight: 700; color: #334155;
+    margin: 6px 0 2px;
+  }
+  p { margin: 3px 0; }
+  ul.neat, ol.neat { padding-left: 1.2em; margin: 4px 0; }
+  ul.neat li, ol.neat li { margin-bottom: 2px; }
+
+  .tbl { width: 100%; border-collapse: collapse; font-size: 9pt; margin: 4px 0; }
+  .tbl th, .tbl td { border: 1px solid #cbd5e1; padding: 4px 6px; vertical-align: top; }
+  .tbl th { background: #e0e7ff; color: #1e3a8a; font-weight: 700; text-align: left; }
+  .tbl td.ctr { text-align: center; }
+
+  .hero-box {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border: 1px solid #93c5fd;
+    padding: 10px 14px;
+    border-radius: 6px;
+    margin: 8px 0;
+  }
+
+  .level-card {
+    border: 1.5px solid;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin: 6px 0;
+    page-break-inside: avoid;
+  }
+  .level-l1 { border-color: #9ca3af; background: #f9fafb; }
+  .level-l2 { border-color: #60a5fa; background: #eff6ff; }
+  .level-l3 { border-color: #34d399; background: #ecfdf5; }
+  .level-l4 { border-color: #a78bfa; background: #f5f3ff; }
+  .level-l5 { border-color: #f59e0b; background: #fffbeb; }
+
+  .level-badge {
+    display: inline-block;
+    font-family: "Hiragino Kaku Gothic ProN", sans-serif;
+    font-weight: 800;
+    font-size: 11pt;
+    line-height: 1.3;
+    padding: 2px 10px;
+    border-radius: 999px;
+    margin-right: 6px;
+    color: white;
+    vertical-align: middle;
+  }
+  .level-card > span.level-badge + strong {
+    vertical-align: middle;
+  }
+  /* レベルカードのヘッダ行は行高を確保して、バッジ・タイトル・メタ情報が重ならないようにする */
+  .level-card > p:first-of-type,
+  .level-card { line-height: 1.55; }
+  .badge-l1 { background: #6b7280; }
+  .badge-l2 { background: #3b82f6; }
+  .badge-l3 { background: #10b981; }
+  .badge-l4 { background: #8b5cf6; }
+  .badge-l5 { background: #f59e0b; }
+
+  .callout-good {
+    border-left: 4px solid #22c55e;
+    background: #f0fdf4;
+    padding: 6px 10px;
+    margin: 4px 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 9.5pt;
+  }
+  .callout-try {
+    border-left: 4px solid #eab308;
+    background: #fefce8;
+    padding: 6px 10px;
+    margin: 4px 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 9.5pt;
+  }
+  .callout-theory {
+    border-left: 4px solid #6366f1;
+    background: #eef2ff;
+    padding: 6px 10px;
+    margin: 4px 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 9.5pt;
+  }
+
+  .sq {
+    display: inline-block;
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 9pt;
+    line-height: 1.5;
+    color: #78350f;
+    margin: 2px 2px;
+    max-width: 100%;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    vertical-align: middle;
+  }
+  .sq-q {
+    display: inline-block;
+    background: #e0e7ff;
+    border: 1px solid #a5b4fc;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 9pt;
+    line-height: 1.5;
+    color: #312e81;
+    margin: 2px 2px;
+    max-width: 100%;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    vertical-align: middle;
+  }
+  /* sqタグを含む行は行高を少し広めにして隣接行と重ならないようにする */
+  p:has(.sq), p:has(.sq-q) {
+    line-height: 1.85;
+  }
+
+  .page-num {
+    position: absolute;
+    bottom: 8mm; right: 14mm;
+    font-size: 8pt; color: #6b7280;
+  }
+  .footer-note {
+    position: absolute;
+    bottom: 8mm; left: 14mm;
+    font-size: 8pt; color: #6b7280;
+  }
+
+  .print-btn {
+    position: fixed; top: 10px; right: 10px;
+    background: #1e40af; color: white; border: none;
+    width: 40px; height: 40px; border-radius: 50%;
+    cursor: pointer; font-size: 14px; z-index: 1000;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    opacity: 0.6;
+    transition: opacity 0.2s, transform 0.2s;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+  }
+  .print-btn:hover {
+    background: #1e3a8a; opacity: 1;
+    transform: scale(1.1);
+  }
+  .print-btn .label {
+    display: none;
+  }
+  .print-btn:hover .label {
+    display: inline-block;
+    position: absolute;
+    right: 48px; top: 50%; transform: translateY(-50%);
+    background: #1e40af; color: white;
+    padding: 4px 10px; border-radius: 4px;
+    white-space: nowrap; font-size: 12px;
+  }
+
+  @media print {
+    body { background: white; }
+    .a4-page { margin: 0; box-shadow: none; padding: 0; }
+    .no-print, .print-btn { display: none !important; }
+  }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+  .subject-card {
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 8px 10px;
+    background: white;
+    page-break-inside: avoid;
+  }
+  .subject-card h4 {
+    font-family: "Hiragino Kaku Gothic ProN", sans-serif;
+    font-weight: 800;
+    font-size: 10.5pt;
+    padding-bottom: 3px;
+    margin-bottom: 5px;
+    border-bottom: 2px solid;
+  }
+</style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()" title="印刷 / PDF保存"><i class="fas fa-print"></i><span class="label">印刷 / PDF保存</span></button>
+
+<!-- ============ ページ 1：表紙＋理論基盤 ============ -->
+<div class="a4-page">
+
+  <div class="text-right text-xs text-gray-600 mb-1 sans">
+    文書番号：KBY-2026-0424-R<br>
+    作成者：松川村トコトン指導主事　小林　寿英
+  </div>
+
+  <h1 class="doc-title">振り返り実践ガイド（松川中学校版）</h1>
+  <h1 class="doc-subtitle">— メタ認知を育てる5段階フレームと教科別の声かけ —</h1>
+
+  <div class="hero-box">
+    <p class="sans font-bold text-blue-900 mb-1" style="font-size:11pt;">
+      <i class="fas fa-compass mr-1"></i>このガイドの位置づけ
+    </p>
+    <p style="font-size:10pt;">
+      生徒の学びを一段深くする鍵は、<strong>授業の終わりに書く「振り返り」</strong>にあります。
+      しかし「何となく書かせる」だけでは「楽しかった」「むずかしかった」で終わってしまい、
+      学力にも、自立した学習者としての力にもつながりにくいのが現実です。<br>
+      本ガイドは、国際的な学習科学の知見（メタ認知・自己調整学習・SOLO Taxonomy・ハッティの効果量研究）を統合し、
+      <strong>松川中学校の日常授業で、どの教科でも使える「振り返りの5段階フレーム」</strong>として整理したものです。
+      職員会議・教科会・学年会でそのまま共通言語として使えるよう設計しました。
+    </p>
+  </div>
+
+  <h2 class="sec">1. 理論的基盤：なぜ「振り返り」がそれほど重要なのか</h2>
+
+  <div class="callout-theory sans">
+    <strong><i class="fas fa-book mr-1"></i>4つの理論の統合：</strong>
+    本ガイドは以下の4つの理論を統合して設計されています。どの教科・どの学年でも、この4本柱は同じです。
+  </div>
+
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th style="width:22%;">理論</th>
+        <th style="width:30%;">提唱者／中核概念</th>
+        <th>授業での意味</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>メタ認知理論</strong></td>
+        <td>フラベル（Flavell, 1979）<br>「認知についての認知」</td>
+        <td>自分が何を分かっていて、何が分かっていないかを <strong>自分で見張る力</strong>。中学期は前頭前野の発達期で、この力を伸ばす絶好期。</td>
+      </tr>
+      <tr>
+        <td><strong>自己調整学習</strong></td>
+        <td>ジマーマン（Zimmerman）<br>3段階モデル：予見→遂行→自己省察</td>
+        <td>学習を「計画する→やりながら見張る→振り返って次に生かす」の循環として捉える。<strong>高校進学・受験に向けて最も必要な力</strong>。</td>
+      </tr>
+      <tr>
+        <td><strong>SOLO Taxonomy</strong></td>
+        <td>ビッグス（Biggs）<br>記述の構造的発達5段階</td>
+        <td>振り返り記述が <strong>単一事実 → 関連 → 構造 → 拡張抽象</strong> へと深まるプロセスを可視化。評価規準として使える。</td>
+      </tr>
+      <tr>
+        <td><strong>効果量研究</strong></td>
+        <td>ハッティ（Hattie）<br>EEFメタ認知ガイダンス</td>
+        <td>メタ認知指導の効果量 <strong>d ≈ 0.69</strong>（7ヶ月分の学習前進に相当）。投資対効果が最も高い指導の一つ。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 class="sec">2. 振り返り「5段階レベル」— 生徒の成長の見取り図</h2>
+
+  <p style="font-size:10pt;">
+    振り返りには「深さの階層」があります。最初からL5を目指す必要はありません。
+    <strong>今どこにいるかを見取り、1段ずつ上げていく</strong>ことが大事です。
+    以下の典型記述例は、中学生（1〜3年）が実際に書く言葉を想定しています。
+  </p>
+
+  <!-- L1 -->
+  <div class="level-card level-l1">
+    <span class="level-badge badge-l1">L1</span>
+    <strong class="sans">感想レベル</strong>　<span class="text-xs text-gray-600">📝 SOLO: 前構造的 / 効果量 ≈ 0</span>
+    <p style="font-size:9.5pt; margin-top:3px;">
+      活動の記述と表面的な感想にとどまる段階。<strong>まず書けたこと自体を認める</strong>のがスタートライン。中1の4月にはこの段階の生徒が多い。
+    </p>
+    <p style="font-size:9pt;"><strong class="sans">典型記述：</strong>
+      <span class="sq">今日は〇〇をやった</span>
+      <span class="sq">ふつうだった</span>
+      <span class="sq">むずかしかった</span>
+      <span class="sq">めんどくさかった</span>
+    </p>
+  </div>
+
+  <!-- L2 -->
+  <div class="level-card level-l2">
+    <span class="level-badge badge-l2">L2</span>
+    <strong class="sans">事実記述レベル</strong>　<span class="text-xs text-gray-600">📋 学びの自覚 / SOLO: 単一構造的 / 効果量 ≈ 0.15</span>
+    <p style="font-size:9.5pt; margin-top:3px;">
+      <strong>何を学んだかを具体的な事実として書ける</strong>段階。学びの自覚の芽生え。授業用語・単元の概念が記述に登場する。
+    </p>
+    <p style="font-size:9pt;"><strong class="sans">典型記述：</strong>
+      <span class="sq">連立方程式は2つの文字を消去すれば1元の方程式になると分かった</span>
+      <span class="sq">光合成には光・水・二酸化炭素が必要だと理解した</span>
+    </p>
+  </div>
+
+  <!-- L3 -->
+  <div class="level-card level-l3">
+    <span class="level-badge badge-l3">L3</span>
+    <strong class="sans">関連づけレベル</strong>　<span class="text-xs text-gray-600">🔗 意味づけ・協働 / SOLO: 多構造的 / 効果量 ≈ 0.40</span>
+    <p style="font-size:9.5pt; margin-top:3px;">
+      複数の事実を<strong>因果や他者の視点でつなぐ</strong>段階。「なぜなら」「〜と似ている」「〇〇さんの考え」が登場する。
+    </p>
+    <p style="font-size:9pt;"><strong class="sans">典型記述：</strong>
+      <span class="sq">加減法より代入法が速かったのは、片方がy=の形だったから。形を見て方法を選ぶと効率がいい</span>
+      <span class="sq">佐藤さんの意見で、自分が見落としていた条件に気づいた</span>
+    </p>
+  </div>
+
+  <!-- L4 -->
+  <div class="level-card level-l4">
+    <span class="level-badge badge-l4">L4</span>
+    <strong class="sans">メタ認知レベル</strong>　<span class="text-xs text-gray-600">🧠 自己分析・方略選択 / SOLO: 関連構造的 / 効果量 ≈ 0.69</span>
+    <p style="font-size:9.5pt; margin-top:3px;">
+      <strong>「自分はどう学んだか」「なぜその方法がうまくいったか」を客観的に評価</strong>できる段階。学び方自体が分析対象になる。中学期に特に伸ばしたいレベル。
+    </p>
+    <p style="font-size:9pt;"><strong class="sans">典型記述：</strong>
+      <span class="sq">最初に全体を図でまとめてから問題を解くと、式の意味がずれなくなった。自分は「全体像をつかんでから細部」という順序が合っている</span>
+      <span class="sq">分からない時にすぐ答えを見ず、3分考えてから教科書に戻ったら記憶に残った。次のテスト勉強にも使える</span>
+    </p>
+  </div>
+
+  <!-- L5 -->
+  <div class="level-card level-l5">
+    <span class="level-badge badge-l5">L5</span>
+    <strong class="sans">転移・価値化レベル</strong>　<span class="text-xs text-gray-600">🌟 粘り強さ・回復力・将来接続 / SOLO: 拡張抽象的 / 効果量 ≈ 0.75+</span>
+    <p style="font-size:9.5pt; margin-top:3px;">
+      <strong>学びを他教科・生活・進路・社会につなげ、自己成長の物語として語れる</strong>段階。価値化ができる生徒は学年に数名からスタートし、年間で増やしていく。
+    </p>
+    <p style="font-size:9pt;"><strong class="sans">典型記述：</strong>
+      <span class="sq">「比べるときは基準をそろえる」という考え方は、数学の割合でも、理科の濃度でも、社会の人口密度でも同じ。教科を貫く見方があると気づいた</span>
+      <span class="sq">前回のテスト前より、分からない所を自分で見つけて質問できるようになった。失敗を次に生かせる自分に変わってきている</span>
+    </p>
+  </div>
+
+  <div class="page-num">1 / 4</div>
+  <div class="footer-note">振り返り実践ガイド（松川中学校版）｜松川村トコトン指導主事 小林寿英</div>
+</div>
+
+
+<!-- ============ ページ 2：7観点・日常授業の型 ============ -->
+<div class="a4-page">
+
+  <h2 class="sec">3. 振り返りを「深める」7つの観点（見取りチェックリスト）</h2>
+
+  <p style="font-size:10pt;">
+    教師が生徒の振り返り記述を見取る際の<strong>共通チェックリスト</strong>です。
+    合計21点を目安にレベル判定も可能で、<strong>観点別学習状況の評価（主体的に学習に取り組む態度）</strong>の根拠資料としても活用できます。
+  </p>
+
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th style="width:4%;">#</th>
+        <th style="width:16%;">観点</th>
+        <th style="width:18%;">0点（未記入）</th>
+        <th style="width:20%;">1点（萌芽）</th>
+        <th style="width:20%;">2点（到達）</th>
+        <th style="width:22%;">3点（深化）</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="ctr">1</td>
+        <td><strong>具体性</strong></td>
+        <td>白紙・1語</td>
+        <td>抽象的感想</td>
+        <td>具体的事実</td>
+        <td>エピソード＋数値</td>
+      </tr>
+      <tr>
+        <td class="ctr">2</td>
+        <td><strong>因果・論理</strong></td>
+        <td>なし</td>
+        <td>弱い接続</td>
+        <td>「なぜなら」明確</td>
+        <td>複数因果を構造化</td>
+      </tr>
+      <tr>
+        <td class="ctr">3</td>
+        <td><strong>他者への言及</strong></td>
+        <td>なし</td>
+        <td>名前のみ</td>
+        <td>行動・発言を引用</td>
+        <td>相互作用から気づき</td>
+      </tr>
+      <tr>
+        <td class="ctr">4</td>
+        <td><strong>自分の学び方</strong></td>
+        <td>なし</td>
+        <td>「難しかった」</td>
+        <td>学習方略を具体記述</td>
+        <td>方略の有効性を分析</td>
+      </tr>
+      <tr>
+        <td class="ctr">5</td>
+        <td><strong>次の行動</strong></td>
+        <td>なし</td>
+        <td>漠然とした意欲</td>
+        <td>具体的な行動計画</td>
+        <td>根拠＋計画＋接続</td>
+      </tr>
+      <tr>
+        <td class="ctr">6</td>
+        <td><strong>教科横断・既習</strong></td>
+        <td>なし</td>
+        <td>曖昧な関連</td>
+        <td>他教科・既習と明確</td>
+        <td>複数関連＋比較</td>
+      </tr>
+      <tr>
+        <td class="ctr">7</td>
+        <td><strong>社会・生活・成長</strong></td>
+        <td>なし</td>
+        <td>漠然とした接続</td>
+        <td>生活と具体接続</td>
+        <td>価値化＋成長認識</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="text-xs text-gray-600 mt-1">
+    <strong>合計点→レベル変換：</strong> 0〜3=L1｜4〜7=L2｜8〜11=L3｜12〜16=L4｜17〜21=L5
+  </p>
+
+  <div class="callout-good sans">
+    <strong><i class="fas fa-lightbulb mr-1"></i>実用ポイント：</strong>
+    教師は毎回7観点すべてを見る必要はありません。
+    <strong>単元初期は 1・2（具体性・因果）</strong>、<strong>中盤は 3・4（他者・学び方）</strong>、
+    <strong>終末は 5・6・7（次行動・横断・価値化）</strong> と、焦点を絞ると指導がぶれません。
+  </div>
+
+  <h2 class="sec">4. 日常授業で使える「振り返りの型」— 5つの問いフレーム</h2>
+
+  <p style="font-size:10pt;">
+    振り返りは以下の<strong>5つの問い</strong>で構成すると、そのまま7観点をカバーできます。
+    50分授業の時間配分に応じて「3問バージョン」「5問フルバージョン」を使い分けます。
+    ノート・振り返りシート・Google フォームなど、記述形式は問いません。
+  </p>
+
+  <div class="grid-2">
+    <div class="subject-card" style="border-color:#60a5fa;">
+      <h4 style="color:#1e40af; border-color:#60a5fa;">短縮3問版（毎時間・終末5分）</h4>
+      <ol class="neat sans" style="font-size:9.5pt;">
+        <li>① <strong>今日わかったこと</strong>（→観点1・2）</li>
+        <li>② <strong>どうやって学んだか</strong>（→観点4）</li>
+        <li>③ <strong>次にいかすこと</strong>（→観点5）</li>
+      </ol>
+      <p class="text-xs text-gray-600 mt-2">L3レベルまで十分届きます。通常授業の標準型として。</p>
+    </div>
+    <div class="subject-card" style="border-color:#a78bfa;">
+      <h4 style="color:#6d28d9; border-color:#a78bfa;">フル5問版（単元末・定期テスト前後・10分）</h4>
+      <ol class="neat sans" style="font-size:9.5pt;">
+        <li>① 今日わかったこと（観点1・2）</li>
+        <li>② どうやって学んだか（観点4）</li>
+        <li>③ 次にいかすこと（観点5）</li>
+        <li>④ <strong>友だち・教師との学び</strong>（観点3）</li>
+        <li>⑤ <strong>手ごたえ・これまでの学習とのつながり</strong>（観点6・7）</li>
+      </ol>
+      <p class="text-xs text-gray-600 mt-2">L4〜L5を狙う際の型。単元末・テスト返却時に。</p>
+    </div>
+  </div>
+
+  <h3 class="sub">4-1. 書く時間がない日の「口頭 30 秒振り返り」</h3>
+  <div class="callout-try sans">
+    <strong>ペアで30秒ずつ：</strong>
+    「今日 <span class="sq-q">一番大事だった学び</span> は？ それを <span class="sq-q">どうやって</span> 手に入れた？」
+    → 書かずとも、この2問で L3 のエッセンスに届きます。帰りの会・朝の会でも実施可能。
+  </div>
+
+  <h3 class="sub">4-2. 書く時間を「1行だけ」にする日の工夫</h3>
+  <div class="callout-try sans">
+    <strong>1行振り返り：</strong> 
+    「<span class="sq-q">〇〇だから△△</span>」の形でノート右下に1行書く。
+    接続詞「だから／なぜなら／〜と似ている／〜とちがって」のどれかを必ず使う。
+    <strong>この接続詞の強制が L2→L3 への飛躍を促します。</strong>
+  </div>
+
+  <h2 class="sec">5. 単元を貫く「3層の振り返り」— 入れ子構造で定着させる</h2>
+
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th style="width:16%;">層</th>
+        <th style="width:18%;">頻度</th>
+        <th style="width:22%;">狙うレベル</th>
+        <th>中心の問い</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>ミクロ</strong><br>（授業内）</td>
+        <td>1時間に1回<br>終末5分</td>
+        <td>L1→L2→L3</td>
+        <td>今日わかったこと／どうやって学んだか／次にいかすこと</td>
+      </tr>
+      <tr>
+        <td><strong>メゾ</strong><br>（週・単元中盤）</td>
+        <td>週1回／単元中盤</td>
+        <td>L3→L4</td>
+        <td>この1週間の学び方で一番うまくいったのは？ それはなぜ？</td>
+      </tr>
+      <tr>
+        <td><strong>マクロ</strong><br>（単元末・定期テスト後）</td>
+        <td>単元末・定期考査後</td>
+        <td>L4→L5</td>
+        <td>この学びは他教科・生活・進路にどうつながる？ 自分はどう変わった？</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout-good sans">
+    <strong><i class="fas fa-seedling mr-1"></i>成長の原則：</strong>
+    L1 の生徒にいきなり L5 の問いをすると固まります。<strong>ミクロで L2→L3 を安定させてからメゾで L4 を、マクロで L5 を引き出す</strong>。
+    学期を通じて入れ子で積み上げるのが最も効果的です。
+  </div>
+
+  <div class="page-num">2 / 4</div>
+  <div class="footer-note">振り返り実践ガイド（松川中学校版）｜松川村トコトン指導主事 小林寿英</div>
+</div>
+
+
+<!-- ============ ページ 3：声かけの実際・教科別 ============ -->
+<div class="a4-page">
+
+  <h2 class="sec">6. レベル別・効果的な教師の声かけ（発問テンプレート）</h2>
+
+  <div class="callout-theory sans">
+    <strong><i class="fas fa-microphone mr-1"></i>原則：</strong>
+    今のレベルを <strong>否定せず肯定してから</strong>、<strong>次レベルに必要な「問い」を一つだけ</strong>渡す。
+    中学生は発達的に「指示されること」に抵抗を示しがちなので、<strong>「〜しなさい」ではなく「〜はどう？」の問い</strong>で終わる形が効果的です。
+  </div>
+
+  <!-- L1 → L2 -->
+  <div class="level-card level-l1">
+    <p class="sans"><span class="level-badge badge-l1">L1→L2</span><strong>感想から事実記述へ</strong></p>
+    <div class="grid-2 mt-1">
+      <div>
+        <p class="sans text-xs font-bold text-green-700">✓ まず認める</p>
+        <p style="font-size:9.5pt;">「書けたね、それが第一歩。」<br>「自分の気持ちを言葉にできていること、大事だよ。」</p>
+      </div>
+      <div>
+        <p class="sans text-xs font-bold text-amber-700">→ 次の1問</p>
+        <p style="font-size:9.5pt;">「<strong>その『むずかしい』って、具体的にどの場面？</strong>」<br>「今日の授業で<strong>一つだけ覚えて帰れるなら何</strong>を選ぶ？」</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- L2 → L3 -->
+  <div class="level-card level-l2">
+    <p class="sans"><span class="level-badge badge-l2">L2→L3</span><strong>事実から関連づけへ</strong></p>
+    <div class="grid-2 mt-1">
+      <div>
+        <p class="sans text-xs font-bold text-green-700">✓ まず認める</p>
+        <p style="font-size:9.5pt;">「何を学んだかちゃんと書けているね。」<br>「用語を正確に使えている。」</p>
+      </div>
+      <div>
+        <p class="sans text-xs font-bold text-amber-700">→ 次の1問</p>
+        <p style="font-size:9.5pt;">「<strong>なぜそうなる？</strong> 『なぜなら』で続けてみて。」<br>「<strong>前に習った〇〇と似ている</strong>点はある？」<br>「<strong>友だちの発言で『なるほど』</strong>と思ったことは？」</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- L3 → L4 -->
+  <div class="level-card level-l3">
+    <p class="sans"><span class="level-badge badge-l3">L3→L4</span><strong>関連づけからメタ認知へ</strong></p>
+    <div class="grid-2 mt-1">
+      <div>
+        <p class="sans text-xs font-bold text-green-700">✓ まず認める</p>
+        <p style="font-size:9.5pt;">「関連づけて考えられているね、深い学びだよ。」<br>「『だから』『なぜなら』が使えている。」</p>
+      </div>
+      <div>
+        <p class="sans text-xs font-bold text-amber-700">→ 次の1問</p>
+        <p style="font-size:9.5pt;">「<strong>自分はどうやって</strong>その答えにたどり着いた？」<br>「その学び方は、<strong>自分に合っていた？</strong> 次の単元でも使える？」<br>「<strong>うまくいった理由</strong>は何だと思う？」</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- L4 → L5 -->
+  <div class="level-card level-l4">
+    <p class="sans"><span class="level-badge badge-l4">L4→L5</span><strong>メタ認知から転移・価値化へ</strong></p>
+    <div class="grid-2 mt-1">
+      <div>
+        <p class="sans text-xs font-bold text-green-700">✓ まず認める</p>
+        <p style="font-size:9.5pt;">「自分の学び方を客観的に見られているね、これがメタ認知。」<br>「学び方そのものを振り返れるのは大人の学習者の力。」</p>
+      </div>
+      <div>
+        <p class="sans text-xs font-bold text-amber-700">→ 次の1問</p>
+        <p style="font-size:9.5pt;">「この考え方は、<strong>他の教科のどこで使えそう？</strong>」<br>「<strong>将来の仕事や生活</strong>のどんな場面で役立つ？」<br>「中1の自分と比べて、<strong>何が変わった？</strong>」</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- L5 -->
+  <div class="level-card level-l5">
+    <p class="sans"><span class="level-badge badge-l5">L5</span><strong>転移・価値化レベルの生徒への声かけ（維持＋広げる）</strong></p>
+    <p style="font-size:9.5pt;">「研究者のような振り返りだね。ぜひ<strong>友だちに『学び方そのもの』を教えてあげて</strong>。教えることでさらに深まる。」</p>
+    <p style="font-size:9.5pt;">→ 学級・学年で「振り返りモデル」として紹介し、他の生徒の手本になってもらう。<strong>教えることは最強の学び</strong>（プロテジェ効果）。</p>
+  </div>
+
+  <h3 class="sub">6-1. 避けたい声かけ（NG集）</h3>
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th style="width:40%;">NG（振り返りを止める声かけ）</th>
+        <th>なぜNGか</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>「もっとちゃんと書きなさい」</td><td>何をどう改善するか示されず、生徒は萎縮する。観点の具体指示が必要。</td></tr>
+      <tr><td>「感想じゃなくて学びを書いて」</td><td>感想自体を否定すると書くこと自体への抵抗が生まれる。「感想＋もう一つ」と足し算で。</td></tr>
+      <tr><td>「友だちのまねはダメ」</td><td>L3（他者への言及）は成長の証。真似ではなく「〇〇さんから気づいたこと」としてむしろ推奨。</td></tr>
+      <tr><td>「短いからダメ」</td><td>量より質。1行でも「なぜなら」が入っていれば L3。長短で評価しない。</td></tr>
+      <tr><td>「わかりませんと書くな」</td><td>「わからない」を自覚することこそメタ認知の入口。「どこで」「何が」わからないかに焦点化させる。</td></tr>
+      <tr><td>「成績に響くよ」と脅す</td><td>外発的動機に誘導すると記述は表面的になる。「学び方がうまくなる」という内発の言葉で。</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="sec">7. 教科性を生かした振り返りの焦点化（中学校版）</h2>
+
+  <p style="font-size:10pt;">
+    振り返りの<strong>枠は共通</strong>でも、教科ごとに<strong>焦点を置く観点</strong>を変えると「教科の本質に迫るメタ認知」が育ちます。
+    以下は中学校の教科ごとの推奨焦点と、L3→L4 を狙う発問例です。
+  </p>
+
+  <div class="grid-2 mt-2">
+    <div class="subject-card" style="border-color:#dc2626;">
+      <h4 style="color:#991b1b; border-color:#dc2626;"><i class="fas fa-book mr-1"></i>国語</h4>
+      <p style="font-size:9pt;"><strong>焦点観点：</strong>2（因果・論理）・3（他者）・7（価値化）</p>
+      <p style="font-size:9pt;"><strong>教科性：</strong>「ことばで意味を構成する」教科 → 自分の解釈がどう変わったかを言語化</p>
+      <p style="font-size:9pt;"><strong>発問例：</strong></p>
+      <ul class="neat" style="font-size:9pt;">
+        <li>・「初読と再読で、<strong>どこで読みが変わった？</strong> 根拠は本文のどこ？」</li>
+        <li>・「〇〇さんの解釈と比べて、自分の読みの<strong>強み・弱みは何？</strong>」</li>
+        <li>・「この作品の主題は、<strong>今の自分のどんな経験</strong>と重なる？」</li>
+      </ul>
+    </div>
+
+    <div class="subject-card" style="border-color:#2563eb;">
+      <h4 style="color:#1e3a8a; border-color:#2563eb;"><i class="fas fa-square-root-variable mr-1"></i>数学</h4>
+      <p style="font-size:9pt;"><strong>焦点観点：</strong>2（因果・論理）・4（方略）・6（教科横断）</p>
+      <p style="font-size:9pt;"><strong>教科性：</strong>「構造と一般化」の教科 → 解き方ではなく <strong>「なぜその方法を選んだか」</strong>を問う</p>
+      <p style="font-size:9pt;"><strong>発問例：</strong></p>
+      <ul class="neat" style="font-size:9pt;">
+        <li>・「なぜ図（式／表／グラフ）を選んだ？ 他の方法とどちらが速い？」</li>
+        <li>・「<strong>小学校で学んだ〇〇の考え方</strong>とどうつながる？」</li>
+        <li>・「この解き方が有効なのは<strong>どんな条件のとき</strong>？ 別の条件では？」</li>
+      </ul>
+    </div>
+
+    <div class="subject-card" style="border-color:#059669;">
+      <h4 style="color:#065f46; border-color:#059669;"><i class="fas fa-flask mr-1"></i>理科</h4>
+      <p style="font-size:9pt;"><strong>焦点観点：</strong>1（具体性）・2（因果）・6（既習接続）</p>
+      <p style="font-size:9pt;"><strong>教科性：</strong>「予想 → 検証 → 修正」の教科 → <strong>予想と結果のズレ</strong>を必ず振り返る</p>
+      <p style="font-size:9pt;"><strong>発問例：</strong></p>
+      <ul class="neat" style="font-size:9pt;">
+        <li>・「最初の予想と実験結果、<strong>どこがちがった？</strong> なぜ？」</li>
+        <li>・「この結果から<strong>新たに生まれた疑問</strong>は？ 次の単元の何につながる？」</li>
+        <li>・「日常のどんな現象<strong>にもこの法則が効いている</strong>？」</li>
+      </ul>
+    </div>
+
+    <div class="subject-card" style="border-color:#ea580c;">
+      <h4 style="color:#9a3412; border-color:#ea580c;"><i class="fas fa-globe-asia mr-1"></i>社会</h4>
+      <p style="font-size:9pt;"><strong>焦点観点：</strong>3（多視点）・6（横断）・7（価値化）</p>
+      <p style="font-size:9pt;"><strong>教科性：</strong>「多面的・多角的」の教科 → <strong>複数の立場から</strong>見直す</p>
+      <p style="font-size:9pt;"><strong>発問例：</strong></p>
+      <ul class="neat" style="font-size:9pt;">
+        <li>・「<strong>〇〇の立場</strong>から見ると、この出来事はどう見える？」</li>
+        <li>・「今の松川村・日本・世界に<strong>どうつながっている</strong>？」</li>
+        <li>・「もし自分が当時の人だったら、<strong>どの選択をした</strong>？ 根拠は？」</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="page-num">3 / 4</div>
+  <div class="footer-note">振り返り実践ガイド（松川中学校版）｜松川村トコトン指導主事 小林寿英</div>
+</div>
+
+
+<!-- ============ ページ 4：教科別続き・年間計画 ============ -->
+<div class="a4-page">
+
+  <h2 class="sec">7. 教科性を生かした振り返りの焦点化（つづき）</h2>
+
+  <div class="grid-2 mt-2">
+    <div class="subject-card" style="border-color:#7c3aed;">
+      <h4 style="color:#5b21b6; border-color:#7c3aed;"><i class="fas fa-language mr-1"></i>外国語（英語）</h4>
+      <p style="font-size:9pt;"><strong>焦点観点：</strong>4（方略）・5（次行動）・3（他者）</p>
+      <p style="font-size:9pt;"><strong>教科性：</strong>「使ってみてうまくいかないと学べない」教科 → <strong>通じた／通じなかった</strong>体験と方略</p>
+      <p style="font-size:9pt;"><strong>発問例：</strong></p>
+      <ul class="neat" style="font-size:9pt;">
+        <li>・「相手に通じた／通じなかった場面は？ 何がちがった？」</li>
+        <li>・「知らない語に出会った時<strong>どう乗り越えた？</strong>（推測／質問／辞書）」</li>
+        <li>・「次に使う場面があったら、<strong>何を準備する</strong>？」</li>
+      </ul>
+    </div>
+
+    <div class="subject-card" style="border-color:#db2777;">
+      <h4 style="color:#9d174d; border-color:#db2777;"><i class="fas fa-palette mr-1"></i>美術／音楽</h4>
+      <p style="font-size:9pt;"><strong>焦点観点：</strong>4（方略）・5（次行動）・7（価値化）</p>
+      <p style="font-size:9pt;"><strong>教科性：</strong>「表現意図と技能」の教科 → <strong>意図と結果のあいだ</strong>を振り返る</p>
+      <p style="font-size:9pt;"><strong>発問例：</strong></p>
+      <ul class="neat" style="font-size:9pt;">
+        <li>・「表したかったことと、できたもの、<strong>ずれはどこ？</strong>」</li>
+        <li>・「この<strong>技法（色／リズム／構図）を選んだ理由</strong>は？」</li>
+        <li>・「友だちの作品で<strong>取り入れたい技</strong>は？ なぜ？」</li>
+      </ul>
+    </div>
+
+    <div class="subject-card" style="border-color:#0891b2;">
+      <h4 style="color:#155e75; border-color:#0891b2;"><i class="fas fa-dumbbell mr-1"></i>保健体育</h4>
+      <p style="font-size:9pt;"><strong>焦点観点：</strong>1（具体性）・4（方略）・5（次行動）</p>
+      <p style="font-size:9pt;"><strong>教科性：</strong>「身体で学ぶ」教科 → <strong>感覚と動作の言語化</strong>が振り返りの肝</p>
+      <p style="font-size:9pt;"><strong>発問例：</strong></p>
+      <ul class="neat" style="font-size:9pt;">
+        <li>・「うまくいった時の<strong>体のどこの感覚</strong>を覚えている？」</li>
+        <li>・「〇〇さんの動きで、<strong>どの部分を真似したい</strong>？」</li>
+        <li>・「次に一番練習すべきポイントは？<strong>なぜそこ？</strong>」</li>
+      </ul>
+    </div>
+
+    <div class="subject-card" style="border-color:#ca8a04;">
+      <h4 style="color:#854d0e; border-color:#ca8a04;"><i class="fas fa-hammer mr-1"></i>技術・家庭／総合・道徳</h4>
+      <p style="font-size:9pt;"><strong>焦点観点：</strong>3（他者）・6（横断）・7（価値化）</p>
+      <p style="font-size:9pt;"><strong>教科性：</strong>「生活・社会と自分をつなぐ」教科 → <strong>自分の変容・価値判断</strong>を言語化</p>
+      <p style="font-size:9pt;"><strong>発問例：</strong></p>
+      <ul class="neat" style="font-size:9pt;">
+        <li>・「今日の学びで、<strong>自分のどんな考えが揺れた</strong>？」</li>
+        <li>・「家庭・地域で<strong>すぐ試せそうなこと</strong>は？」</li>
+        <li>・「<strong>自分のこれからの行動</strong>で変えたい小さなことは？」</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 class="sec">8. 松川中学校・年間を通した育成プラン</h2>
+
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th style="width:14%;">時期</th>
+        <th style="width:20%;">学年・学級の目標</th>
+        <th style="width:30%;">教師の重点</th>
+        <th>学校としての共通取組</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>4〜5月</strong><br>導入期</td>
+        <td>全員が L1→L2 に<br>（書けること）</td>
+        <td>「書けたね」で認める。3問短縮版を毎時間。接続詞カードをクラスに掲示。</td>
+        <td>全教科で同じ3問フォーマットを採用。学年団で記述例を共有。</td>
+      </tr>
+      <tr>
+        <td><strong>6〜9月</strong><br>接続期</td>
+        <td>学級平均 L3<br>（関連づけ）</td>
+        <td>「なぜなら」「前の〇〇と似ている」の意識づけ。ペア対話30秒を週2回。</td>
+        <td>教科会でL2→L3のモデル記述を持ち寄り。学年通信で生徒の良質記述を匿名紹介。</td>
+      </tr>
+      <tr>
+        <td><strong>10〜12月</strong><br>省察期</td>
+        <td>上位1/3 が L4 到達</td>
+        <td>「どうやって学んだ？」を核にしたメタ認知発問。単元末マクロ振り返り。</td>
+        <td>定期テスト返却時にテスト勉強の方略を振り返る時間を全教科で設定。</td>
+      </tr>
+      <tr>
+        <td><strong>1〜3月</strong><br>転移期</td>
+        <td>複数名が L5 到達<br>学級平均 L3〜L4</td>
+        <td>教科横断テーマでの振り返り。「進路」「将来」「社会」とつなぐ問い。</td>
+        <td>年度末の「1年間の学びの振り返り」でポートフォリオ化。次年度への引継ぎ。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">学年別の力点（発達段階に応じた重点）</h3>
+
+  <div class="grid-3 mt-2">
+    <div class="subject-card" style="border-color:#60a5fa;">
+      <h4 style="color:#1e40af; border-color:#60a5fa;">中学1年</h4>
+      <p style="font-size:9pt;"><strong>重点：</strong>L1→L2→L3 の安定</p>
+      <ul class="neat" style="font-size:9pt;">
+        <li>・書く習慣づくりが最優先</li>
+        <li>・接続詞「だから／なぜなら」の意識化</li>
+        <li>・小学校との違いを自覚させる声かけ</li>
+      </ul>
+    </div>
+    <div class="subject-card" style="border-color:#a78bfa;">
+      <h4 style="color:#6d28d9; border-color:#a78bfa;">中学2年</h4>
+      <p style="font-size:9pt;"><strong>重点：</strong>L3→L4 への飛躍</p>
+      <ul class="neat" style="font-size:9pt;">
+        <li>・「学び方そのもの」を対象化</li>
+        <li>・定期テスト勉強の振り返りを強化</li>
+        <li>・他教科との関連を意識化</li>
+      </ul>
+    </div>
+    <div class="subject-card" style="border-color:#f59e0b;">
+      <h4 style="color:#92400e; border-color:#f59e0b;">中学3年</h4>
+      <p style="font-size:9pt;"><strong>重点：</strong>L4→L5 と進路接続</p>
+      <ul class="neat" style="font-size:9pt;">
+        <li>・学びを進路・将来に結ぶ問い</li>
+        <li>・受験勉強を自己調整学習として捉え直す</li>
+        <li>・卒業後も使える学び方を言語化</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 class="sec">9. 学校全体で取り組むために</h2>
+
+  <div class="hero-box mt-1">
+    <p class="sans font-bold text-blue-900 mb-1"><i class="fas fa-bullseye mr-1"></i>最終目標</p>
+    <p style="font-size:10pt;">
+      目指すのは、生徒が卒業までに<strong>「自分の頭の中で 5段階・7観点の振り返りを回せる」</strong>状態になることです。
+      そのためには、<strong>教科ごとに声かけが違う</strong>状態ではなく、<strong>学校全体で共通の言葉・共通のレベル観</strong>を持つことが欠かせません。
+      「L3までいけたね」「『なぜなら』が入ると L3 だよ」という共通言語が職員室・教室・家庭の会話に広がれば、
+      振り返りは学校文化として定着します。
+    </p>
+    <p class="sans text-right mt-2" style="font-size:9.5pt;">
+      ─ これが「自ら学ぶ力」の中核、メタ認知育成のゴールイメージです。
+    </p>
+  </div>
+
+  <h3 class="sub">教科会・職員会議で使うための3ステップ</h3>
+  <ol class="neat sans" style="font-size:10pt;">
+    <li>① <strong>共通理解</strong>：本ガイドのP1〜P2を教科会で15分読み合わせ。L1〜L5のイメージを統一する。</li>
+    <li>② <strong>試行</strong>：1〜2週間、各教科で3問短縮版を実施。回収した記述を教科会で L1〜L5 で判定してみる。</li>
+    <li>③ <strong>共有</strong>：判定がブレた記述を題材に議論。<strong>判定のズレ自体が教師の学び</strong>になる。</li>
+  </ol>
+
+  <h3 class="sub">参考文献・理論的典拠</h3>
+  <ul class="neat" style="font-size:8.5pt; color:#4b5563;">
+    <li>Flavell, J. H. (1979). <em>Metacognition and cognitive monitoring: A new area of cognitive–developmental inquiry.</em></li>
+    <li>Zimmerman, B. J. (2002). <em>Becoming a Self-Regulated Learner: An Overview.</em></li>
+    <li>Biggs, J. & Collis, K. (1982). <em>Evaluating the Quality of Learning: The SOLO Taxonomy.</em></li>
+    <li>Hattie, J. (2009, 2017). <em>Visible Learning</em>／メタ認知指導の効果量 d ≈ 0.69。</li>
+    <li>Education Endowment Foundation (EEF) <em>Metacognition and Self-regulated Learning: Guidance Report</em>.</li>
+    <li>前田康裕（熊本大学）「振り返り」研究／日本における実践モデル。</li>
+  </ul>
+
+  <div class="page-num">4 / 4</div>
+  <div class="footer-note">振り返り実践ガイド（松川中学校版）｜松川村トコトン指導主事 小林寿英｜2026年4月</div>
+</div>
+
+</body>
+</html>

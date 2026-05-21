@@ -116,15 +116,24 @@ export { ProgressWebSocket } from './websocket'
 // ローカルDB: card_id, hint_level, hint_text
 // 本番DB:     learning_card_id, hint_number, hint_content, thinking_tool_suggestion
 // ============================================================
-// Gemini モデル定数
-// カード生成・問題生成など品質重要タスク用（Gemini 3 Flash - 無料枠あり・高性能）
-const GEMINI_MODEL_QUALITY = 'gemini-3-flash-preview'
+// Gemini モデル定数（2026年5月 Google I/O 2026 リリース反映）
+// カード生成・問題生成など品質重要タスク用（Gemini 3.5 Flash GA - 最高性能・4倍速）
+// 2026/5/19 GA: gemini-3.1 Pro を全ベンチで上回り、コーディング・エージェントに最強
+const GEMINI_MODEL_QUALITY = 'gemini-3.5-flash'
 // チャット・フィードバック・分析など軽量タスク用（Gemini 3.1 Flash Lite - 高速・低コスト・無料枠あり）
+// 注: 3.5 Flash Lite は未リリースのため 3.1 Lite を継続使用
 const GEMINI_MODEL_LITE = 'gemini-3.1-flash-lite-preview'
-// フォールバック用（Gemini 2.5 Flash - 安定・無料枠あり）
+// フォールバック1（Gemini 3 Flash Preview - 旧プライマリ）
+const GEMINI_MODEL_FALLBACK_PRIMARY = 'gemini-3-flash-preview'
+// フォールバック2（Gemini 2.5 Flash - 安定・無料枠あり）
 const GEMINI_MODEL_FALLBACK = 'gemini-2.5-flash'
 // 旧フォールバック（Gemini 2.0 Flash）
 const GEMINI_MODEL_LEGACY = 'gemini-2.0-flash'
+// マルチモーダル動画・画像生成用（Gemini Omni Flash - 2026/5 リリース）
+// 動画生成・編集・マルチモーダル創作に特化。Google AI+/Pro/Ultra で提供
+const GEMINI_MODEL_OMNI = 'gemini-omni-flash'
+// 画像生成フォールバック（Nano Banana 2 - 旧画像生成）
+const GEMINI_MODEL_IMAGE_FALLBACK = 'gemini-3.1-flash-image-preview'
 // ============================================================
 
 // ============================================================
@@ -2118,7 +2127,7 @@ app.get('/api/admin/research/overview', async (c) => {
         system: {
           total_tables: (results[12] as any)?.results?.length || 0,
           db_engine: 'Cloudflare D1 (SQLite)',
-          ai_engine: 'Gemini 2.5 Flash / 3 Flash',
+          ai_engine: 'Gemini 3.5 Flash / 3 Flash / 2.5 Flash',
           framework: 'Hono + Cloudflare Pages',
         },
         generated_at: new Date().toISOString()
@@ -9782,6 +9791,54 @@ app.get('/guide/:curriculumId', async (c) => {
       })
       .catch(function(){});
   })();
+
+  // === 🔐 fetch グローバル認証インターセプター ===
+  // /guide/* は app.js を読み込まないため、ここでも fetch をパッチして
+  // /api/* への呼び出しに自動で Authorization: Bearer <session_token> を付与する。
+  (function installFetchAuthInterceptor(){
+    if (typeof window === 'undefined' || !window.fetch) return;
+    if (window.__fetchAuthInterceptorInstalled) return;
+    window.__fetchAuthInterceptorInstalled = true;
+
+    var originalFetch = window.fetch.bind(window);
+    var PUBLIC_PATHS = [
+      '/api/build-id','/api/auth/login','/api/auth/register',
+      '/api/auth/logout','/api/auth/refresh','/api/health',
+      '/api/notifications/send','/api/realtime/connect'
+    ];
+
+    window.fetch = function patchedFetch(input, init){
+      try {
+        var url = '';
+        if (typeof input === 'string') url = input;
+        else if (input instanceof URL) url = input.toString();
+        else if (input && typeof input.url === 'string') url = input.url;
+
+        var isApi = url.indexOf('/api/') >= 0;
+        var isPublic = false;
+        for (var i = 0; i < PUBLIC_PATHS.length; i++){
+          if (url.indexOf(PUBLIC_PATHS[i]) >= 0){ isPublic = true; break; }
+        }
+
+        if (isApi && !isPublic){
+          var token = localStorage.getItem('session_token');
+          if (token){
+            var newInit = Object.assign({}, init || {});
+            var h = new Headers((init && init.headers) || {});
+            if (!h.has('Authorization')){
+              h.set('Authorization', 'Bearer ' + token);
+            }
+            newInit.headers = h;
+            return originalFetch(input, newInit);
+          }
+        }
+      } catch(e){
+        console.warn('fetch interceptor error:', e);
+      }
+      return originalFetch(input, init);
+    };
+    console.log('✅ fetch auth interceptor installed (guide)');
+  })();
   </script>
   <title>学習のてびき - ${escapeHTML(curriculum.unit_name)}</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
@@ -16445,15 +16502,117 @@ ${edit_instruction}
     }
 
     // Gemini APIで例題を再生成
+    const problemTextForPrompt = (card.problem_text || card.problem_description || '').trim()
+
+    // ========================================
+    // 🎯 STAGE 1: 同単元の「別概念候補リスト」を先に生成（多様性確保）
+    // 「譜代大名↔外様大名↔大名」のような類似ループを断ち切るため、
+    // まずAIに「本題の答えとは異なる、同じ単元内の他の概念」を10個列挙させ、
+    // その中から1つを選んで例題を作る、という2段階方式にする。
+    // ========================================
+    let candidateConcepts: string[] = []
+    try {
+      const stage1Prompt = `あなたは${card.grade_level || '小学5'}年生の${card.subject || '社会'}の先生です。
+
+【本問題】${problemTextForPrompt}
+【本問題の答え】${mainAnswer}
+【単元名】${card.unit_name || ''}
+
+この単元「${card.unit_name || ''}」の中で、本問題の答え「${mainAnswer}」とは**意味的に異なる**、別の重要キーワード・別の概念・別の人物・別の出来事・別の用語を **10個** 列挙してください。
+
+【★★★ 絶対条件 ★★★】
+1. 本題の答え「${mainAnswer}」と意味的にほぼ同じ語、上位概念、下位概念、言い換え語は **絶対に含めない**
+   - 例: 「大名」が答えなら、「譜代大名」「外様大名」「親藩」「家臣」「武士」は **不可**
+   - 例: 「徳川家康」が答えなら、「徳川家」「家康」「初代将軍」「江戸幕府を開いた人物」は **不可**
+2. 同じ単元の中の **別カテゴリの知識** を選ぶこと
+   - 「人物」が答え → 別の人物・制度・出来事・地名・道具・産業・文化など、別カテゴリから
+   - 「制度」が答え → 別の制度・人物・出来事・地名など
+   - 「地名」が答え → 別の地名・人物・産業・地理用語など
+3. ${card.grade_level || '小学5'}年生が教科書で習う用語のみ
+4. 概念は **互いに重複しない** 多様な10個（人物・出来事・制度・地名・産業など複数カテゴリにまたがるように）
+
+【良い例】
+本題「大名」→ 候補: ["徳川家康", "参勤交代", "鎖国", "武家諸法度", "江戸", "町人", "百姓", "朱印船貿易", "島原の乱", "キリスト教禁止令"]
+本題「光合成」→ 候補: ["二酸化炭素", "葉緑体", "根", "蒸散", "デンプン", "酸素", "気孔", "葉脈", "茎", "種子"]
+本題「徳川家康」→ 候補: ["関ヶ原の戦い", "江戸幕府", "豊臣秀吉", "石田三成", "大坂の陣", "参勤交代", "大名", "鎖国", "朱印船貿易", "武家諸法度"]
+
+以下のJSON形式のみで回答してください（説明文不要）:
+{"concepts": ["概念1", "概念2", "概念3", "概念4", "概念5", "概念6", "概念7", "概念8", "概念9", "概念10"]}`
+
+      const stage1Controller = new AbortController()
+      const stage1Timeout = setTimeout(() => stage1Controller.abort(), 12000)
+      const stage1Models = [GEMINI_MODEL_QUALITY, GEMINI_MODEL_FALLBACK_PRIMARY, GEMINI_MODEL_FALLBACK]
+      let stage1Resp: Response | null = null
+      for (const m of stage1Models) {
+        try {
+          const r = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${geminiApiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              signal: stage1Controller.signal,
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: stage1Prompt }] }],
+                generationConfig: { temperature: 0.9, maxOutputTokens: 400 }
+              })
+            }
+          )
+          if (r.ok) { stage1Resp = r; break }
+        } catch (_) { /* try next model */ }
+      }
+      clearTimeout(stage1Timeout)
+      if (stage1Resp) {
+        const stage1Data = await stage1Resp.json() as any
+        const stage1Text = stage1Data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        const stage1Json = stage1Text.match(/\{[\s\S]*\}/)
+        if (stage1Json) {
+          try {
+            const parsed = JSON.parse(stage1Json[0])
+            if (Array.isArray(parsed.concepts)) {
+              const mainLower = mainAnswer.toLowerCase()
+              const mainStemLower = mainAnswer.replace(/[系語族型類科目派流業]+$/u, '').toLowerCase()
+              candidateConcepts = parsed.concepts
+                .map((s: any) => String(s || '').trim())
+                .filter((s: string) => {
+                  if (!s || s.length < 1 || s.length > 30) return false
+                  const sL = s.toLowerCase()
+                  // 本題の答えと同一・包含関係にあるものを除外
+                  if (sL === mainLower) return false
+                  if (mainStemLower.length >= 2 && (sL.includes(mainStemLower) || mainStemLower.includes(sL))) return false
+                  return true
+                })
+                .slice(0, 10)
+              console.log(`✅ STAGE 1: 候補概念${candidateConcepts.length}個を取得 — [${candidateConcepts.join(', ')}]`)
+            }
+          } catch (_) { /* JSON parse failed, fall through */ }
+        }
+      }
+    } catch (stage1Err: any) {
+      console.warn(`⚠️ STAGE 1 候補概念生成スキップ: ${stage1Err.message}`)
+    }
+
+    // 候補リストブロック（STAGE 2 で使用）
+    const candidateBlock = candidateConcepts.length >= 3
+      ? `\n【★★★ 必ずこの候補リストから「example_answer」を1つ選ぶこと ★★★】\n以下は本題の答え「${mainAnswer}」とは別の、同単元の重要概念です。この中から1つを example_answer として選び、そのテーマで例題を作ってください。\n候補リスト: ${candidateConcepts.map(c => `「${c}」`).join(' / ')}\n→ 上記リストの語以外を answer に使うことは**禁止**です。リストの中で最も「本題の理解の前提・関連知識」になりそうなものを選んでください。\n`
+      : ''
+
     const prompt = `あなたは${card.grade_level || '小学5'}年生の${card.subject || '社会'}の先生です。
 
-以下の本問題と「直接的に関連する」「類似した」例題を作成してください。
+以下の本問題と「同じ単元」の例題を作成してください。
 例題は本問題を解くための「練習問題・準備問題」として機能します。
 
-【★★★ 絶対禁止事項 ★★★】
+【★★★ 絶対禁止事項（違反したら即座に再生成）★★★】
 - 例題の答え(example_answer)に「${mainAnswer}」を絶対に使わないこと。1文字も含まないこと。
 - 例題の解き方(example_solution)のテキストに「${mainAnswer}」という文字列を絶対に含めないこと。
 - 例題の問題文(example_problem)で本問題と同じことを聞かないこと。問い方を変えるだけもNG。
+- ★★★ 例題の答えとして使ってはいけない語（本題の関連語・言い換え・上位下位語）★★★
+  本題の答え「${mainAnswer}」と意味的にほぼ同じ語、上位概念、下位概念、言い換え語は使わないこと。
+  例: 本題の答え「大名」→ 例題の答えに「譜代大名」「外様大名」「親藩」「家臣」など同類概念を使うのもNG
+  例: 本題の答え「徳川家康」→ 例題の答えに「徳川家」「家康」「初代将軍」「江戸幕府を開いた人物」など同一人物・直接的言い換えを使うのもNG
+  → 必ず「**別の概念・別の人物・別の用語**」を答えにすること。
+- ★★★ 本題と同じ人物・同じ年代・同じ場所だけを問わないこと ★★★
+  例: 本題が「徳川家光が定めた制度は？」→ 例題は徳川家光以外の人物（家康・秀忠・綱吉など）か、別の制度を問うこと
+  例: 本題が「江戸幕府の○○制度」→ 例題は別の制度や別の時代の出来事を問うこと
 - 上記に違反した場合、回答は無効として拒否されます。
 
 【★★★ 最重要: 問題と答えの論理的一貫性 ★★★】
@@ -16472,7 +16631,7 @@ ${mainAnswer}
 
 【単元名】
 ${card.unit_name || ''}
-
+${candidateBlock}
 【★最重要ルール★】
 - 例題は本問題と「同じ具体的なトピック」に直接関連する問題にすること
 - ★★★ 例題は本問題の「核心テーマ」に直結すること。本問題の表面的・周辺的な情報（色、形、数え方など）を問うのは絶対禁止 ★★★
@@ -16544,19 +16703,35 @@ ${card.unit_name || ''}
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 20000)
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.8, maxOutputTokens: 500 }
-        })
+    // フォールバック付きで Gemini 呼び出し（最新モデル → 旧モデル）
+    const fixExampleModels = [GEMINI_MODEL_QUALITY, GEMINI_MODEL_FALLBACK_PRIMARY, GEMINI_MODEL_FALLBACK]
+    let response: Response | null = null
+    let lastErr: string = ''
+    for (const m of fixExampleModels) {
+      try {
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${geminiApiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.8, maxOutputTokens: 500 }
+            })
+          }
+        )
+        if (r.ok) { response = r; break }
+        lastErr = `${m}: HTTP ${r.status}`
+      } catch (e: any) {
+        lastErr = `${m}: ${e.message}`
       }
-    )
+    }
     clearTimeout(timeout)
+    if (!response) {
+      console.warn(`🔧 例題修正: 全モデル失敗 ${lastErr}`)
+      return c.json({ success: false, error: `Gemini API failed: ${lastErr}` })
+    }
 
     const data = await response.json() as any
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
@@ -16565,7 +16740,7 @@ ${card.unit_name || ''}
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
       console.error('🔧 例題修正: JSON解析失敗')
-      return c.json({ success: false, error: 'AI response parse error' }, 500)
+      return c.json({ success: false, error: 'AI response parse error' })
     }
 
     const result = JSON.parse(jsonMatch[0])
@@ -16583,7 +16758,22 @@ ${card.unit_name || ''}
     )
     if (isSameResult) {
       console.warn(`🔧 例題修正: AIが同じ答えを返した (${resultAnswer} ≈ ${mainAnswer})`)
-      return c.json({ success: false, error: 'AI returned same answer' }, 500)
+      return c.json({ success: false, error: 'AI returned same answer' })
+    }
+
+    // ★ 候補リストがある場合、AIが候補リスト外の語を返していたら警告（同類語の混入を検出）
+    if (candidateConcepts.length >= 3) {
+      const candidateLowers = candidateConcepts.map(c => c.toLowerCase())
+      const matchedCandidate = candidateLowers.find(cL => 
+        resultLower === cL || resultLower.includes(cL) || cL.includes(resultLower)
+      )
+      if (!matchedCandidate) {
+        console.warn(`⚠️ 例題修正: AIが候補リスト外の語「${resultAnswer}」を返した — 候補: [${candidateConcepts.join(', ')}]`)
+        // 候補リスト外でも、同類語チェック（mainAnswerと類似）に通っていれば保存は続行
+        // ただし、後続の coherence チェックで弾かれる可能性は残る
+      } else {
+        console.log(`✅ AIが候補リストから「${resultAnswer}」を選択（候補との一致: ${matchedCandidate}）`)
+      }
     }
     
     // 例題の問題文が本題とほぼ同じでないかチェック
@@ -16602,7 +16792,7 @@ ${card.unit_name || ''}
       }
       if (tooSimilarResult) {
         console.warn(`🔧 例題修正: AIが本題と類似した問題文を返した`)
-        return c.json({ success: false, error: 'AI returned similar problem' }, 500)
+        return c.json({ success: false, error: 'AI returned similar problem' })
       }
     }
     
@@ -16616,12 +16806,12 @@ ${card.unit_name || ''}
       // 答えが問題文にそのまま含まれている（括弧書き含む）
       if (rpLower.includes(raLower) || (raStem.length >= 2 && rpLower.includes(raStem))) {
         console.warn(`🔧 例題修正: トートロジー検出 — 例題の答え "${resultAnswer}" が問題文に含まれている`)
-        return c.json({ success: false, error: 'Tautological question - answer already in problem text' }, 500)
+        return c.json({ success: false, error: 'Tautological question - answer already in problem text' })
       }
       // コアキーワードが問題文に含まれている（例: 答え「二酸化炭素が出るから」のコア「二酸化炭素」が問題文にある）
       if (raCore.length >= 2 && raCore !== raLower && rpLower.includes(raCore)) {
         console.warn(`🔧 例題修正: トートロジー検出（コアキーワード） — "${raCore}" (from "${resultAnswer}") が問題文に含まれている`)
-        return c.json({ success: false, error: 'Tautological question - answer core keyword in problem text' }, 500)
+        return c.json({ success: false, error: 'Tautological question - answer core keyword in problem text' })
       }
       // 括弧書き内に答えのコアがある: 「（二酸化炭素）」のようなパターン
       const bracketContent = resultProblem.match(/[（(]([^）)]+)[）)]/g)
@@ -16630,7 +16820,7 @@ ${card.unit_name || ''}
           const inner = bc.replace(/[（()）]/g, '').trim().toLowerCase()
           if (inner === raLower || inner === raCore || (raCore.length >= 2 && (inner.includes(raCore) || raCore.includes(inner)))) {
             console.warn(`🔧 例題修正: トートロジー検出（括弧書き） — 「${bc}」に答え "${resultAnswer}" のコアが含まれている`)
-            return c.json({ success: false, error: 'Tautological question - answer in brackets in problem text' }, 500)
+            return c.json({ success: false, error: 'Tautological question - answer in brackets in problem text' })
           }
         }
       }
@@ -16672,7 +16862,7 @@ ${card.unit_name || ''}
         const coherenceTimeout = setTimeout(() => coherenceController.abort(), 8000)
         
         const coherenceResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_FALLBACK}:generateContent?key=${geminiApiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -16692,7 +16882,7 @@ ${card.unit_name || ''}
           const coherenceResult = JSON.parse(coherenceJsonMatch[0])
           if (coherenceResult.coherent === false) {
             console.warn(`🔧 例題修正: 論理的一貫性なし — 問い「${resultProblem}」→答え「${resultAnswer}」: ${coherenceResult.reason || '不整合'}`)
-            return c.json({ success: false, error: `Incoherent Q&A: ${coherenceResult.reason || 'answer does not match question'}` }, 500)
+            return c.json({ success: false, error: `Incoherent Q&A: ${coherenceResult.reason || 'answer does not match question'}` })
           }
           if (coherenceResult.relevant === false) {
             // テーマ関連性は警告のみ — 500エラーにすると無限リトライループになるため
@@ -16746,7 +16936,7 @@ ${card.unit_name || ''}
     })
   } catch (e: any) {
     console.error('例題修正エラー:', e.message)
-    return c.json({ success: false, error: e.message }, 500)
+    return c.json({ success: false, error: e.message })
   }
 })
 
@@ -17497,9 +17687,9 @@ ${customInfo}${mikataSection}
 12. 【★★★答え漏洩禁止★★★】new_terms, teacher_help_keywords, hints の hint_text, ai_teacher_message, ai_teacher_advice には、answer（正解）そのものを絶対に含めないこと。これらのフィールドは問題を解く前に児童に見える。答えがバレると学習効果がゼロになる。背景知識・考え方・アプローチ方法のみを書くこと
 13. 【★★★例題と本題の答え重複禁止★★★】example_answer と answer は絶対に同じ文字列にしてはいけない。同じ単語・同じフレーズも禁止。例題は本題の関連トピックだが、答えは必ず別の値にすること。違反例: answer=「ゲルマン系」, example_answer=「ゲルマン系」は禁止。正しい例: answer=「ゲルマン系」, example_answer=「ラテン系」`
 
-    // gemini-3-flash-preview をプライマリ（Gemini 3 Flash・最高推論能力）
-    // フォールバック: gemini-2.5-flash（安定）, gemini-2.0-flash（レガシー）
-    const models = [GEMINI_MODEL_QUALITY, GEMINI_MODEL_FALLBACK, GEMINI_MODEL_LEGACY]
+    // gemini-3.5-flash をプライマリ（Gemini 3.5 Flash GA・2026/5/19・4倍速・最高性能）
+    // フォールバック: gemini-3-flash-preview, gemini-2.5-flash（安定）, gemini-2.0-flash（レガシー）
+    const models = [GEMINI_MODEL_QUALITY, GEMINI_MODEL_FALLBACK_PRIMARY, GEMINI_MODEL_FALLBACK, GEMINI_MODEL_LEGACY]
     
     console.log(`📋 コース情報:`, {
       コース名: courseInfo.name,
@@ -18703,7 +18893,7 @@ app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => 
 }`
 
     // フォールバック機能付きAPI呼び出し
-    const models = [GEMINI_MODEL_QUALITY, GEMINI_MODEL_FALLBACK, GEMINI_MODEL_LEGACY]
+    const models = [GEMINI_MODEL_QUALITY, GEMINI_MODEL_FALLBACK_PRIMARY, GEMINI_MODEL_FALLBACK, GEMINI_MODEL_LEGACY]
     let response
     let lastError
     
@@ -20091,7 +20281,7 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
 4問目：友達と取り組めるゲーム型問題 / 5問目：本物の仕事場面を題材にした問題 / 6問目：知的好奇心を刺激する探究型問題`
 
     // フォールバック機能付きAPI呼び出し
-    const models = [GEMINI_MODEL_QUALITY, GEMINI_MODEL_FALLBACK, GEMINI_MODEL_LEGACY]
+    const models = [GEMINI_MODEL_QUALITY, GEMINI_MODEL_FALLBACK_PRIMARY, GEMINI_MODEL_FALLBACK, GEMINI_MODEL_LEGACY]
     let response
     let lastError
     
@@ -20301,7 +20491,7 @@ ${courses.results.map((_: any, i: number) =>
 - learning_video_ideaは、動画で見せると理解が飛躍的に深まる場面。自然現象（火山噴火、天体運動）、実験映像、歴史的場面の再現など。PCの強みを活かしたリッチコンテンツ。動画不要なら空文字`
 
     // フォールバック機能付きAPI呼び出し
-    const models = [GEMINI_MODEL_QUALITY, GEMINI_MODEL_FALLBACK, GEMINI_MODEL_LEGACY]
+    const models = [GEMINI_MODEL_QUALITY, GEMINI_MODEL_FALLBACK_PRIMARY, GEMINI_MODEL_FALLBACK, GEMINI_MODEL_LEGACY]
     let response
     let lastError
     
@@ -27616,22 +27806,54 @@ app.post('/api/ai/generate-tactile-widget', async (c) => {
     const forbiddenNote = forbidden_answer ? `\n\n【★★★ 絶対に表示してはいけない禁止ワード ★★★】\n「${forbidden_answer}」という単語・文字列を図の中に絶対に表示してはいけません。\nこのワードは問題の正解なので、見えてしまうとヒントになりません。\n代わりに「？」マークや空欄にしてください。` : ''
 
     const prompt = `あなたはNano Banana 2（日本の教育AIアシスタント）です。
-子どもが画面上で「さわって学べる」インタラクティブなHTML/SVGウィジェットを1つ生成してください。
+子どもが画面上で「さわって考えて学べる」**質の高いインタラクティブHTML/SVG教材** を1つ生成してください。
+
+【★★★ 最重要：浅いウィジェットは絶対禁止 ★★★】
+- 「丸を1個ドラッグするだけ」「ボタンを1つ押すだけ」「正解の単語をタップするだけ」のような **思考プロセスが1ステップで終わる教材は不合格** です
+- 児童が **複数の判断・分類・順序づけ・関係性の構築** をしないと正解に到達できない構造にしてください
+- 「答えがその場で見えるヒント表示」も禁止（=「答えはどれ？」と選ばせるだけのウィジェット）
+- このウィジェットは **「自分で考えて操作することで概念が腑に落ちる」** ためのもの
+
+【★★★ 9つの教育インタラクションパターン — どれか1つを必ず採用 ★★★】
+1. **分類 (Classification)**: 複数の項目を2〜4のグループにドラッグして仕分ける（例: 譜代大名/外様大名/親藩 を江戸からの距離で配置）
+2. **順序づけ (Ordering)**: イベントや概念を時系列・大小・因果の順に並べ替える（例: 江戸幕府の出来事を年代順に並べる）
+3. **対応づけ (Matching)**: 左右2列の項目を線で結ぶ・ペア化する（例: 人物 ↔ 業績、用語 ↔ 定義）
+4. **構築 (Construction)**: 部品を組み合わせて図・式・文を完成させる（例: 漢字パーツを組み合わせて漢字を作る、分数の分子分母を組む）
+5. **比較 (Comparison)**: 2つ以上の対象をパラメータで比較し違いを可視化（例: スライダーで2つの図形の面積を変えて比較）
+6. **シミュレーション (Simulation)**: 入力を変えると結果がリアルタイムに変わる（例: 角度スライダーで光の屈折を見る、人口を変えて密度を計算）
+7. **推理 (Deduction)**: ヒントを順に開示し、消去法・条件絞り込みで答えに迫る（例: 3つの手がかりから人物を当てる謎解き）
+8. **探索 (Exploration)**: マップ・図上をクリックすると情報が現れる（例: 日本地図をタップして各地方の特産を学ぶ）
+9. **創造 (Creation)**: 児童が自分で要素を配置・描画して作品を作り、ルールに沿っているか即フィードバック（例: 都市計画ゲームで人口を伸ばす）
+
+【★★★ 品質要件：以下を**すべて**満たすこと ★★★】
+[A] **複数ステップの思考**: 児童が3つ以上の操作・判断をしないと完成しない
+[B] **状態の保持**: 操作した結果が画面に残り、全体像を見ながら考えられる（=ドラッグした位置がリセットされない、選んだ項目がハイライトされ続ける）
+[C] **段階的フィードバック**: 全部正解する前でも「ここまでは合ってるよ」「あと2つ」のような中間フィードバックを表示
+[D] **複数の正解パス**: 解き方が1つに固定されず、児童の判断で違うアプローチも試せる
+[E] **概念の可視化**: 操作することで「なぜそうなるか」の構造が見えてくる（=分類軸・関係図・順序の矢印などが現れる）
+[F] **要素数の充実**: 操作対象が **最低5個以上** あること（1〜2個では浅い）
+[G] **「もう一度」「最初に戻す」ボタン必須**: 児童が何度も試行錯誤できるよう、リセット機能を必ず実装
 
 【★★★ 最最重要ルール: 答えを絶対に見せないこと ★★★】
-- このウィジェットは「ヒント」であり「解答」ではありません
 - 問題の正解・解答をそのまま表示してはいけません
-- 正解の文字列・数値・用語をそのまま見えるように配置してはいけません
-- 例: 答えが「今は昔」なら、その文字列をそのまま目立つように表示してはダメ
-- 代わりに、考え方のヒントや関連概念の整理を視覚的に示す
-- 児童が「自分で考えて答えにたどり着く」ための手がかりを提供する
-- ★正しいアプローチ: 時間の流れの概念図、分類の枠組み、思考の手順を示す
-- ★間違いアプローチ: 答えの選択肢を並べてタップさせる、答えをハイライトして見せる
+- 答えの文字列を画面に直接配置してはダメ
+- ヒントとなる「考え方の枠組み」「分類軸」「比較指標」のみ提供
+- ★正しい: 時間の流れの概念図、分類の枠組み、思考の手順を示す
+- ★間違い: 答えの選択肢を並べてタップさせる、答えをハイライトして見せる
+
+【パターン選択の判断フロー】
+- 学習内容に「分類できる項目」がある → パターン1 (分類)
+- 「時系列・順番」が重要 → パターン2 (順序づけ)
+- 「対応関係」がある → パターン3 (対応づけ)
+- 「部品の組み合わせ」 → パターン4 (構築)
+- 「数値の変化と結果」 → パターン6 (シミュレーション)
+- 「位置情報」 → パターン8 (探索)
+- 上記が複数当てはまる場合は、より深い思考が必要なものを優先
 
 【生成ルール ★必ず守ること★】
 1. HTMLコード1つだけ出力。<div>で始まり</div>で終わる
 2. すべてのCSSはインラインstyle属性（<style>タグ不使用）
-3. ★★★ 最重要 ★★★ JavaScriptは必ず以下のどちらかの方法で記述：
+3. ★★★ JavaScriptは必ず以下のどちらかの方法で記述：
    方法A（推奨）: onclick="(function(){ ... })()" のようにイベント属性内に即時実行関数で記述
    方法B: <script>タグを<div>の内部に配置（外部に置かない）
    ★ドラッグ操作の場合は必ず以下のパターンを使用：
@@ -27640,35 +27862,48 @@ app.post('/api/ai/generate-tactile-widget', async (c) => {
    ★ すべてのロジックをイベント属性内のインライン関数として完結させること
 4. 外部ライブラリ不使用（純粋HTML/SVG/CSS/JSのみ）
 5. 問題の数値・データを正確に反映
-6. タップ・ドラッグ・スライダーなど触って操作できる要素を必ず含む
-7. フィードバック（色変化、数値更新、○×表示等）を即時表示
-8. 日本語ラベル、カラフルで楽しいデザイン、角丸、影つき
-9. 最大幅100%、レスポンシブ対応
-10. 子どもが直感的に操作を理解できるUI
-11. touch-action:noneをドラッグ要素に設定してスクロールを防止
-12. cursor:grab をドラッグ可能な要素に設定
+6. タップ・ドラッグ・スライダーなど触って操作できる要素を必ず含む（最低5個以上）
+7. フィードバック（色変化、数値更新、進捗バー、○×表示等）を即時表示
+8. **状態保持**: ドラッグした位置・選んだ項目を保持し、全体像を確認できるようにする
+9. 日本語ラベル、カラフルで楽しいデザイン、角丸、影つき
+10. 最大幅100%、レスポンシブ対応
+11. 子どもが直感的に操作を理解できるUI（操作方法を画面上部に1〜2文で明示）
+12. touch-action:noneをドラッグ要素に設定してスクロールを防止
+13. cursor:grab をドラッグ可能な要素に設定
+14. ★「もう一度」ボタンを必ず配置（onclick で初期状態に戻す）
+
+【良い例 — このレベルを目指すこと】
+- 【パターン1: 分類】江戸幕府の大名（10人）を「江戸からの距離（近い/中間/遠い）」3つのゾーンにドラッグ。配置した数に応じて「近い: 3個、遠い: 4個」と即時カウント表示。全部置けば「親藩・譜代は江戸の近くだね！」と気づきメッセージ。
+- 【パターン2: 順序づけ】光合成のステップ6枚のカード（「日光が当たる」「葉緑体が反応」「水と二酸化炭素を取り込む」「デンプンができる」「酸素を出す」「成長する」）を上下にドラッグして正しい順に並べる。並べ替えるたびに「順番が合うと矢印が緑になる」フィードバック。
+- 【パターン3: 対応づけ】左に歴史人物5人、右に業績5つ。指でなぞって線を引き、対応を作る。間違った線は赤、正しい線は緑に。
+- 【パターン4: 構築】漢字「明」を作るため、左から「日」「月」「日」「火」のパーツをドラッグして組み合わせ枠に置く。正しい組み合わせを発見させる。
+- 【パターン6: シミュレーション】スライダーで「人口」「面積」を変えると「人口密度」がリアルタイム計算され、棒グラフで他都市と比較。
+
+【悪い例 — 絶対にやらないこと】
+- 円を1個ドラッグして「江戸」に近づける（1ステップで終わる、要素1個）→ NG
+- 「正解はどれ？」と3択タップ（=単なるクイズ）→ NG
+- 答えの文字列が画面に表示されている → NG
+- 操作後すぐ消えるアニメーションだけ（状態が残らない）→ NG
 
 【ドラッグ操作の正しい実装例（SVG円をドラッグ）】
 <circle cx="100" cy="100" r="20" fill="#FF6B6B" style="cursor:grab;touch-action:none;"
   onpointerdown="(function(e){e.preventDefault();e.stopPropagation();var c=e.target;c.style.cursor='grabbing';var svg=c.closest('svg');var move=function(ev){ev.preventDefault();var r=svg.getBoundingClientRect();c.setAttribute('cx',Math.max(20,Math.min(ev.clientX-r.left,r.width-20)));c.setAttribute('cy',Math.max(20,Math.min(ev.clientY-r.top,r.height-20)));};var up=function(){c.style.cursor='grab';document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);};document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);})(event)" />
-
-【ウィジェットの例】
-- 数直線: ドラッグで数値を移動できるSVG
-- ブロック操作: タップで色が変わるブロック群
-- 得点カード: +/- のカードをタップして合計を計算
-- 割合: スライダーで円グラフ/棒グラフが変化
-- 時計: 針をドラッグして時刻を設定
-- 色分け: タップで色を塗り分けるマス目
-- 天秤: 左右にアイテムをドラッグして釣り合いを確認
-- 分数: ピザやケーキを等分するタッチ操作
-- コンパス: ドラッグで弧を描く操作（onpointermove使用）
 
 【学習カード情報】
 ${context}
 ${editNote}
 ${forbiddenNote}
 
-この学習内容に最適なインタラクティブウィジェットをHTMLコードだけで出力してください。
+【★ 出力前のセルフチェック ★】出力する前に以下を確認:
+□ 9パターンのどれを採用したか明確か？
+□ 操作対象は5個以上あるか？
+□ 児童が3ステップ以上考える設計か？
+□ 状態が保持されて全体像が見えるか？
+□ 中間フィードバックがあるか？
+□ 「もう一度」ボタンがあるか？
+□ 答えそのものを表示していないか？
+
+この学習内容に最適な**深い思考を要するインタラクティブ教材**をHTMLコードだけで出力してください。
 コードブロック(\`\`\`)で囲まないこと。説明文不要。HTMLのみ。`
 
     // Nano Banana 2 でウィジェットHTML + 説明画像を生成
@@ -27679,7 +27914,13 @@ ${forbiddenNote}
         headers: { 'x-goog-api-key': geminiApiKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.7 }
+          // ★ 品質向上: temperature 0.9 で創造的なパターン選択を促し、maxOutputTokens を 8192 に拡大して
+          // 複雑なインタラクション（5個以上の要素・複数ステップ・状態管理）を含む長いHTMLを生成可能に
+          generationConfig: { 
+            responseModalities: ['TEXT', 'IMAGE'], 
+            temperature: 0.9,
+            maxOutputTokens: 8192
+          }
         })
       }
     )
@@ -27747,14 +27988,29 @@ ${forbiddenNote}
       }
     }
 
+    // ★ 品質チェック: インタラクティブ要素数と思考の深さを評価
+    const interactiveElements = (widgetHtml.match(/onpointerdown|onclick|onchange|oninput|draggable=/gi) || []).length
+    const stateElements = (widgetHtml.match(/<circle|<rect|<button|<input|<li/gi) || []).length
+    const hasReset = /もう一度|最初に戻す|リセット|やり直/i.test(widgetHtml)
+    const qualityScore = {
+      interactive_handlers: interactiveElements,
+      visual_elements: stateElements,
+      has_reset_button: hasReset,
+      is_deep_enough: interactiveElements >= 3 && stateElements >= 5
+    }
+    if (!qualityScore.is_deep_enough) {
+      console.warn(`⚠️ NB2 tactile品質警告: インタラクティブ${interactiveElements}個、要素${stateElements}個 — 浅いウィジェットの可能性`)
+    }
+
     const genTime = Date.now() - startTime
-    console.log(`✅ NB2 tactile widget生成: ${genTime}ms, HTML=${widgetHtml.length}文字, 画像=${illustrationUrl ? 'あり' : 'なし'}`)
+    console.log(`✅ NB2 tactile widget生成: ${genTime}ms, HTML=${widgetHtml.length}文字, インタラクション=${interactiveElements}, 要素=${stateElements}, リセット=${hasReset}, 画像=${illustrationUrl ? 'あり' : 'なし'}`)
 
     return c.json({
       success: true,
       widget_html: widgetHtml,
       illustration_url: illustrationUrl,
       explanation: explanationText.replace(/<[^>]*>/g, '').substring(0, 300),
+      quality_score: qualityScore,
       generation_time_ms: genTime,
       model: 'Nano Banana 2 (gemini-3.1-flash-image)',
       message: widgetHtml ? 'ウィジェットを生成しました' : '画像のみ生成しました'
@@ -27952,12 +28208,26 @@ app.post('/api/ai/generate-nb2-music', async (c) => {
   "tempo_bpm": 数値（テンポ、子ども向けは100-140推奨）,
   "key": "キー（例: C major, A minor）",
   "lyrics": "歌詞全文（[Verse1]\\n歌詞...\\n[Chorus]\\n歌詞...\\n[Verse2]\\n歌詞...\\n[Chorus]\\n歌詞...\\n[Bridge]\\n歌詞...\\n[Chorus]\\n歌詞... の構成、4分以内で歌える長さ）",
+  "lyrics_reading": "★必須★ lyricsの読み仮名版。漢字を全てひらがなに変換し、TTSが正しく歌えるようにしたもの。改行・セクションマーカーはlyricsと完全に同じ位置に保つ。例: 「譜代大名」→「ふだいだいみょう」、「江戸」→「えど」、「徳川家康」→「とくがわいえやす」",
+  "short_lyrics": "ショートバージョン歌詞（サビ中心、30秒で歌える分量、4-8行程度。空にしないこと）",
+  "short_lyrics_reading": "★必須★ short_lyricsの読み仮名版（ひらがなのみ）。TTS入力用",
   "melody_description": "メロディの特徴（音の上下、リズムパターンの説明）",
   "learning_points": ["覚えられるポイント1", "ポイント2", "ポイント3"],
   "sing_along_tips": "歌い方のコツ（手拍子、振り付け等）",
   "suno_style_prompt": "English style prompt for Suno AI, max 30 words, e.g. 'upbeat children pop, catchy melody, Japanese vocals, educational, happy, 120bpm, major key'（必ず英語で書くこと、空にしないこと）",
-  "short_lyrics": "ショートバージョン歌詞（サビ中心、30秒で歌える分量、4-8行程度。空にしないこと）"
+  "kanji_readings": [{"kanji": "譜代大名", "yomi": "ふだいだいみょう"}, {"kanji": "徳川家康", "yomi": "とくがわいえやす"}] (★★★必須★★★ 歌詞に登場する全ての固有名詞・専門用語の読み仮名リスト。最低5個。AIが「ふだいだいめい」のような読み誤りをしないよう、正しい読みを明示)
 }
+
+【★★★ 最重要ルール：歌詞の漢字読み仮名 ★★★】
+1. 歴史用語・地名・人名は「ふりがな読み」を必ず正確に把握すること
+   ✅ 「譜代大名」→「ふだいだいみょう」（×ふだいだいめい）
+   ✅ 「外様大名」→「とざまだいみょう」
+   ✅ 「親藩」→「しんぱん」
+   ✅ 「大坂」→「おおさか」（×だいはん）
+   ✅ 「江戸」→「えど」
+   ✅ 「徳川家康」→「とくがわいえやす」
+2. lyrics_reading には漢字を完全にひらがな化した版を出力（TTS送信用）
+3. kanji_readings には固有名詞ペアを最低5個リストアップ
 
 【重要ルール】
 1. suno_style_promptは必ず英語で30語以内で書く。NONEや空文字は禁止
@@ -27967,7 +28237,7 @@ app.post('/api/ai/generate-nb2-music', async (c) => {
 5. 繰り返しとリズムで記憶に残りやすくする
 6. 子どもが口ずさめるシンプルなメロディライン
 7. 楽しくポジティブな雰囲気
-8. 歌詞は日本語、suno_style_promptのみ英語
+8. 歌詞は日本語（表示用は漢字混じり、TTS用はひらがな版）、suno_style_promptのみ英語
 
 【学習情報】
 ${context}
@@ -28090,24 +28360,46 @@ JSON形式のみ出力してください。コードブロック(\`\`\`)で囲�
 // 歌詞テキストからLyria 3 Clipで30秒のボーカル付き音楽を生成（非同期・分離）
 app.post('/api/ai/generate-tts-preview', async (c) => {
   const startTime = Date.now()
-  const { lyrics_text, song_style, song_title } = await c.req.json()
+  const { lyrics_text, lyrics_text_reading, kanji_readings, song_style, song_title } = await c.req.json()
   const env = c.env as any
   const geminiApiKey = env.GEMINI_API_KEY
   if (!geminiApiKey) return c.json({ success: false, error: 'GEMINI_API_KEY not configured' })
   if (!lyrics_text || lyrics_text.length < 10) return c.json({ success: false, error: '歌詞テキストが短すぎます' })
 
   try {
+    // ★★★ TTS入力用テキスト準備：ひらがな版があればそれを使用、なければ漢字→ひらがな置換 ★★★
+    // 1. lyrics_text_reading（AI生成のひらがな版）があれば優先
+    // 2. なければ kanji_readings から漢字→ひらがな置換
+    let ttsLyrics = lyrics_text
+    if (lyrics_text_reading && lyrics_text_reading.length >= 10) {
+      ttsLyrics = lyrics_text_reading
+      console.log(`🎵 TTS: ひらがな版歌詞を使用 (${ttsLyrics.length}文字)`)
+    } else if (Array.isArray(kanji_readings) && kanji_readings.length > 0) {
+      // 漢字→ひらがな置換（長い語から順に置換して部分一致衝突を防ぐ）
+      const sorted = [...kanji_readings].sort((a: any, b: any) => 
+        (b.kanji || '').length - (a.kanji || '').length
+      )
+      for (const { kanji, yomi } of sorted) {
+        if (kanji && yomi && kanji.length >= 1) {
+          const escaped = kanji.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          ttsLyrics = ttsLyrics.replace(new RegExp(escaped, 'g'), yomi)
+        }
+      }
+      console.log(`🎵 TTS: kanji_readings で ${kanji_readings.length} 語を置換`)
+    }
+
     // Lyria 3 Clip 用プロンプト: 歌詞 + スタイル指示
     const styleHint = song_style || 'upbeat children pop'
     const prompt = `子ども向けの明るく楽しい日本語の学習ソングを30秒で作成してください。
 ジャンル: ${styleHint}
 テンポ: 120 BPM、メジャーキー
-ボーカル: 明るく元気な声、はっきりした日本語
+ボーカル: 明るく元気な声、はっきりした日本語の発音
 雰囲気: 子どもが口ずさめる、覚えやすいメロディ
 
-以下の歌詞を歌ってください:
+★以下の歌詞を、ひらがなで書かれている通りに正確に発音して歌ってください★
+（特に固有名詞・歴史用語の読み方は歌詞のひらがな表記をそのまま使うこと）:
 
-${lyrics_text.substring(0, 800)}`
+${ttsLyrics.substring(0, 800)}`
 
     const audioResp = await fetch(
       'https://generativelanguage.googleapis.com/v1beta/models/lyria-3-clip-preview:generateContent',
@@ -42215,7 +42507,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
 `
 
     // 10. Gemini API呼び出し（フォールバック付き、タイムアウト対策）
-    const courseModels = [GEMINI_MODEL_QUALITY, GEMINI_MODEL_FALLBACK, GEMINI_MODEL_LEGACY]
+    const courseModels = [GEMINI_MODEL_QUALITY, GEMINI_MODEL_FALLBACK_PRIMARY, GEMINI_MODEL_FALLBACK, GEMINI_MODEL_LEGACY]
     let geminiResponse: Response | null = null
     let lastError = ''
     

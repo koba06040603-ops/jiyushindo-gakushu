@@ -1354,21 +1354,28 @@ ${template.elaboration ? `- 精緻化プロンプト（各カードの最後に�
 ※ v4の制御パラメータに忠実に従ってください
 `
 
-    // Gemini API呼び出し
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 8000, responseMimeType: 'application/json' },
-        }),
-      }
-    )
+    // Gemini API呼び出し（3.5 Flash GA → 3 Flash Preview の順でフォールバック）
+    const v4Models = ['gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-flash']
+    let geminiResponse: Response | null = null
+    let lastError: string = ''
+    for (const m of v4Models) {
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 8000, responseMimeType: 'application/json' },
+          }),
+        }
+      )
+      if (resp.ok) { geminiResponse = resp; break }
+      lastError = `${m}: ${resp.status}`
+    }
 
-    if (!geminiResponse.ok) {
-      throw new Error(`Gemini API error: ${geminiResponse.status}`)
+    if (!geminiResponse) {
+      throw new Error(`Gemini API error (all models failed): ${lastError}`)
     }
 
     const geminiData = await geminiResponse.json() as any

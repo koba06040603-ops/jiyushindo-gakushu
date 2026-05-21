@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>GenSparkワークスペース契約・運営委譲 ご提案｜松川村教育委員会 古畑 元大 教育長 様</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 15mm 14mm; }
+  html, body { font-family: "Hiragino Mincho ProN", "Yu Mincho", "MS PMincho", serif; color: #1f2937; background: #f3f4f6; }
+  body { font-size: 10.5pt; line-height: 1.6; }
+  .sans { font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif; }
+
+  .a4-page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 8mm auto;
+    background: white;
+    padding: 15mm 14mm;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    page-break-after: always;
+    box-sizing: border-box;
+    position: relative;
+  }
+  .a4-page:last-child { page-break-after: auto; }
+
+  h1.doc-title {
+    font-family: "Hiragino Mincho ProN", serif;
+    font-size: 20pt; font-weight: 800; color: #1e3a8a;
+    text-align: center; letter-spacing: 0.04em;
+    border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 8px;
+  }
+  h1.doc-subtitle {
+    font-size: 11pt; text-align: center; color: #475569; margin-bottom: 18px; font-weight: normal;
+  }
+  h2.sec {
+    font-family: "Hiragino Kaku Gothic ProN", sans-serif;
+    font-size: 13pt; font-weight: 800; color: #1e3a8a;
+    border-left: 5px solid #1e40af; padding-left: 10px;
+    margin: 18px 0 10px; background: #eff6ff; padding-top: 3px; padding-bottom: 3px;
+  }
+  h3.sub {
+    font-family: "Hiragino Kaku Gothic ProN", sans-serif;
+    font-size: 11.5pt; font-weight: 700; color: #1e40af;
+    margin: 10px 0 4px;
+  }
+  h4.sub2 {
+    font-family: "Hiragino Kaku Gothic ProN", sans-serif;
+    font-size: 10.5pt; font-weight: 700; color: #334155;
+    margin: 8px 0 2px;
+  }
+  p { margin-bottom: 6px; }
+  ul.neat { margin: 4px 0 6px 22px; }
+  ul.neat li { margin-bottom: 2px; }
+
+  .tbl { width: 100%; border-collapse: collapse; font-size: 9.5pt; font-family: "Hiragino Kaku Gothic ProN", sans-serif; }
+  .tbl th, .tbl td { border: 1px solid #cbd5e1; padding: 6px 8px; vertical-align: middle; }
+  .tbl th { background: #dbeafe; color: #1e3a8a; font-weight: 700; }
+  .tbl .num { text-align: right; font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+  .tbl .ctr { text-align: center; }
+
+  .note { font-size: 8.5pt; color: #64748b; font-family: "Hiragino Kaku Gothic ProN", sans-serif; }
+
+  .hero-box {
+    border: 2px solid #1e40af; background: #eff6ff;
+    padding: 10px 14px; border-radius: 6px; margin: 8px 0;
+  }
+  .highlight {
+    background: linear-gradient(90deg, #fef3c7, #fde68a);
+    padding: 10px 14px; border-radius: 6px;
+    border-left: 4px solid #d97706;
+  }
+  .warn {
+    background: #fef2f2; border-left: 4px solid #dc2626;
+    padding: 8px 12px; border-radius: 4px; font-size: 10pt;
+  }
+  .good {
+    background: #ecfdf5; border-left: 4px solid #059669;
+    padding: 8px 12px; border-radius: 4px; font-size: 10pt;
+  }
+
+  .meta-table { font-family: "Hiragino Kaku Gothic ProN", sans-serif; }
+  .meta-table td { padding: 3px 8px; font-size: 10pt; }
+  .meta-table .label { color: #64748b; width: 80px; }
+
+  .hanko-area {
+    display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px;
+  }
+  .hanko {
+    width: 50px; height: 50px; border: 1.5px solid #991b1b;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    color: #991b1b; font-size: 9pt; font-weight: bold;
+  }
+
+  .step-card {
+    border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px;
+    margin-bottom: 6px; background: #f8fafc;
+  }
+  .step-card .step-num {
+    display: inline-block; width: 24px; height: 24px; background: #1e40af;
+    color: white; border-radius: 50%; text-align: center; line-height: 24px;
+    font-weight: bold; font-size: 10pt; margin-right: 8px;
+  }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+
+  .kpi-card {
+    background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px;
+    padding: 8px 10px; text-align: center;
+  }
+  .kpi-card .label { font-size: 8.5pt; color: #1e40af; }
+  .kpi-card .val { font-size: 15pt; font-weight: 800; color: #1e3a8a; font-family: "Hiragino Kaku Gothic ProN", sans-serif; }
+  .kpi-card .sub { font-size: 8pt; color: #475569; }
+
+  .page-num {
+    position: absolute; bottom: 10mm; right: 14mm; font-size: 8.5pt; color: #64748b;
+    font-family: "Hiragino Kaku Gothic ProN", sans-serif;
+  }
+  .footer-note {
+    position: absolute; bottom: 10mm; left: 14mm; font-size: 8.5pt; color: #94a3b8;
+    font-family: "Hiragino Kaku Gothic ProN", sans-serif;
+  }
+
+  @media print {
+    body { background: white; font-size: 10.5pt; }
+    .a4-page { margin: 0; box-shadow: none; padding: 15mm 14mm; }
+    .no-print { display: none !important; }
+  }
+  .print-btn {
+    position: fixed; right: 16px; bottom: 16px; z-index: 100;
+    background: #1e40af; color: white; font-weight: 700;
+    padding: 10px 16px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    cursor: pointer; border: none; font-family: sans-serif;
+  }
+</style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()"><i class="fas fa-print mr-1"></i>印刷 / PDF保存</button>
+
+<!-- ========== ページ 1：表紙＋要旨 ========== -->
+<div class="a4-page">
+
+  <div class="text-right text-xs text-gray-600 mb-2 sans">
+    文書番号：KBY-2026-0422-B<br>
+    作成日：2026年4月22日
+  </div>
+
+  <h1 class="doc-title">Genspark（AIワークスペース）導入に関するご提案</h1>
+  <h1 class="doc-subtitle">— 個人運用から教育委員会主体の組織運用（Teamプラン）への移行について —</h1>
+
+  <table class="meta-table mt-4">
+    <tr>
+      <td class="label">宛　先：</td>
+      <td><strong>松川村教育委員会　教育長　古畑 元大 様</strong></td>
+    </tr>
+    <tr>
+      <td class="label">作成者：</td>
+      <td><strong>松川村トコトン指導主事　小林　寿英</strong></td>
+    </tr>
+    <tr>
+      <td class="label">日　付：</td>
+      <td>2026年4月22日</td>
+    </tr>
+    <tr>
+      <td class="label">件　名：</td>
+      <td>Genspark ワークスペース契約（Team プラン）および運営主担当の委譲に関するご提案</td>
+    </tr>
+  </table>
+
+  <h2 class="sec">要旨（Executive Summary）</h2>
+
+  <div class="hero-box">
+    <p class="sans font-bold text-blue-900 mb-2">
+      <i class="fas fa-bullseye mr-1"></i>本提案の3つの核心
+    </p>
+    <ol class="neat sans" style="font-size:10.5pt;">
+      <li>① <strong>教育委員会名義で GenSpark Team プランを契約</strong>いただき、小林を当該ワークスペースに招待してください。</li>
+      <li>② 現在、個人負担月額 <strong>約 9.8 万円</strong>（税込 $659.99/月）で運用している費用を、<strong>教育委員会の公費で月額 約 46,000 円（$300/月・Team 10 名）</strong>に圧縮しつつ、<strong>現状と同等以上の作業量（月 120,000 クレジット）</strong>を確保できます。</li>
+      <li>③ 契約主体・運営主担当を <strong>小林個人 → 松川村教育委員会</strong> へ委譲し、<strong>担当者が交代しても止まらない持続可能な体制</strong>を構築します。</li>
+    </ol>
+  </div>
+
+  <div class="mt-2 p-2 bg-amber-50 border-l-4 border-amber-500 rounded sans" style="font-size:9.5pt;">
+    <strong><i class="fas fa-file-invoice mr-1 text-amber-700"></i>実データ根拠：</strong>
+    小林個人 VISA カードでの GenSpark 支払実績（Gmail 領収書ベース）は、
+    2025年10月〜2026年3月の 6 ヶ月で <strong>55 件 / $1,805.15（約 273,600 円）</strong>。
+    特に 2026年2月は <strong>$731.49（約 11.1 万円・26 件のクレジット追加購入）</strong>に達し、Pro プラン単体では不足する作業量を示しています。
+    2026年4月以降は Pro プランで <strong>月額 約 9.8 万円（年額 約 117.6 万円）</strong>の固定費が発生中。
+    <span class="text-gray-600">※ 詳細は別添「GenSpark 月別支払い 実績レポート」をご参照ください。</span>
+  </div>
+
+  <h3 class="sub">ご判断いただきたい事項</h3>
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th style="width:5%;">No</th>
+        <th style="width:45%;">項目</th>
+        <th style="width:20%;">現状</th>
+        <th style="width:30%;">ご判断後</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="ctr">1</td>
+        <td>契約主体</td>
+        <td>小林 個人</td>
+        <td><strong>松川村教育委員会</strong></td>
+      </tr>
+      <tr>
+        <td class="ctr">2</td>
+        <td>支払方法</td>
+        <td>小林個人のクレジットカード</td>
+        <td><strong>教育委員会公費・請求書払い</strong></td>
+      </tr>
+      <tr>
+        <td class="ctr">3</td>
+        <td>契約プラン</td>
+        <td>Pro プラン（税込 $659.99/月・1名）</td>
+        <td><strong>Team プラン（$30/月・人 × 10 名）</strong></td>
+      </tr>
+      <tr>
+        <td class="ctr">4</td>
+        <td>月額費用</td>
+        <td>約 98,000 円/月（＋ 不足時 Credits Pack 追加購入）</td>
+        <td><strong>約 46,000 円/月（10 名構成・$300/月）</strong></td>
+      </tr>
+      <tr>
+        <td class="ctr">5</td>
+        <td>確保クレジット量</td>
+        <td>Pro：月 125,000 クレジット（1 名）</td>
+        <td><strong>Team：月 120,000 クレジット（12,000 × 10 名・日次リフレッシュ）</strong></td>
+      </tr>
+      <tr>
+        <td class="ctr">6</td>
+        <td>運営主担当</td>
+        <td>小林</td>
+        <td><strong>教育委員会（運用継続は小林が利用者として支援）</strong></td>
+      </tr>
+      <tr>
+        <td class="ctr">7</td>
+        <td>セキュリティ</td>
+        <td>個人アカウント</td>
+        <td><strong>エンタープライズ（SOC2・ISO27001 準拠）</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">提案の趣旨</h3>
+  <p>
+    現在、私（小林）個人のアカウントおよび費用負担にて、生成AIプラットフォーム「Genspark」を活用し、
+    <strong>自由進度学習システム</strong>および<strong>協働ナビシステム</strong>の構築・運用を行っております。
+    これらのシステムは松川村の教育現場においてすでに成果を上げつつありますが、
+    今後の持続可能な運用とさらなる発展を見据え、
+    <strong>個人運用から教育委員会主体の組織運用（Team プラン・ワークスペース契約）へ移行すること</strong>
+    をご提案いたします。
+  </p>
+  <p>
+    本提案は、私の離任・異動等があっても、松川村の教育改革プロジェクトが後退することなく
+    <strong>持続可能な体制として定着すること</strong>を最大の目的とし、
+    同時に、<strong>全国初の「教育委員会主体 × 自由進度学習 × AI」実装モデル</strong>としての
+    先行投資的意義を強調するものです。
+  </p>
+
+  <div class="highlight sans mt-2">
+    <p style="font-size:10.5pt;">
+      <i class="fas fa-lightbulb text-amber-700 mr-1"></i>
+      <strong>ご判断のポイント：</strong>
+      現状の Pro 個人プラン（月 約 9.8 万円・年 約 117.6 万円）に対し、
+      Team プラン 10 名構成（月 約 4.6 万円・年 約 55 万円）へ移行することで、
+      <strong>現行の作業量（月 12 万クレジット相当）を維持しながら 年間 約 62.6 万円（約 53 %）削減</strong>が可能です。
+      さらに 10 名枠により<strong>教育委員会職員・ICT 担当教員にも順次配布</strong>でき、組織全体での AI 活用基盤となります。
+    </p>
+  </div>
+
+  <div class="page-num">1 / 4</div>
+  <div class="footer-note">松川村教育委員会 古畑 元大 教育長 様｜GenSparkワークスペース導入提案（小林寿英）</div>
+</div>
+
+<!-- ========== ページ 2：背景・目的・メリット ========== -->
+<div class="a4-page">
+
+  <h2 class="sec">1. 提案の背景と目的</h2>
+
+  <h3 class="sub">1-1. 現状</h3>
+  <p>
+    2025年度より、私（小林）は松川村トコトン指導主事として着任以来、
+    村内児童生徒の<strong>個別最適な学び</strong>と<strong>協働的な学び</strong>を両立させるため、
+    生成AIプラットフォーム「Genspark」を用いて以下の2つの基盤システムを自ら構築・運用してまいりました。
+  </p>
+  <div class="two-col mt-2">
+    <div class="good">
+      <h4 class="sub2 text-green-800"><i class="fas fa-rocket mr-1"></i>自由進度学習システム</h4>
+      <p style="font-size:9.5pt;">
+        児童生徒一人ひとりの理解度・進度に合わせた教材提示とAIチュータリングを行うシステム。
+        既に松川小・松川中の一部学級で試行運用。
+      </p>
+    </div>
+    <div class="good">
+      <h4 class="sub2 text-green-800"><i class="fas fa-users mr-1"></i>協働ナビシステム</h4>
+      <p style="font-size:9.5pt;">
+        グループ学習・探究活動におけるタスク分担・進捗共有・AIファシリテーションを行うシステム。
+        他校との連携にも拡張可能。
+      </p>
+    </div>
+  </div>
+
+  <h3 class="sub">1-2. 現状の課題</h3>
+  <div class="warn sans">
+    <ul class="neat" style="font-size:10pt;">
+      <li>① 契約・支払の主体が <strong>小林個人</strong> であり、異動・退職時にサービスが即停止するリスク</li>
+      <li>② 個人クレカ決済のため <strong>公費処理・領収書発行・監査対応</strong> に制約がある</li>
+      <li>③ Pro プラン（個人）は <strong>月額 約 9 万円</strong>と高額で、小林の経済的負担が大きい</li>
+      <li>④ 個人アカウントではエンタープライズ級のセキュリティ機能が活用できない</li>
+      <li>⑤ 教育委員会の <strong>公式運営・ガバナンスの対象外</strong>となっており、組織資産として引継ぎできない</li>
+    </ul>
+  </div>
+
+  <h3 class="sub">1-3. 目的</h3>
+  <ol class="neat sans">
+    <li>ア. <strong>担当者交代でも止まらない体制</strong>の構築（組織資産化）</li>
+    <li>イ. <strong>公費処理・監査対応</strong>の明瞭化</li>
+    <li>ウ. <strong>セキュリティとデータ保護</strong>の強化</li>
+    <li>エ. <strong>費用の大幅圧縮と作業量の確保の両立</strong>（現 Pro 個人 117.6 万円/年 → Team 10 名 55 万円/年、約 53 % 削減）</li>
+    <li>オ. <strong>全国初の実装モデル</strong>として松川村を位置づける先行投資</li>
+  </ol>
+
+  <h2 class="sec">2. GenSpark ワークスペース（Team プラン）導入の4大メリット</h2>
+
+  <h3 class="sub">① 持続可能な教育システムの構築（先行投資）</h3>
+  <p>
+    教育委員会が公式にワークスペースを管理することで、<strong>担当者が変わってもシステムとデータが確実に引き継がれます</strong>。
+    自由進度学習システムと協働ナビシステムは、これからの個別最適な学びを支える重要なインフラです。
+    これらを組織資産として正式に位置づけることは、<strong>全国初の革新的な取り組みを松川村に定着させるための「先行投資」</strong>にほかなりません。
+  </p>
+
+  <h3 class="sub">② セキュリティとデータ保護の強化</h3>
+  <p>個人アカウントでの運用とは異なり、Team プランでは以下のエンタープライズレベルのセキュリティが保証されます。</p>
+  <table class="tbl">
+    <thead>
+      <tr><th style="width:35%;">セキュリティ項目</th><th>内容</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>ゼロ・トレーニング・ポリシー</td><td>入力データがAIモデルの学習に<strong>一切利用されない</strong>ことが保証される</td></tr>
+      <tr><td>データ分離（Data Isolation）</td><td>松川村の教育データが他組織データから<strong>物理的・論理的に隔離</strong>される</td></tr>
+      <tr><td>SOC 2 Type Ⅱ 準拠</td><td>米国公認会計士協会の定める<strong>情報セキュリティ内部統制</strong>認証</td></tr>
+      <tr><td>ISO 27001 認証</td><td>情報セキュリティマネジメントシステムの<strong>国際標準規格</strong>取得</td></tr>
+      <tr><td>SSO／アクセス管理</td><td>シングルサインオン、2要素認証、IPアドレス制限が利用可能</td></tr>
+      <tr><td>監査ログ</td><td>誰がいつ何をしたかを追跡でき、<strong>公的機関の監査要件</strong>を満たす</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">③ 管理・支払いの明瞭化とガバナンス</h3>
+  <p>
+    現在、私個人が毎月 約 9.8 万円（税込 $659.99/月）の Pro プラン費用を立替えております。
+    これを教育委員会名義の Team プラン（月額 約 4.6 万円・10 名）へ移行することで以下が実現します。
+  </p>
+  <ul class="neat sans">
+    <li>・<strong>支払の透明化：</strong>公金としての明瞭な処理（請求書・領収書が組織宛で発行）</li>
+    <li>・<strong>一元管理：</strong>管理者（教育委員会）がメンバーの追加・削除、利用状況を一覧で把握可能</li>
+    <li>・<strong>監査対応：</strong>村議会・監査委員からの問合せにも組織として回答可能</li>
+    <li>・<strong>立替解消：</strong>小林の個人負担・個人リスクが解消される</li>
+  </ul>
+
+  <h3 class="sub">④ 全国初の「教育委員会主体 × 自由進度学習 × AI」モデル</h3>
+  <p>
+    全国の教育委員会の多くは、特定の教員個人のAI活用実績に依存した運用を行っており、
+    <strong>組織として正式にAIワークスペースを保有・運営する自治体は極めて少数</strong>です。
+    松川村が本提案を採択されれば、それ自体が<strong>全国の自治体教育委員会にとってのモデル事例</strong>となり、
+    視察受入・メディア取材・補助金申請・地方創生交付金等において<strong>波及効果</strong>が見込まれます。
+  </p>
+
+  <div class="page-num">2 / 4</div>
+  <div class="footer-note">松川村教育委員会 古畑 元大 教育長 様｜GenSparkワークスペース導入提案（小林寿英）</div>
+</div>
+
+<!-- ========== ページ 3：費用感・委譲・ステップ ========== -->
+<div class="a4-page">
+
+  <h2 class="sec">3. 費用感について</h2>
+
+  <div class="good sans" style="background:#f0fdf4; border-color:#86efac;">
+    <p style="font-size:10pt;">
+      <i class="fas fa-balance-scale mr-1"></i>
+      <strong>プラン選定の考え方：</strong>
+      現在の小林個人の作業実績（2026年2月 $731.49・クレジット Pack 26 件購入）から推定すると、
+      <strong>月 120,000 〜 200,000 クレジット規模</strong>の処理を行っています。
+      Team プラン最小構成（2 名・月 24,000 クレジット）では作業量不足のため、
+      <strong>Team プラン 10 名構成（月 120,000 クレジット）</strong>を推奨します。
+      これにより <strong>現行作業量を維持しつつ年 62.6 万円削減</strong>し、同時に <strong>組織全体へ AI 活用基盤を配布</strong>できます。
+    </p>
+  </div>
+
+  <h3 class="sub">3-1. プラン比較表（Team 10 名構成）</h3>
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th>項目</th>
+        <th style="width:28%;">現在（Pro 個人）</th>
+        <th style="width:32%;">移行後（Team 10 名）</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>契約主体</td>
+        <td>小林個人</td>
+        <td><strong>松川村教育委員会</strong></td>
+      </tr>
+      <tr>
+        <td>料金（単価）</td>
+        <td class="num">$659.99 / 月 税込（約 98,000 円）</td>
+        <td class="num"><strong>$30 / 月・1 ユーザー（約 4,600 円）</strong></td>
+      </tr>
+      <tr>
+        <td>推奨構成（10 名）</td>
+        <td class="num">—</td>
+        <td class="num"><strong>$300 / 月（約 46,000 円）</strong></td>
+      </tr>
+      <tr>
+        <td>確保クレジット量（月）</td>
+        <td class="num">125,000 クレジット<br><span class="text-xs text-red-700">※ 2026/2月は不足し Pack 追加購入</span></td>
+        <td class="num"><strong>120,000 クレジット<br><span class="text-xs text-green-700">※ 12,000 × 10 名・日次リフレッシュ</span></strong></td>
+      </tr>
+      <tr>
+        <td>利用可能人数</td>
+        <td>1 名（小林のみ）</td>
+        <td>10 名（最大 150 名まで拡張可）</td>
+      </tr>
+      <tr>
+        <td>高度 AI 無制限アクセス</td>
+        <td>✓</td>
+        <td>✓</td>
+      </tr>
+      <tr>
+        <td>データ分離／ゼロトレーニング</td>
+        <td class="ctr">—</td>
+        <td class="ctr"><strong>✓</strong></td>
+      </tr>
+      <tr>
+        <td>SOC2・ISO27001 適用</td>
+        <td class="ctr">—</td>
+        <td class="ctr"><strong>✓</strong></td>
+      </tr>
+      <tr>
+        <td>組織管理・監査ログ</td>
+        <td class="ctr">—</td>
+        <td class="ctr"><strong>✓</strong></td>
+      </tr>
+      <tr>
+        <td>支払方法</td>
+        <td>個人クレカ</td>
+        <td><strong>請求書払い・公費対応可</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">3-2. 年間費用の比較</h3>
+  <div class="three-col mt-2">
+    <div class="kpi-card" style="background:#fef2f2; border-color:#fecaca;">
+      <div class="label" style="color:#991b1b;">現状（Pro 個人・小林負担）</div>
+      <div class="val" style="color:#991b1b;">約 117.6 万円</div>
+      <div class="sub">98,000 円 × 12 ヶ月</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">移行後（Team 10 名）</div>
+      <div class="val">約 55 万円</div>
+      <div class="sub">46,000 円 × 12 ヶ月</div>
+    </div>
+    <div class="kpi-card" style="background:#fef3c7; border-color:#fde68a;">
+      <div class="label" style="color:#92400e;">削減額（年）</div>
+      <div class="val" style="color:#92400e;">約 62.6 万円</div>
+      <div class="sub">削減率 約 53 %（利用人数は 10 倍）</div>
+    </div>
+  </div>
+  <p class="note mt-2">※ 為替レート 1 USD ≒ 153 円（2026年4月基準）で換算。実額は為替変動により ±5 % 程度の変動があります。</p>
+  <p class="note">※ Team プランは 1 ユーザーあたり 月 12,000 クレジット（日次リフレッシュ）が付与され、ワークスペース内で共有・分配が可能です。</p>
+
+  <h3 class="sub">3-3. 初年度 10 名枠の内訳（想定割り当て）</h3>
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th style="width:8%;">No</th>
+        <th style="width:34%;">割り当て先</th>
+        <th style="width:28%;">主な用途</th>
+        <th>クレジット利用イメージ</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="ctr">1</td><td>松川村教育委員会管理者（筆頭：古畑 元大 教育長）</td><td>管理・監査・SSO設定</td><td>少（管理用途中心）</td></tr>
+      <tr><td class="ctr">2</td><td><strong>小林 寿英（トコトン指導主事）</strong></td><td>システム開発・研修・レポート</td><td><strong>中〜高（主体的利用）</strong></td></tr>
+      <tr><td class="ctr">3・4</td><td>松川小学校 ICT 担当教員（2 名）</td><td>教材開発・授業支援</td><td>中（学級運用）</td></tr>
+      <tr><td class="ctr">5・6</td><td>松川中学校 ICT 担当教員（2 名）</td><td>教材開発・授業支援</td><td>中（学級運用）</td></tr>
+      <tr><td class="ctr">7・8</td><td>各校 教務主任（2 名）</td><td>校務文書・保護者連絡</td><td>少〜中</td></tr>
+      <tr><td class="ctr">9</td><td>教育委員会事務局 担当者</td><td>統計・資料作成</td><td>少〜中</td></tr>
+      <tr><td class="ctr">10</td><td>予備枠（単年度設規担当・視察対応など）</td><td>柔軟割り当て</td><td>使用塗布に応じる</td></tr>
+      <tr style="background:#dbeafe; font-weight:700;"><td class="ctr">合計</td><td>10 名</td><td>月額 $300（約 46,000 円）</td><td>月 120,000 クレジット・組織共有</td></tr>
+    </tbody>
+  </table>
+  <p class="note">※ 利用人数は単年度ごとに見直し可能です（Team プランは 2〜150 名から柔軟に調整可）。拡大・縮小も管理画面から即時可能。</p>
+
+  <h2 class="sec">4. 運営主担当の委譲について（本提案の核心）</h2>
+
+  <h3 class="sub">4-1. 現在のリスク構造</h3>
+  <div class="warn sans">
+    <p style="font-size:10pt;">
+      現在、松川村の AI 教育プロジェクトは、<strong>技術・契約・支払のすべてが小林個人に集中</strong>しています。
+      これは以下のリスクを内包しています。
+    </p>
+    <ul class="neat" style="font-size:10pt;">
+      <li>・小林が異動・退職した瞬間に、サービスが停止し、2システムが使用不能になる</li>
+      <li>・契約が個人名義のため、教育委員会として<strong>正式にシステムを保有していない</strong>状態</li>
+      <li>・小林の経済的負担（月 約 9.8 万円）が継続的に発生している</li>
+    </ul>
+  </div>
+
+  <h3 class="sub">4-2. 委譲後の役割分担（小林は「利用者」として継続）</h3>
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th style="width:18%;">項目</th>
+        <th>松川村教育委員会（委譲後）</th>
+        <th>小林（利用者として継続）</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>契約主体</td>
+        <td><strong>✓ 契約名義人・支払主体</strong></td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>費用負担</td>
+        <td><strong>✓ 公費</strong></td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>管理者権限</td>
+        <td><strong>✓ ワークスペース管理者（古畑 元大 教育長 または指定職員）</strong></td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>メンバー管理</td>
+        <td><strong>✓ 追加・削除・権限付与</strong></td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>システム構築・運用</td>
+        <td>—</td>
+        <td><strong>✓ 継続（自由進度学習・協働ナビ開発）</strong></td>
+      </tr>
+      <tr>
+        <td>教員研修・資料作成</td>
+        <td>—</td>
+        <td><strong>✓ 継続（校内展開支援）</strong></td>
+      </tr>
+      <tr>
+        <td>月次レポート作成</td>
+        <td>—</td>
+        <td><strong>✓ 継続（データ分析・提言）</strong></td>
+      </tr>
+      <tr>
+        <td>技術サポート</td>
+        <td>—</td>
+        <td><strong>✓ 利用者としてアドバイザリ提供</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="good sans">
+    <p style="font-size:10pt;">
+      <i class="fas fa-check-circle mr-1"></i>
+      <strong>ポイント：</strong>小林は契約主体から外れますが、利用者・開発者・運用支援者としては継続します。
+      「支払責任と組織統制は教育委員会」「運用ノウハウは小林」の適切な分業体制となります。
+    </p>
+  </div>
+
+  <div class="page-num">3 / 4</div>
+  <div class="footer-note">松川村教育委員会 古畑 元大 教育長 様｜GenSparkワークスペース導入提案（小林寿英）</div>
+</div>
+
+<!-- ========== ページ 4：ステップ・効果・署名 ========== -->
+<div class="a4-page">
+
+  <h2 class="sec">5. 移行までの具体的ステップ（お願い）</h2>
+
+  <div class="step-card">
+    <span class="step-num">1</span>
+    <strong class="sans">Team プランアカウント開設（教育委員会名義・10 名枠）</strong>
+    <p class="ml-8" style="font-size:10pt;">
+      GenSpark 公式サイト（<span class="sans">https://genspark.ai</span>）より、
+      教育委員会の公的メールアドレス（例：<span class="sans">info@vill.matsukawa.nagano.jp</span>）で Team プランを <strong>10 シート</strong> でご契約ください。
+      決済は請求書払い対応が可能です（年払い・月払い選択可、月額 $300・約 46,000 円）。
+    </p>
+    <p class="ml-8 note">所要：約 15 分　／　必要書類：クレジットカード または 請求書払い申込書</p>
+  </div>
+
+  <div class="step-card">
+    <span class="step-num">2</span>
+    <strong class="sans">メンバー招待（小林のメールアドレス）</strong>
+    <p class="ml-8" style="font-size:10pt;">
+      管理画面より「メンバー招待」をクリックし、小林の業務用メールアドレスを入力して招待メールを送信いただきます。
+      小林は招待メールのリンクからワークスペースに参加します。
+    </p>
+    <p class="ml-8 note">所要：約 5 分</p>
+  </div>
+
+  <div class="step-card">
+    <span class="step-num">3</span>
+    <strong class="sans">システム・データ移行</strong>
+    <p class="ml-8" style="font-size:10pt;">
+      小林の個人アカウントで構築済みの<strong>自由進度学習システム</strong>および
+      <strong>協働ナビシステム</strong>のプロジェクト・ワークフローを新ワークスペースへ移行します。
+      移行作業は小林が一貫して実施し、データ損失・機能劣化は発生しません。
+    </p>
+    <p class="ml-8 note">所要：約 2〜3 日（段階的移行）</p>
+  </div>
+
+  <div class="step-card">
+    <span class="step-num">4</span>
+    <strong class="sans">個人契約の解約（Pro プラン停止）</strong>
+    <p class="ml-8" style="font-size:10pt;">
+      移行完了を確認後、小林の Pro プラン個人契約を解約します。
+      以降、小林の月額 約 9.8 万円の個人負担は発生しません。
+    </p>
+    <p class="ml-8 note">所要：即日　／　当月末締め・翌月解約が原則</p>
+  </div>
+
+  <h2 class="sec">6. 期待される効果（5年間）</h2>
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th>項目</th>
+        <th style="width:25%;">金額換算</th>
+        <th>備考</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>① 小林個人負担解消（5年累積）</td><td class="num text-green-700">約 588 万円</td><td>年 117.6 万円 × 5 年相当が村予算で処理</td></tr>
+      <tr><td>② 外注委託代替効果（システム構築・運用）</td><td class="num text-green-700">約 2,300 〜 3,600 万円</td><td>年 460〜720 万円の外注相当を内製化</td></tr>
+      <tr><td>③ 視察受入・講演依頼の収入</td><td class="num text-green-700">約 100 万円</td><td>1 件 5 万円 × 20 件 / 5 年（推計）</td></tr>
+      <tr><td>④ メディア・広報露出効果</td><td class="num text-green-700">約 500 万円</td><td>新聞・テレビ・教育専門誌掲載の広告換算</td></tr>
+      <tr><td>⑤ 移住促進・地域活性化効果</td><td class="num text-green-700">約 300 万円</td><td>教育魅力化による転入増（概算）</td></tr>
+      <tr style="background:#fef3c7; font-weight:700;">
+        <td>経済効果 合計（5年）</td>
+        <td class="num">約 3,700 〜 5,000 万円</td>
+        <td>控えめ試算</td>
+      </tr>
+      <tr>
+        <td>投資額（Team プラン 10 名 × 5 年）</td>
+        <td class="num">約 275 万円</td>
+        <td>55 万円 × 5 年</td>
+      </tr>
+      <tr style="background:#dbeafe; font-weight:700;">
+        <td>投資対効果（ROI）</td>
+        <td class="num text-blue-900">約 13 〜 18 倍</td>
+        <td>先行投資としての合理性</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="highlight sans mt-3">
+    <p style="font-size:11pt;">
+      <i class="fas fa-star text-amber-700 mr-1"></i>
+      <strong>結論：</strong>
+      Team プラン 10 名契約（年 約 55 万円）は、
+      <strong>小林個人の経済負担（年 117.6 万円）を解消しつつ、現行の作業量を維持・組織全体に拡張する</strong>ための合理的投資です。
+      比較して <strong>年間 62.6 万円の削減</strong>、かつ <strong>全国初の組織主体 AI 教育実装モデル</strong>として松川村の価値を高め、
+      5年累積で <strong>投資 275 万円 → 効果 約 3,700〜5,000 万円（ROI 約 13〜18 倍）</strong>
+      が期待されます。
+    </p>
+  </div>
+
+  <h2 class="sec">7. ご判断のお願い</h2>
+  <p>
+    以上、Genspark ワークスペースの教育委員会契約化と運営主担当の委譲について、提案させていただきました。
+    本提案は、<strong>松川村の教育改革プロジェクトを「小林個人の属人的取組」から「松川村教育委員会の組織的資産」へと昇華させる重要な節目</strong>と考えております。
+  </p>
+  <p>
+    つきましては、下記の3点について、ご確認・ご承認をいただきたく、よろしくお願い申し上げます。
+  </p>
+  <ol class="neat sans">
+    <li>① 松川村教育委員会名義での GenSpark Team プラン契約（10 名枠・月額 約 46,000 円）</li>
+    <li>② 小林をメンバーとして招待すること（残り 8 名枠は教育委員会で保持・順次配布）</li>
+    <li>③ 契約主体・運営主担当を教育委員会へ委譲すること（小林は利用者として継続支援）</li>
+  </ol>
+
+  <div class="mt-4 p-3 bg-blue-50 border border-blue-300 rounded sans">
+    <p class="text-sm">
+      <i class="fas fa-info-circle text-blue-700 mr-1"></i>
+      <strong>添付資料：</strong>
+      「GenSpark 月額使用費用 実績レポート（小林個人運用期間）」（A4 2ページ）を別途ご用意しております。
+      過去 12 ヶ月の実費推移、利用用途内訳、外注換算比較を掲載しております。
+    </p>
+  </div>
+
+  <!-- 署名欄 -->
+  <div class="mt-6 grid grid-cols-2 gap-6">
+    <div class="border border-gray-400 p-4 rounded">
+      <p class="text-xs text-gray-500 sans">提出</p>
+      <p class="sans"><strong>松川村トコトン指導主事</strong></p>
+      <p class="text-xl sans font-bold mt-1">小林　寿英</p>
+      <div class="hanko-area">
+        <div class="hanko">小林</div>
+      </div>
+    </div>
+    <div class="border border-gray-400 p-4 rounded">
+      <p class="text-xs text-gray-500 sans">受領・ご判断</p>
+      <p class="sans"><strong>松川村教育委員会　教育長</strong></p>
+      <p class="text-xl sans font-bold mt-1">古畑 元大 様</p>
+      <div class="mt-3 text-xs text-gray-600 sans">
+        受領日：　　　　年　　月　　日<br>
+        ご判断：□ 承認　　□ 修正依頼　　□ 保留
+      </div>
+      <div class="hanko-area">
+        <div class="hanko" style="border-style: dashed; color:#9ca3af;">印</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-num">4 / 4</div>
+  <div class="footer-note">本提案書に関するお問い合わせ：小林寿英（松川村トコトン指導主事）</div>
+</div>
+
+</body>
+</html>

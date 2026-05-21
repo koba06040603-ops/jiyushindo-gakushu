@@ -744,6 +744,65 @@ if (typeof axios !== 'undefined') {
   axios.defaults.timeout = 300000 // 5分（AI生成の並列処理に対応）
 }
 
+// =============================================================================
+// 🔐 fetch グローバルインターセプター（認証トークン自動付与）
+// axios と同様に、/api/* への fetch 呼び出しに Authorization ヘッダーを自動付与する。
+// これにより、個別の fetch コールで Authorization を書き忘れても 401 にならない。
+// =============================================================================
+;(function installFetchAuthInterceptor() {
+  if (typeof window === 'undefined' || !window.fetch) return
+  if (window.__fetchAuthInterceptorInstalled) return
+  window.__fetchAuthInterceptorInstalled = true
+
+  const originalFetch = window.fetch.bind(window)
+
+  window.fetch = function patchedFetch(input, init) {
+    try {
+      // URL を抽出（string か Request オブジェクト）
+      let url = ''
+      if (typeof input === 'string') url = input
+      else if (input instanceof URL) url = input.toString()
+      else if (input && typeof input.url === 'string') url = input.url
+
+      // /api/* かつ 公開エンドポイント以外にのみ付与
+      const isApi = url.indexOf('/api/') >= 0 || url.startsWith('/api/')
+      const PUBLIC_PATHS = [
+        '/api/build-id',
+        '/api/auth/login',
+        '/api/auth/register',
+        '/api/auth/logout',
+        '/api/auth/refresh',
+        '/api/health',
+        '/api/notifications/send',
+        '/api/realtime/connect',
+      ]
+      const isPublic = PUBLIC_PATHS.some(function(p) {
+        return url.indexOf(p) >= 0
+      })
+
+      if (isApi && !isPublic) {
+        const token = (typeof state !== 'undefined' && state.auth && state.auth.sessionToken)
+          || localStorage.getItem('session_token')
+        if (token) {
+          // init.headers を破壊しないようにマージ
+          const newInit = Object.assign({}, init || {})
+          const h = new Headers((init && init.headers) || {})
+          if (!h.has('Authorization')) {
+            h.set('Authorization', 'Bearer ' + token)
+          }
+          newInit.headers = h
+          return originalFetch(input, newInit)
+        }
+      }
+    } catch (e) {
+      // インターセプターでの例外は無視して元の fetch を呼ぶ（フェイルセーフ）
+      console.warn('fetch interceptor error:', e)
+    }
+    return originalFetch(input, init)
+  }
+  console.log('✅ fetch auth interceptor installed')
+})();
+
 // グローバル状態管理
 const state = {
   currentView: 'top', // 'top', 'guide', 'card', 'progress', 'login'
@@ -7924,9 +7983,11 @@ async function loadCardPage(cardId) {
               if (exSection) {
                 exSection.innerHTML = `
                   <h3 class="card-heading font-bold text-gray-800 mb-4"><i class="fas fa-lightbulb mr-2 text-yellow-500"></i>例題</h3>
-                  <div class="text-center py-6">
+                  <div class="text-center py-6 bg-yellow-50 rounded-lg">
                     <i class="fas fa-exclamation-triangle text-yellow-500 text-2xl mb-2"></i>
-                    <p class="text-gray-500 text-sm">例題を準備中です。ページを再読み込みするか、しばらくお待ちください。</p>
+                    <p class="text-gray-600 text-sm font-bold mb-1">例題の自動生成が難しい問題です</p>
+                    <p class="text-gray-500 text-xs mb-3">本題に集中して取り組んでみましょう。</p>
+                    <button onclick="(function(btn){btn.disabled=true;btn.innerHTML='<i class=&quot;fas fa-spinner fa-spin mr-1&quot;></i>再生成中...';tryFixExample(0);})(this)" class="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-4 py-2 rounded-lg text-xs font-bold shadow hover:opacity-90"><i class="fas fa-sync-alt mr-1"></i>もう一度生成する</button>
                   </div>`
               }
               return
@@ -7974,9 +8035,11 @@ async function loadCardPage(cardId) {
               if (exSection) {
                 exSection.innerHTML = `
                   <h3 class="card-heading font-bold text-gray-800 mb-4"><i class="fas fa-lightbulb mr-2 text-yellow-500"></i>例題</h3>
-                  <div class="text-center py-6">
+                  <div class="text-center py-6 bg-yellow-50 rounded-lg">
                     <i class="fas fa-exclamation-triangle text-yellow-500 text-2xl mb-2"></i>
-                    <p class="text-gray-500 text-sm">例題を準備中です。ページを再読み込みするか、しばらくお待ちください。</p>
+                    <p class="text-gray-600 text-sm font-bold mb-1">例題の自動生成が難しい問題です</p>
+                    <p class="text-gray-500 text-xs mb-3">本題に集中して取り組んでみましょう。</p>
+                    <button onclick="(function(btn){btn.disabled=true;btn.innerHTML='<i class=&quot;fas fa-spinner fa-spin mr-1&quot;></i>再生成中...';tryFixExample(0);})(this)" class="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-4 py-2 rounded-lg text-xs font-bold shadow hover:opacity-90"><i class="fas fa-sync-alt mr-1"></i>もう一度生成する</button>
                   </div>`
               }
             }
@@ -7990,9 +8053,11 @@ async function loadCardPage(cardId) {
             if (exSection) {
               exSection.innerHTML = `
                 <h3 class="card-heading font-bold text-gray-800 mb-4"><i class="fas fa-lightbulb mr-2 text-yellow-500"></i>例題</h3>
-                <div class="text-center py-6">
+                <div class="text-center py-6 bg-yellow-50 rounded-lg">
                   <i class="fas fa-exclamation-triangle text-yellow-500 text-2xl mb-2"></i>
-                  <p class="text-gray-500 text-sm">例題を準備中です。ページを再読み込みするか、しばらくお待ちください。</p>
+                  <p class="text-gray-600 text-sm font-bold mb-1">例題の自動生成が難しい問題です</p>
+                  <p class="text-gray-500 text-xs mb-3">本題に集中して取り組んでみましょう。</p>
+                  <button onclick="(function(btn){btn.disabled=true;btn.innerHTML='<i class=&quot;fas fa-spinner fa-spin mr-1&quot;></i>再生成中...';tryFixExample(0);})(this)" class="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-4 py-2 rounded-lg text-xs font-bold shadow hover:opacity-90"><i class="fas fa-sync-alt mr-1"></i>もう一度生成する</button>
                 </div>`
             }
           }
@@ -42582,8 +42647,12 @@ async function executeLearningMusicGenerate(cardId) {
         html += '</div>'
       }
       
+      // ★ 編集用に歌詞データをグローバルに保存
+      window['__songData_' + cardId] = sd
+
       // アクション
       html += '<div style="padding:10px 14px 14px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">'
+      html += '<button onclick="openLyricsEditor(\'' + cardId + '\')" style="background:linear-gradient(135deg,#8B5CF6,#EC4899);color:white;border:none;padding:7px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;"><i class="fas fa-edit" style="margin-right:3px;"></i>歌詞を編集</button>'
       html += '<button onclick="executeLearningMusicGenerate(\'' + cardId + '\')" style="background:linear-gradient(135deg,#10B981,#3B82F6);color:white;border:none;padding:7px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;"><i class="fas fa-sync-alt" style="margin-right:3px;"></i>再生成</button>'
       html += '<button onclick="copyLyricsToClipboard()" style="background:#6366F1;color:white;border:none;padding:7px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;"><i class="fas fa-copy" style="margin-right:3px;"></i>歌詞コピー</button>'
       if (sd.suno_style_prompt) {
@@ -42597,7 +42666,15 @@ async function executeLearningMusicGenerate(cardId) {
       
       // ★ 非同期でLyria 3 Clip音楽を取得（歌詞表示後にバックグラウンドで）
       const lyricsForTTS = sd.short_lyrics && sd.short_lyrics !== 'NONE' && sd.short_lyrics.length > 10 ? sd.short_lyrics : (sd.lyrics || '')
-      if (lyricsForTTS.length > 10) {
+      // ★★★ TTS用ひらがな版歌詞（漢字読み誤り対策） ★★★
+      const lyricsReadingForTTS = (sd.short_lyrics_reading && sd.short_lyrics_reading.length > 10) ? sd.short_lyrics_reading
+        : (sd.lyrics_reading && sd.lyrics_reading.length > 10) ? sd.lyrics_reading : ''
+      // 編集された歌詞があれば優先
+      const editedLyrics = window['__editedLyrics_' + cardId]
+      const editedReading = window['__editedReading_' + cardId]
+      const finalLyricsForDisplay = editedLyrics || lyricsForTTS
+      const finalLyricsForTTS = editedReading || lyricsReadingForTTS || lyricsForTTS
+      if (finalLyricsForDisplay.length > 10) {
         (async function loadLyriaAudio() {
           try {
             const ttsController = new AbortController()
@@ -42607,7 +42684,9 @@ async function executeLearningMusicGenerate(cardId) {
               headers: { 'Content-Type': 'application/json' },
               signal: ttsController.signal,
               body: JSON.stringify({
-                lyrics_text: lyricsForTTS,
+                lyrics_text: finalLyricsForDisplay,
+                lyrics_text_reading: finalLyricsForTTS,
+                kanji_readings: sd.kanji_readings || [],
                 song_style: sd.genre || styleLabels[style] || style,
                 song_title: sd.song_title || ''
               })
@@ -43633,6 +43712,131 @@ function copyLyricsToClipboard() {
   }
 }
 window.copyLyricsToClipboard = copyLyricsToClipboard
+
+// ============================================================
+// 🎤 歌詞エディタ（Suno風）— 漢字読み誤りの修正・歌詞の自由編集
+// ============================================================
+function openLyricsEditor(cardId) {
+  const sd = window['__songData_' + cardId]
+  if (!sd) {
+    if (typeof showToast === 'function') showToast('歌詞データが見つかりません', 'error')
+    return
+  }
+  
+  // 既存の編集内容（あれば）
+  const existingLyrics = window['__editedLyrics_' + cardId] || sd.short_lyrics || sd.lyrics || ''
+  const existingReading = window['__editedReading_' + cardId] || sd.short_lyrics_reading || sd.lyrics_reading || ''
+  
+  // モーダル作成
+  const modalId = 'lyrics-editor-modal-' + Date.now()
+  const modal = document.createElement('div')
+  modal.id = modalId
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;animation:fadeIn 0.2s;'
+  
+  // 漢字読み仮名リスト（あれば表示用に整形）
+  let readingsHtml = ''
+  if (Array.isArray(sd.kanji_readings) && sd.kanji_readings.length > 0) {
+    readingsHtml = '<div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:10px;margin-bottom:12px;">' +
+      '<p style="font-size:0.75rem;color:#92400E;font-weight:bold;margin-bottom:6px;"><i class="fas fa-info-circle" style="margin-right:4px;"></i>漢字の読み方（AIに教えた読み）</p>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;">'
+    sd.kanji_readings.forEach(function(kr) {
+      if (kr.kanji && kr.yomi) {
+        readingsHtml += '<span style="background:white;border:1px solid #FCD34D;border-radius:6px;padding:3px 8px;font-size:0.7rem;color:#92400E;">' + 
+          escapeHtmlSafe(kr.kanji) + '<small style="color:#9CA3AF;margin-left:4px;">→ ' + escapeHtmlSafe(kr.yomi) + '</small></span>'
+      }
+    })
+    readingsHtml += '</div></div>'
+  }
+  
+  modal.innerHTML = 
+    '<div style="background:white;border-radius:16px;padding:20px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">' +
+        '<h3 style="font-size:1.1rem;font-weight:bold;color:#1F2937;margin:0;">' +
+          '<i class="fas fa-microphone-alt" style="color:#8B5CF6;margin-right:6px;"></i>歌詞エディタ' +
+        '</h3>' +
+        '<button onclick="document.getElementById(\'' + modalId + '\').remove()" style="background:#F3F4F6;border:none;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:0.9rem;">✕</button>' +
+      '</div>' +
+      '<p style="font-size:0.75rem;color:#6B7280;margin-bottom:12px;line-height:1.5;">' +
+        '歌詞を自由に編集できます。<br>' +
+        '<strong style="color:#8B5CF6;">読み仮名版</strong>を編集すると、AIに正しい発音で歌わせられます（例: 譜代大名 → ふだいだいみょう）。' +
+      '</p>' +
+      readingsHtml +
+      '<div style="margin-bottom:14px;">' +
+        '<label style="display:block;font-size:0.8rem;font-weight:bold;color:#374151;margin-bottom:4px;">' +
+          '<i class="fas fa-music" style="color:#10B981;margin-right:4px;"></i>歌詞（表示用・漢字混じり）' +
+        '</label>' +
+        '<textarea id="lyrics-display-edit-' + cardId + '" style="width:100%;min-height:120px;border:2px solid #E5E7EB;border-radius:8px;padding:10px;font-family:inherit;font-size:0.85rem;line-height:1.6;resize:vertical;">' + escapeHtmlSafe(existingLyrics) + '</textarea>' +
+      '</div>' +
+      '<div style="margin-bottom:14px;">' +
+        '<label style="display:block;font-size:0.8rem;font-weight:bold;color:#374151;margin-bottom:4px;">' +
+          '<i class="fas fa-volume-up" style="color:#8B5CF6;margin-right:4px;"></i>読み仮名版（TTS用・ひらがな）' +
+          ' <span style="font-weight:normal;color:#6B7280;font-size:0.7rem;">— AIが読み間違える時はここを直す</span>' +
+        '</label>' +
+        '<textarea id="lyrics-reading-edit-' + cardId + '" style="width:100%;min-height:120px;border:2px solid #DDD6FE;border-radius:8px;padding:10px;font-family:inherit;font-size:0.85rem;line-height:1.6;resize:vertical;background:#FAF5FF;">' + escapeHtmlSafe(existingReading) + '</textarea>' +
+        '<p style="font-size:0.65rem;color:#9CA3AF;margin-top:4px;">' +
+          '<i class="fas fa-lightbulb" style="margin-right:3px;"></i>ヒント: 「ふだいだいめい」を「ふだいだいみょう」のように直すと、歌い直すときに正しく発音されます。' +
+        '</p>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">' +
+        '<button onclick="resetLyricsEditor(\'' + cardId + '\',\'' + modalId + '\')" style="background:#F3F4F6;color:#374151;border:1px solid #E5E7EB;padding:8px 14px;border-radius:8px;font-size:0.8rem;cursor:pointer;font-weight:bold;">' +
+          '<i class="fas fa-undo" style="margin-right:4px;"></i>元に戻す' +
+        '</button>' +
+        '<button onclick="applyLyricsEdit(\'' + cardId + '\',\'' + modalId + '\')" style="background:linear-gradient(135deg,#8B5CF6,#EC4899);color:white;border:none;padding:8px 16px;border-radius:8px;font-size:0.8rem;cursor:pointer;font-weight:bold;">' +
+          '<i class="fas fa-microphone-alt" style="margin-right:4px;"></i>この歌詞で歌い直す' +
+        '</button>' +
+      '</div>' +
+    '</div>'
+  
+  document.body.appendChild(modal)
+}
+
+function escapeHtmlSafe(s) {
+  if (!s) return ''
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
+function resetLyricsEditor(cardId, modalId) {
+  const sd = window['__songData_' + cardId]
+  if (!sd) return
+  delete window['__editedLyrics_' + cardId]
+  delete window['__editedReading_' + cardId]
+  const dispEl = document.getElementById('lyrics-display-edit-' + cardId)
+  const readEl = document.getElementById('lyrics-reading-edit-' + cardId)
+  if (dispEl) dispEl.value = sd.short_lyrics || sd.lyrics || ''
+  if (readEl) readEl.value = sd.short_lyrics_reading || sd.lyrics_reading || ''
+  if (typeof showToast === 'function') showToast('元の歌詞に戻しました', 'info')
+}
+
+function applyLyricsEdit(cardId, modalId) {
+  const dispEl = document.getElementById('lyrics-display-edit-' + cardId)
+  const readEl = document.getElementById('lyrics-reading-edit-' + cardId)
+  const editedDisp = (dispEl ? dispEl.value : '').trim()
+  const editedRead = (readEl ? readEl.value : '').trim()
+  
+  if (editedDisp.length < 5) {
+    if (typeof showToast === 'function') showToast('歌詞が短すぎます', 'error')
+    return
+  }
+  
+  // 編集内容をグローバルに保存
+  window['__editedLyrics_' + cardId] = editedDisp
+  window['__editedReading_' + cardId] = editedRead
+  
+  // モーダルを閉じる
+  const modal = document.getElementById(modalId)
+  if (modal) modal.remove()
+  
+  if (typeof showToast === 'function') showToast('編集した歌詞で歌い直します...', 'success')
+  
+  // TTS を再生成（既存の音楽生成関数を呼ぶ）
+  if (typeof executeLearningMusicGenerate === 'function') {
+    executeLearningMusicGenerate(cardId)
+  }
+}
+
+window.openLyricsEditor = openLyricsEditor
+window.resetLyricsEditor = resetLyricsEditor
+window.applyLyricsEdit = applyLyricsEdit
 
 // ファイルサイズフォーマット
 function formatFileSize(bytes) {

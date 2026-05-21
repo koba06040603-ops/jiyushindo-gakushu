@@ -1,0 +1,1542 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>費用内訳 詳細版｜松川村教育委員会ご提案</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body { font-family: 'Hiragino Kaku Gothic ProN','Noto Sans JP','Yu Gothic',sans-serif; color:#1a1a1a; }
+  .hero-gradient { background: linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #92400e 100%); }
+  .cost-card { transition: transform .2s, box-shadow .2s; }
+  .cost-card:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,.1); }
+  .toc-link:hover { background: #fef3c7; padding-left: 16px; transition: all .2s; }
+  .breakdown-table th { background: #92400e; color:white; }
+  .breakdown-table tr:nth-child(even) td { background: #fef9e7; }
+  .breakdown-table td { padding: 10px 12px; border-bottom: 1px solid #fde68a; }
+  .breakdown-table td.num { text-align: right; font-weight: 600; font-family: 'Courier New', monospace; }
+  .highlight-box { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-left: 6px solid #f59e0b; padding: 20px; border-radius: 8px; }
+  .step-tab { cursor: pointer; transition: all .2s; }
+  .step-tab.active { background: #d97706; color: white; box-shadow: 0 4px 12px rgba(217,119,6,.3); }
+  .step-tab:not(.active):hover { background: #fef3c7; }
+  .saving-badge { background: #059669; color:white; padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: bold; }
+  @media print {
+    .no-print { display: none !important; }
+    body { font-size: 10pt; }
+    section { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body class="bg-gray-50">
+
+<!-- ========== ナビ ========== -->
+<nav class="bg-white shadow-md sticky top-0 z-50 no-print">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center flex-wrap gap-2">
+    <a href="/matsukawa-proposal.html" class="text-amber-700 font-bold hover:text-amber-900">
+      <i class="fas fa-arrow-left mr-1"></i>提案書へ戻る
+    </a>
+    <div class="flex gap-3 text-sm flex-wrap">
+      <a href="#summary" class="text-gray-700 hover:text-amber-700">概要</a>
+      <a href="#scale" class="text-gray-700 hover:text-amber-700">前提規模</a>
+      <a href="#breakdown" class="text-gray-700 hover:text-amber-700">項目別内訳</a>
+      <a href="#plans" class="text-gray-700 hover:text-amber-700">プラン別</a>
+      <a href="#subsidy" class="text-gray-700 hover:text-amber-700">補助金</a>
+      <a href="#compare" class="text-gray-700 hover:text-amber-700">他社実名比較</a>
+      <a href="#matsukawa-involvement" class="text-emerald-700 font-bold hover:text-emerald-900">指導主事無料化＋GenSpark</a>
+      <a href="#tco" class="text-gray-700 hover:text-amber-700">5年TCO</a>
+      <a href="#faq" class="text-gray-700 hover:text-amber-700">Q&amp;A</a>
+    </div>
+    <button onclick="window.print()" class="bg-amber-600 text-white px-3 py-1 rounded text-sm hover:bg-amber-700">
+      <i class="fas fa-print mr-1"></i>印刷
+    </button>
+  </div>
+</nav>
+
+<!-- ========== ヒーロー ========== -->
+<header class="hero-gradient text-white py-16 px-4">
+  <div class="max-w-5xl mx-auto text-center">
+    <div class="inline-block bg-white/20 px-4 py-1 rounded-full text-sm mb-4">
+      <i class="fas fa-yen-sign mr-1"></i>費用内訳 詳細版
+    </div>
+    <h1 class="text-4xl md:text-5xl font-bold mb-4">
+      「その金額で大丈夫？」にお答えします
+    </h1>
+    <p class="text-xl opacity-95 mb-2">松川村教育委員会 専用お見積り内訳書</p>
+    <p class="text-sm opacity-80">松川村 実児童生徒数（小学校 429名・2024年 + 中学校 242名・2026年 = 計671名）ベース</p>
+  </div>
+</header>
+
+<!-- ========== 1. エグゼクティブサマリー ========== -->
+<section id="summary" class="py-12 px-4 bg-white">
+  <div class="max-w-5xl mx-auto">
+    <div class="flex items-center mb-6">
+      <span class="bg-amber-600 text-white text-lg font-bold px-4 py-2 rounded mr-4">1</span>
+      <h2 class="text-3xl font-bold">結論 ― ひと目でわかる松川村ご負担額</h2>
+    </div>
+
+    <!-- 費用の実態 凡例 -->
+    <div class="bg-emerald-50 border-l-4 border-emerald-600 rounded p-4 mb-5">
+      <p class="font-bold text-emerald-900 mb-2"><i class="fas fa-lightbulb mr-1"></i>本提案で実際に発生する費用は「GenSpark AI 利用料」のみです</p>
+      <p class="text-sm text-gray-700 mb-2">
+        システム構築・サーバー運用・教員研修・保護者説明・サポートデスク・月次レポート作成・セキュリティ対応・システム改修等、
+        一般的には外部業者への委託で数百万円単位の費用が発生する業務は、
+        <strong>すべて指導主事（私）が GenSpark を活用して村内で内製化</strong>しています。
+      </p>
+      <p class="text-sm text-gray-800">
+        したがって松川村にご負担いただくのは、私が提案書作成・費用分析・資料修正・データ分析・システム改修依頼等で
+        実際に使用している <strong class="text-amber-700">GenSpark AI ツールの従量課金実費（月額約 10 万円・変動あり）</strong> のみです。
+      </p>
+    </div>
+
+    <div class="highlight-box mb-8">
+      <p class="text-lg mb-3">
+        <strong>STEP A（学校単位・推奨プラン）</strong>を導入された場合の実コスト：
+      </p>
+      <table class="w-full text-lg">
+        <tr class="text-gray-500">
+          <td class="py-2 line-through">① 一般的な外部委託費（初期 70万 + 年間 80.4万）</td>
+          <td class="py-2 text-right font-bold line-through">1,504,000 円</td>
+        </tr>
+        <tr class="text-emerald-700">
+          <td class="py-2">② 指導主事（私） × GenSpark による全面内製化</td>
+          <td class="py-2 text-right font-bold">- 1,504,000 円</td>
+        </tr>
+        <tr class="text-amber-700 border-t border-gray-300">
+          <td class="py-2">③ 実発生費用：GenSpark AI 利用料（実費・月約10万円×12ヶ月）</td>
+          <td class="py-2 text-right font-bold">+ 1,200,000 円</td>
+        </tr>
+        <tr class="border-t border-gray-300">
+          <td class="py-2 text-gray-700">小計（補助金適用前）</td>
+          <td class="py-2 text-right font-bold text-gray-700">1,200,000 円</td>
+        </tr>
+        <tr class="text-green-700">
+          <td class="py-2">EdTech補助金 2/3 活用</td>
+          <td class="py-2 text-right font-bold">- 800,000 円</td>
+        </tr>
+        <tr class="border-t-2 border-amber-600 text-amber-900">
+          <td class="py-3 font-bold text-xl">松川村 実質ご負担（年額）</td>
+          <td class="py-3 text-right font-bold text-3xl">400,000 円 / 年</td>
+        </tr>
+        <tr class="text-emerald-800">
+          <td class="py-2 text-sm">初期費用（一時金）</td>
+          <td class="py-2 text-right font-bold">0 円</td>
+        </tr>
+      </table>
+      <p class="text-sm text-gray-700 mt-4">
+        <i class="fas fa-check-circle text-green-600 mr-1"></i>
+        児童生徒1人あたり <strong>年間 約 596円（月約50円、1日約1.6円）</strong>。<br>
+        <span class="text-xs text-amber-700">※ GenSpark利用料は実使用量により月7〜13万円で変動（年間84〜156万円）。上記は月10万円想定の基準額です。実使用量に応じ補助金対象額も連動します。</span>
+      </p>
+    </div>
+
+    <!-- 3行まとめ -->
+    <div class="grid md:grid-cols-3 gap-4">
+      <div class="cost-card bg-blue-50 rounded-lg p-6 border-2 border-blue-200">
+        <div class="text-4xl mb-2"><i class="fas fa-user-shield text-blue-600"></i></div>
+        <h3 class="font-bold text-blue-900 mb-2">初期費用 0円</h3>
+        <p class="text-sm text-gray-700">システム構築・研修・資料作成はすべて指導主事が GenSpark で対応済。外部委託ゼロ。</p>
+      </div>
+      <div class="cost-card bg-amber-50 rounded-lg p-6 border-2 border-amber-200">
+        <div class="text-4xl mb-2"><i class="fas fa-chart-line text-amber-600"></i></div>
+        <h3 class="font-bold text-amber-900 mb-2">実コストはAI利用料のみ</h3>
+        <p class="text-sm text-gray-700">GenSpark AI の従量課金実費（月約10万円・変動あり）のみが実発生費用。内訳を毎月明細でご報告。</p>
+      </div>
+      <div class="cost-card bg-green-50 rounded-lg p-6 border-2 border-green-200">
+        <div class="text-4xl mb-2"><i class="fas fa-gift text-green-600"></i></div>
+        <h3 class="font-bold text-green-900 mb-2">補助金後 年40万円</h3>
+        <p class="text-sm text-gray-700">EdTech補助金 2/3 活用で年間 40万円。Qubena通常版 約531万円/年の 約 1/13。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 2. 前提規模 ========== -->
+<section id="scale" class="py-12 px-4 bg-gray-50">
+  <div class="max-w-5xl mx-auto">
+    <div class="flex items-center mb-6">
+      <span class="bg-amber-600 text-white text-lg font-bold px-4 py-2 rounded mr-4">2</span>
+      <h2 class="text-3xl font-bold">前提規模 ― 松川村の実数で算定</h2>
+    </div>
+
+    <p class="text-gray-700 mb-6">
+      本お見積りは、他村の実績や仮の想定値ではなく、<strong>松川村の2026年度実データ</strong>に基づいて算定しています。
+    </p>
+
+    <div class="grid md:grid-cols-2 gap-6 mb-8">
+      <div class="bg-white rounded-lg p-6 shadow-md border-l-4 border-blue-500">
+        <h3 class="font-bold text-xl text-blue-900 mb-3">
+          <i class="fas fa-school mr-2"></i>松川村立松川小学校
+        </h3>
+        <table class="w-full text-sm">
+          <tr class="border-b"><td class="py-2">児童数</td><td class="py-2 text-right font-bold">429名</td></tr>
+          <tr class="border-b"><td class="py-2">学級数</td><td class="py-2 text-right font-bold">18学級</td></tr>
+          <tr class="border-b"><td class="py-2">教員数（概算）</td><td class="py-2 text-right font-bold">約 30名</td></tr>
+          <tr><td class="py-2">出典</td><td class="py-2 text-right text-gray-600 text-xs">2024年度 松川村ご提供データ</td></tr>
+        </table>
+      </div>
+      <div class="bg-white rounded-lg p-6 shadow-md border-l-4 border-green-500">
+        <h3 class="font-bold text-xl text-green-900 mb-3">
+          <i class="fas fa-graduation-cap mr-2"></i>松川村立松川中学校
+        </h3>
+        <table class="w-full text-sm">
+          <tr class="border-b"><td class="py-2">生徒数</td><td class="py-2 text-right font-bold">242名</td></tr>
+          <tr class="border-b"><td class="py-2">学級数</td><td class="py-2 text-right font-bold">9学級</td></tr>
+          <tr class="border-b"><td class="py-2">教員数（概算）</td><td class="py-2 text-right font-bold">約 20名</td></tr>
+          <tr><td class="py-2">出典</td><td class="py-2 text-right text-gray-600 text-xs">2026年度 松川村ご提供データ</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="bg-amber-100 rounded-lg p-6 border-2 border-amber-400">
+      <div class="flex items-center flex-wrap gap-4">
+        <div class="flex-1 min-w-[200px]">
+          <p class="text-sm text-gray-700 mb-1">合計利用者数（アカウント）</p>
+          <p class="text-4xl font-bold text-amber-900">
+            約 <span class="text-6xl">721</span> 名
+          </p>
+          <p class="text-xs text-gray-600 mt-1">内訳：児童429 + 生徒242 + 教員50 ≒ 721</p>
+        </div>
+        <div class="flex-1 min-w-[200px]">
+          <p class="text-sm text-gray-700 mb-1">1人あたり年間ご負担額（STEP A・補助金後）</p>
+          <p class="text-4xl font-bold text-green-700">
+            約 <span class="text-6xl">596</span> 円
+          </p>
+          <p class="text-xs text-gray-600 mt-1">= 月約50円 ≒ 1日約1.6円（初期費用は発生しません）</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 3. 項目別内訳 ========== -->
+<section id="breakdown" class="py-12 px-4 bg-white">
+  <div class="max-w-5xl mx-auto">
+    <div class="flex items-center mb-6">
+      <span class="bg-amber-600 text-white text-lg font-bold px-4 py-2 rounded mr-4">3</span>
+      <h2 class="text-3xl font-bold">項目別 完全内訳（STEP A 学校単位プラン）</h2>
+    </div>
+
+    <p class="text-gray-700 mb-6">
+      下記は「何にいくらかかるのか」を、できる限り細分化して公開するものです。
+      一般的なSaaS事業者は内訳を出さないことが多い中、松川村には透明性を確保しご提示します。
+    </p>
+
+    <!-- 3-1. イニシャル（初期費用） -->
+    <h3 class="text-2xl font-bold text-amber-900 mb-4 mt-8">
+      <i class="fas fa-rocket mr-2"></i>3-1. 初期費用（初年度のみ・すべて指導主事がGenSparkで対応済）
+    </h3>
+
+    <div class="bg-green-50 border-l-4 border-green-600 rounded p-4 mb-4">
+      <p class="text-gray-800">
+        <i class="fas fa-check-double text-green-700 mr-1"></i>
+        <strong>初期費用 7項目は、指導主事が GenSpark を活用して既にすべて対応済のため、松川村のご負担は 0 円 です。</strong>
+      </p>
+      <p class="text-xs text-gray-700 mt-2">
+        ※ これら 7 項目は、通常であれば外部委託で計70万円程度発生する業務ですが、指導主事が提案書作成・システム設計・
+        カスタマイズ・資料作成までを GenSpark で内製化されているため、別途の外部費用は発生しません。
+      </p>
+    </div>
+
+    <div class="overflow-x-auto mb-6">
+      <table class="breakdown-table w-full bg-white rounded-lg shadow-md overflow-hidden">
+        <thead>
+          <tr>
+            <th class="p-3 text-left">費用項目</th>
+            <th class="p-3 text-left">内容</th>
+            <th class="p-3 text-right">一般相場</th>
+            <th class="p-3 text-right">松川村ご負担</th>
+            <th class="p-3 text-left">備考</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>① 環境構築費</td>
+            <td>専用サーバー構築・DB設計・初期セットアップ</td>
+            <td class="num text-gray-500 line-through">200,000 円</td>
+            <td class="num text-green-700 font-bold">0 円</td>
+            <td class="text-xs text-gray-600">指導主事がGenSparkでCloudflare環境構築済</td>
+          </tr>
+          <tr>
+            <td>② 児童生徒データ初期登録</td>
+            <td>約721名分のアカウント発行・クラス編成</td>
+            <td class="num text-gray-500 line-through">100,000 円</td>
+            <td class="num text-green-700 font-bold">0 円</td>
+            <td class="text-xs text-gray-600">CSV取込機能をGenSparkで実装済</td>
+          </tr>
+          <tr>
+            <td>③ カスタマイズ費</td>
+            <td>松川村ロゴ・村の色彩・ご要望反映</td>
+            <td class="num text-gray-500 line-through">80,000 円</td>
+            <td class="num text-green-700 font-bold">0 円</td>
+            <td class="text-xs text-gray-600">指導主事がGenSparkで自由に修正可能</td>
+          </tr>
+          <tr>
+            <td>④ 教員研修費</td>
+            <td>2時間×3回（小中合同）+ 現地訪問2回</td>
+            <td class="num text-gray-500 line-through">150,000 円</td>
+            <td class="num text-green-700 font-bold">0 円</td>
+            <td class="text-xs text-gray-600">指導主事が校内研修を実施</td>
+          </tr>
+          <tr>
+            <td>⑤ 保護者向け説明資料作成</td>
+            <td>パンフレット・動画・説明会登壇</td>
+            <td class="num text-gray-500 line-through">70,000 円</td>
+            <td class="num text-green-700 font-bold">0 円</td>
+            <td class="text-xs text-gray-600">指導主事がGenSparkで資料作成</td>
+          </tr>
+          <tr>
+            <td>⑥ セキュリティ初期設定</td>
+            <td>AES-256-GCM暗号鍵発行・アクセス制御</td>
+            <td class="num text-gray-500 line-through">50,000 円</td>
+            <td class="num text-green-700 font-bold">0 円</td>
+            <td class="text-xs text-gray-600">米田氏ご指摘対応もGenSparkで実装済</td>
+          </tr>
+          <tr>
+            <td>⑦ 既存データ連携（任意）</td>
+            <td>校務支援システムとの接続確認</td>
+            <td class="num text-gray-500 line-through">50,000 円</td>
+            <td class="num text-green-700 font-bold">0 円</td>
+            <td class="text-xs text-gray-600">必要時に指導主事が対応</td>
+          </tr>
+          <tr class="bg-green-100 font-bold">
+            <td colspan="2" class="text-green-900">初期費用 合計（A）</td>
+            <td class="num text-gray-500 line-through">700,000 円</td>
+            <td class="num text-green-900 text-2xl">0 円</td>
+            <td class="text-xs text-green-800">指導主事がGenSparkで全項目対応済</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 3-2. ランニング（継続費用） -->
+    <h3 class="text-2xl font-bold text-amber-900 mb-4 mt-10">
+      <i class="fas fa-sync-alt mr-2"></i>3-2. 継続費用（毎年発生分・すべて指導主事がGenSparkで対応済）
+    </h3>
+
+    <div class="bg-green-50 border-l-4 border-green-600 rounded p-4 mb-4">
+      <p class="text-gray-800">
+        <i class="fas fa-check-double text-green-700 mr-1"></i>
+        <strong>継続費用 9項目も、指導主事が GenSpark を活用して村内で内製化されるため、松川村のご負担は 0 円 です。</strong>
+      </p>
+      <p class="text-xs text-gray-700 mt-2">
+        ※ 一般的な SaaS では年間 80 万円程度発生する運用・保守・サポート業務ですが、
+        本提案ではサーバー（Cloudflare 無料枠～低額）、AI（Gemini API 無料枠）、保守・サポート・研修・レポート作成をすべて指導主事が GenSpark で対応されるため、外部委託費は発生しません。
+      </p>
+    </div>
+
+    <div class="overflow-x-auto mb-6">
+      <table class="breakdown-table w-full bg-white rounded-lg shadow-md overflow-hidden">
+        <thead>
+          <tr>
+            <th class="p-3 text-left">費用項目</th>
+            <th class="p-3 text-left">内容</th>
+            <th class="p-3 text-right">一般相場（月額）</th>
+            <th class="p-3 text-right">松川村ご負担（月額）</th>
+            <th class="p-3 text-left">備考</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>⑧ サーバー利用料</td>
+            <td>Cloudflare（D1/KV/R2）グローバル配信</td>
+            <td class="num text-gray-500 line-through">8,000 円</td>
+            <td class="num text-green-700 font-bold">0 円</td>
+            <td class="text-xs text-gray-600">Cloudflare 無料枠で運用</td>
+          </tr>
+          <tr>
+            <td>⑨ AI利用料（生成AI）</td>
+            <td>個別問題生成・採点・チャットボット</td>
+            <td class="num text-gray-500 line-through">15,000 円</td>
+            <td class="num text-green-700 font-bold">0 円</td>
+            <td class="text-xs text-gray-600">Gemini API 無料枠で運用</td>
+          </tr>
+          <tr>
+            <td>⑩ システム保守費</td>
+            <td>バグ修正・セキュリティ更新・バックアップ</td>
+            <td class="num text-gray-500 line-through">10,000 円</td>
+            <td class="num text-green-700 font-bold">0 円</td>
+            <td class="text-xs text-gray-600">指導主事がGenSparkで対応</td>
+          </tr>
+          <tr>
+            <td>⑪ サポートデスク</td>
+            <td>教員・保護者向け ヘルプデスク</td>
+            <td class="num text-gray-500 line-through">12,000 円</td>
+            <td class="num text-green-700 font-bold">0 円</td>
+            <td class="text-xs text-gray-600">指導主事が校内対応</td>
+          </tr>
+          <tr>
+            <td>⑫ 月次レポート作成</td>
+            <td>教育委員会向け進捗・効果レポート</td>
+            <td class="num text-gray-500 line-through">5,000 円</td>
+            <td class="num text-green-700 font-bold">0 円</td>
+            <td class="text-xs text-gray-600">指導主事がGenSparkで生成</td>
+          </tr>
+          <tr>
+            <td>⑬ コンテンツ更新</td>
+            <td>学習指導要領改定・問題追加・教材更新</td>
+            <td class="num text-gray-500 line-through">6,500 円</td>
+            <td class="num text-green-700 font-bold">0 円</td>
+            <td class="text-xs text-gray-600">指導主事がGenSparkで更新</td>
+          </tr>
+          <tr>
+            <td>⑭ 継続研修</td>
+            <td>学期ごと研修（年3回）・新任教員フォロー</td>
+            <td class="num text-gray-500 line-through">5,000 円</td>
+            <td class="num text-green-700 font-bold">0 円</td>
+            <td class="text-xs text-gray-600">指導主事が校内研修実施</td>
+          </tr>
+          <tr>
+            <td>⑮ 賠償責任保険</td>
+            <td>データ漏えい等の事故対応費</td>
+            <td class="num text-gray-500 line-through">1,500 円</td>
+            <td class="num text-green-700 font-bold">0 円</td>
+            <td class="text-xs text-gray-600">当社側で負担（松川村請求なし）</td>
+          </tr>
+          <tr>
+            <td>⑯ その他運営費</td>
+            <td>通信・会計・書類作成・事務局対応</td>
+            <td class="num text-gray-500 line-through">4,000 円</td>
+            <td class="num text-green-700 font-bold">0 円</td>
+            <td class="text-xs text-gray-600">指導主事が事務局対応</td>
+          </tr>
+          <tr class="bg-green-100 font-bold">
+            <td colspan="2" class="text-green-900">継続費用 合計（B）</td>
+            <td class="num text-gray-500 line-through">67,000 円</td>
+            <td class="num text-green-900 text-2xl">0 円</td>
+            <td class="text-xs text-green-800">/ 月</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 3-3. 実発生費用（GenSpark） -->
+    <h3 class="text-2xl font-bold text-amber-900 mb-4 mt-10">
+      <i class="fas fa-robot mr-2"></i>3-3. 実発生費用（GenSpark AI 利用料・実費）
+    </h3>
+
+    <div class="bg-amber-50 border-l-4 border-amber-500 rounded p-4 mb-4">
+      <p class="text-gray-800 mb-2">
+        <i class="fas fa-exclamation-circle text-amber-700 mr-1"></i>
+        <strong>本提案で唯一実際に発生する費用は、指導主事が業務でお使いになる GenSpark AI ツールの従量課金実費です。</strong>
+      </p>
+      <p class="text-sm text-gray-700">
+        提案書作成・費用分析・資料修正・データ分析レポート生成・セキュリティ対応・システム改修依頼・教材作成等の業務で実際に
+        消費された AI トークン分を、松川村へ実費請求いたします（上乗せマージン・手数料ゼロ）。
+      </p>
+    </div>
+
+    <div class="overflow-x-auto mb-6">
+      <table class="breakdown-table w-full bg-white rounded-lg shadow-md overflow-hidden">
+        <thead>
+          <tr>
+            <th class="p-3 text-left">用途</th>
+            <th class="p-3 text-left">内容</th>
+            <th class="p-3 text-right">月額（想定）</th>
+            <th class="p-3 text-right">年額（想定）</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>⑰ 提案書・文書作成</td>
+            <td>本提案書や教育委員会向け報告書の作成・修正</td>
+            <td class="num">約 25,000 円</td>
+            <td class="num">約 300,000 円</td>
+          </tr>
+          <tr>
+            <td>⑱ データ分析・月次レポート</td>
+            <td>学習ログ分析・効果測定・月次レポート生成</td>
+            <td class="num">約 20,000 円</td>
+            <td class="num">約 240,000 円</td>
+          </tr>
+          <tr>
+            <td>⑲ システム改修依頼</td>
+            <td>機能追加・改善要望の仕様書作成・検証</td>
+            <td class="num">約 20,000 円</td>
+            <td class="num">約 240,000 円</td>
+          </tr>
+          <tr>
+            <td>⑳ セキュリティ対応</td>
+            <td>PII暗号化・脆弱性対応・インシデント調査</td>
+            <td class="num">約 15,000 円</td>
+            <td class="num">約 180,000 円</td>
+          </tr>
+          <tr>
+            <td>㉑ 資料・教材作成</td>
+            <td>教員研修資料・保護者説明資料・授業教材の作成</td>
+            <td class="num">約 10,000 円</td>
+            <td class="num">約 120,000 円</td>
+          </tr>
+          <tr>
+            <td>㉒ その他（問い合わせ対応等）</td>
+            <td>FAQ作成・教員からの質問への回答検討</td>
+            <td class="num">約 10,000 円</td>
+            <td class="num">約 120,000 円</td>
+          </tr>
+          <tr class="bg-amber-100 font-bold">
+            <td colspan="2" class="text-amber-900">GenSpark AI 利用料 合計（C）</td>
+            <td class="num text-amber-900">約 100,000 円</td>
+            <td class="num text-amber-900 text-lg">約 1,200,000 円</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="bg-yellow-50 rounded-lg p-4 border-l-4 border-yellow-500 mb-6">
+      <p class="text-sm text-gray-800">
+        <i class="fas fa-chart-bar text-yellow-700 mr-1"></i>
+        <strong>変動幅について：</strong> GenSpark AI 利用料は従量課金のため、実使用量により
+        <strong class="text-amber-700">月額 7〜13 万円（年間 84〜156 万円）</strong> の範囲で変動します。
+        上記は過去実績に基づく月 10 万円想定の基準額です。毎月末に利用明細をご提出し、翌月の使用計画を相談の上、適切にコントロールいたします。
+      </p>
+    </div>
+
+    <!-- 3-4. 合算 -->
+    <h3 class="text-2xl font-bold text-amber-900 mb-4 mt-10">
+      <i class="fas fa-calculator mr-2"></i>3-4. 年間合算（初年度・2年目以降とも同額）
+    </h3>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg p-6 border-2 border-amber-400">
+        <p class="text-sm text-amber-700 font-bold mb-2">補助金適用前（A + B + C）</p>
+        <p class="text-4xl font-bold text-amber-900 mb-2">1,200,000 円 / 年</p>
+        <p class="text-sm text-gray-700">初期費用0円 + 継続費用0円 + GenSpark実費 約120万円</p>
+        <p class="text-xs text-gray-600 mt-2">※ GenSpark実使用量により 84〜156万円で変動</p>
+      </div>
+      <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-6 border-2 border-green-400">
+        <p class="text-sm text-green-700 font-bold mb-2">EdTech補助金 2/3 適用後</p>
+        <p class="text-4xl font-bold text-green-900 mb-2">400,000 円 / 年</p>
+        <p class="text-sm text-gray-700">松川村 実質ご負担額</p>
+        <p class="text-xs text-gray-600 mt-2">1人あたり 約 596円/年 （月約50円、1日約1.6円）</p>
+      </div>
+    </div>
+
+    <div class="bg-blue-50 rounded-lg p-6 mt-6 border-l-4 border-blue-500">
+      <h4 class="font-bold text-blue-900 mb-2"><i class="fas fa-info-circle mr-2"></i>なぜこの金額でご提供できるのか？</h4>
+      <ul class="text-sm text-gray-700 space-y-1 list-disc pl-5">
+        <li>サーバーに Cloudflare の<strong>エッジ基盤 無料枠</strong>を採用（721名規模なら無料枠内で運用可能）</li>
+        <li>AIは<strong>Gemini API の無料枠</strong>を活用（超過分のみ従量課金だが、指導主事運用で最適化）</li>
+        <li>システム構築・カスタマイズは既に指導主事が GenSpark で完了済み（新規開発費なし）</li>
+        <li>教員研修・保護者説明・サポートデスク・月次レポート作成はすべて<strong>指導主事が校内で実施</strong>（外部委託費ゼロ）</li>
+        <li>実際にかかる費用は、指導主事の業務で消費される <strong>GenSpark AI の従量課金実費のみ</strong></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 4. プラン別 ========== -->
+<section id="plans" class="py-12 px-4 bg-gray-50">
+  <div class="max-w-5xl mx-auto">
+    <div class="flex items-center mb-6">
+      <span class="bg-amber-600 text-white text-lg font-bold px-4 py-2 rounded mr-4">4</span>
+      <h2 class="text-3xl font-bold">プラン別 詳細比較</h2>
+    </div>
+
+    <!-- タブ切替 -->
+    <div class="flex gap-2 mb-6 flex-wrap">
+      <button class="step-tab active px-6 py-3 rounded-lg font-bold border-2 border-amber-400" onclick="showPlan('step2')" id="tab-step2">STEP A 学校単位 <span class="text-xs bg-green-600 text-white px-2 py-0.5 rounded ml-1">推奨</span></button>
+      <button class="step-tab px-6 py-3 rounded-lg font-bold border-2 border-amber-400" onclick="showPlan('step3')" id="tab-step3">STEP B 村全体</button>
+    </div>
+
+    <!-- STEP A（学校単位） -->
+    <div id="plan-step2" class="plan-panel bg-white rounded-xl p-8 shadow-lg">
+      <h3 class="text-2xl font-bold text-green-900 mb-4"><i class="fas fa-school mr-2"></i>STEP A 学校単位プラン <span class="saving-badge ml-2">推奨</span></h3>
+      <div class="grid md:grid-cols-2 gap-6 mb-6">
+        <div>
+          <p class="text-sm text-gray-600 mb-1">対象規模</p>
+          <p class="font-bold text-lg">松川小学校 全校（429名）<br>または松川中学校 全校（242名）</p>
+          <p class="text-sm text-gray-600 mb-1 mt-3">対象教科</p>
+          <p class="font-bold text-lg">主要5教科（国・算/数・理・社・英）</p>
+          <p class="text-sm text-gray-600 mb-1 mt-3">期間</p>
+          <p class="font-bold text-lg">1年契約（自動更新・いつでも解約可）</p>
+        </div>
+        <div class="bg-green-50 rounded p-4">
+          <p class="text-xs text-gray-600 mb-1">年額総額（実発生費用）</p>
+          <p class="text-3xl font-bold text-green-900 mb-2">約 120万円</p>
+          <p class="text-xs text-gray-600 mb-1">内訳</p>
+          <ul class="text-sm space-y-1">
+            <li>初期費用：<strong class="text-green-700">0円</strong>（指導主事が対応済）</li>
+            <li>継続費用：<strong class="text-green-700">0円</strong>（指導主事が対応）</li>
+            <li>GenSpark AI実費：約10万円×12 = 120万円</li>
+          </ul>
+          <p class="text-sm text-green-700 font-bold mt-3">
+            補助金活用後 実質 <span class="text-2xl">約40万円</span>/年
+          </p>
+        </div>
+      </div>
+      <p class="text-sm text-gray-700">
+        <i class="fas fa-star text-yellow-500 mr-1"></i>
+        <strong>松川村に最もおすすめ。</strong>1校まるごと自由進度学習を実現し、モデル校として長野県内外への発信も可能。
+      </p>
+    </div>
+
+    <!-- STEP B -->
+    <div id="plan-step3" class="plan-panel bg-white rounded-xl p-8 shadow-lg hidden">
+      <h3 class="text-2xl font-bold text-purple-900 mb-4"><i class="fas fa-city mr-2"></i>STEP B 村全体プラン</h3>
+      <div class="grid md:grid-cols-2 gap-6 mb-6">
+        <div>
+          <p class="text-sm text-gray-600 mb-1">対象規模</p>
+          <p class="font-bold text-lg">松川小＋松川中 <strong class="text-2xl text-purple-900">全 721名</strong></p>
+          <p class="text-sm text-gray-600 mb-1 mt-3">対象教科</p>
+          <p class="font-bold text-lg">全教科対応</p>
+          <p class="text-sm text-gray-600 mb-1 mt-3">期間</p>
+          <p class="font-bold text-lg">1年契約（自動更新・複数年割引あり）</p>
+        </div>
+        <div class="bg-purple-50 rounded p-4">
+          <p class="text-xs text-gray-600 mb-1">年額総額（実発生費用）</p>
+          <p class="text-3xl font-bold text-purple-900 mb-2">約 156万円</p>
+          <p class="text-xs text-gray-600 mb-1">内訳</p>
+          <ul class="text-sm space-y-1">
+            <li>初期費用：<strong class="text-green-700">0円</strong>（指導主事が対応済）</li>
+            <li>継続費用：<strong class="text-green-700">0円</strong>（指導主事が対応）</li>
+            <li>GenSpark AI実費：約13万円×12 = 156万円（規模大により増）</li>
+          </ul>
+          <p class="text-sm text-green-700 font-bold mt-3">
+            補助金活用後 実質 <span class="text-2xl">約52万円</span>/年
+          </p>
+        </div>
+      </div>
+      <p class="text-sm text-gray-700">
+        <i class="fas fa-trophy text-yellow-500 mr-1"></i>
+        松川村を<strong>「日本初の自由進度学習×AI」全村採用モデル</strong>として、視察受入・補助金申請・メディア露出で投資回収可能。
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 5. 補助金シミュレーション ========== -->
+<section id="subsidy" class="py-12 px-4 bg-white">
+  <div class="max-w-5xl mx-auto">
+    <div class="flex items-center mb-6">
+      <span class="bg-amber-600 text-white text-lg font-bold px-4 py-2 rounded mr-4">5</span>
+      <h2 class="text-3xl font-bold">補助金シミュレーション ― 実質ご負担額</h2>
+    </div>
+
+    <p class="text-gray-700 mb-6">
+      松川村のご負担を最小化するため、以下4つの補助金を組み合わせた申請プランをご提案します。
+      <strong>申請書類の作成は指導主事（私）が村内で対応</strong>します（外部への申請代行は不要・費用ゼロ）。
+    </p>
+
+    <!-- 4制度 -->
+    <div class="grid md:grid-cols-2 gap-4 mb-8">
+      <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-5 border-2 border-green-300">
+        <div class="flex items-center mb-2">
+          <span class="bg-green-600 text-white px-2 py-1 rounded text-sm font-bold mr-2">①</span>
+          <h4 class="font-bold text-green-900">EdTech導入補助金（経産省）</h4>
+        </div>
+        <p class="text-sm text-gray-700 mb-2">補助率 <strong class="text-2xl text-green-700">2/3</strong>（最大）</p>
+        <p class="text-xs text-gray-600">SaaS型教育サービスが対象。松川村規模なら採択確度が高い。</p>
+      </div>
+      <div class="bg-gradient-to-br from-blue-50 to-sky-50 rounded-lg p-5 border-2 border-blue-300">
+        <div class="flex items-center mb-2">
+          <span class="bg-blue-600 text-white px-2 py-1 rounded text-sm font-bold mr-2">②</span>
+          <h4 class="font-bold text-blue-900">GIGAスクール関連予算（文科省）</h4>
+        </div>
+        <p class="text-sm text-gray-700 mb-2">補助率 <strong class="text-2xl text-blue-700">1/2</strong></p>
+        <p class="text-xs text-gray-600">端末整備の次ステップとして、活用促進予算が継続配分。</p>
+      </div>
+      <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg p-5 border-2 border-purple-300">
+        <div class="flex items-center mb-2">
+          <span class="bg-purple-600 text-white px-2 py-1 rounded text-sm font-bold mr-2">③</span>
+          <h4 class="font-bold text-purple-900">長野県ICT教育推進予算</h4>
+        </div>
+        <p class="text-sm text-gray-700 mb-2">補助率 <strong class="text-2xl text-purple-700">1/3</strong></p>
+        <p class="text-xs text-gray-600">県教育委員会経由。松川村のようなモデル事例を重視。</p>
+      </div>
+      <div class="bg-gradient-to-br from-orange-50 to-red-50 rounded-lg p-5 border-2 border-orange-300">
+        <div class="flex items-center mb-2">
+          <span class="bg-orange-600 text-white px-2 py-1 rounded text-sm font-bold mr-2">④</span>
+          <h4 class="font-bold text-orange-900">地方創生交付金</h4>
+        </div>
+        <p class="text-sm text-gray-700 mb-2">補助率 <strong class="text-2xl text-orange-700">1/2</strong></p>
+        <p class="text-xs text-gray-600">「教育による地域活性化」として申請可能。視察受入とセットで効果的。</p>
+      </div>
+    </div>
+
+    <!-- 実質負担シミュレーション -->
+    <h3 class="text-2xl font-bold text-amber-900 mb-4">実質ご負担額 シミュレーション（GenSpark AI 利用料ベース）</h3>
+    <div class="bg-amber-50 border-l-4 border-amber-500 rounded p-3 mb-4">
+      <p class="text-sm text-gray-800">
+        <i class="fas fa-info-circle text-amber-700 mr-1"></i>
+        システム構築費・サーバー費・サポート費等は指導主事の内製化により <strong>全額 0 円</strong>。
+        実発生費用である GenSpark AI 利用料（実費）を基に補助金適用後の実質ご負担額を算出しています。
+      </p>
+    </div>
+    <div class="overflow-x-auto mb-6">
+      <table class="breakdown-table w-full bg-white rounded-lg shadow-lg">
+        <thead>
+          <tr>
+            <th class="p-3 text-left">プラン</th>
+            <th class="p-3 text-right">GenSpark AI<br>利用料（年額）</th>
+            <th class="p-3 text-right">補助金適用 2/3</th>
+            <th class="p-3 text-right">実質ご負担</th>
+            <th class="p-3 text-right">児童生徒1人あたり</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="bg-green-50">
+            <td class="font-bold text-green-900">STEP A 学校単位 ⭐推奨</td>
+            <td class="num">1,200,000 円</td>
+            <td class="num text-green-700">- 800,000 円</td>
+            <td class="num text-green-900 text-lg">400,000 円 / 年</td>
+            <td class="num text-gray-600">約 596 円/年（671名時）</td>
+          </tr>
+          <tr>
+            <td class="font-bold text-purple-900">STEP B 村全体</td>
+            <td class="num">1,560,000 円</td>
+            <td class="num text-green-700">- 1,040,000 円</td>
+            <td class="num text-purple-900 text-lg">520,000 円 / 年</td>
+            <td class="num text-gray-600">約 721 円/年（721名時）</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="text-xs text-gray-500 mb-4">※ 補助金は EdTech補助金 2/3 を主軸とした保守的シミュレーション。GenSpark 利用料は従量課金のため、実使用量により±30%程度変動。初期費用は全プランとも 0 円、2年目以降も同額（継続費用は発生しません）。</p>
+
+    <div class="highlight-box">
+      <p class="text-lg">
+        <i class="fas fa-lightbulb text-amber-600 mr-2"></i>
+        <strong>STEP A（推奨）の場合：児童生徒1人あたり 年間 約596円</strong>（月約50円、1日約1.6円）<br>
+        <span class="text-sm text-gray-700">参考：給食費1食 250〜300円、文房具1年分 約3,000円、ドリル1冊 500〜1,000円</span>
+      </p>
+    </div>
+  </div>
+</section>
+
+<section id="compare" class="py-12 px-4 bg-gray-50">
+  <div class="max-w-5xl mx-auto">
+    <div class="flex items-center mb-6">
+      <span class="bg-amber-600 text-white text-lg font-bold px-4 py-2 rounded mr-4">6</span>
+      <h2 class="text-3xl font-bold">他社サービスとの比較（実在サービス名で明示）</h2>
+    </div>
+
+    <p class="text-gray-700 mb-6">
+      松川村規模（約721名）で、<strong>実在する主要EdTechサービス</strong>を導入した場合の費用比較です。
+      すべて<strong>各社公式サイト・プレスリリース等の公開情報</strong>に基づく概算値を記載しています（2025年時点）。
+    </p>
+
+    <div class="bg-blue-50 border-l-4 border-blue-500 rounded p-4 mb-6 text-sm">
+      <p class="font-bold text-blue-900 mb-1"><i class="fas fa-info-circle mr-1"></i>比較対象サービス（全て実名）</p>
+      <ul class="list-disc pl-5 text-gray-700 space-y-1">
+        <li><strong>Qubena（キュビナ）</strong>：株式会社COMPASS／全国170自治体以上導入・AI型教材シェア大手</li>
+        <li><strong>navima（ナビマ）</strong>：TOPPANエデュケーション（凸版印刷）／AIドリル×協働学習</li>
+        <li><strong>ミライシード</strong>：株式会社ベネッセコーポレーション／全国小中学校で採用</li>
+        <li><strong>スタディサプリ for TEACHERS</strong>：株式会社リクルート／動画授業＋個別学習</li>
+        <li><strong>すらら</strong>：株式会社すららネット／アダプティブラーニング専業</li>
+      </ul>
+    </div>
+
+    <div class="overflow-x-auto mb-6">
+      <table class="breakdown-table w-full bg-white rounded-lg shadow-lg">
+        <thead>
+          <tr>
+            <th class="p-3 text-left">サービス名（提供元）</th>
+            <th class="p-3 text-center">初期費用</th>
+            <th class="p-3 text-center">年額目安<br>（721名想定）</th>
+            <th class="p-3 text-center">自由進度<br>学習</th>
+            <th class="p-3 text-center">AI個別<br>最適化</th>
+            <th class="p-3 text-center">教員<br>負担軽減</th>
+            <th class="p-3 text-left">出典</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="bg-amber-50 font-bold">
+            <td class="text-amber-900">★ 本提案システム<br><span class="text-xs font-normal">（自由進度学習AI）</span></td>
+            <td class="text-center text-amber-900"><span class="text-green-700">0円</span></td>
+            <td class="text-center text-amber-900 text-lg">約 <strong>120万円</strong><br><span class="text-xs font-normal">(補助金後 40万円)</span></td>
+            <td class="text-center text-green-700"><i class="fas fa-check-circle"></i> フル対応</td>
+            <td class="text-center text-green-700"><i class="fas fa-check-circle"></i></td>
+            <td class="text-center text-green-700"><i class="fas fa-check-circle"></i></td>
+            <td class="text-xs">松川村専用見積<br>（GenSpark実費）</td>
+          </tr>
+          <tr>
+            <td>Qubena（キュビナ）<br><span class="text-xs text-gray-600">株式会社COMPASS</span></td>
+            <td class="text-center">30万円<br><span class="text-xs text-gray-500">(税別)</span></td>
+            <td class="text-center">約 <strong>571万円</strong><br><span class="text-xs text-gray-500">(7,920円×721名)</span></td>
+            <td class="text-center text-orange-600">△ 部分対応</td>
+            <td class="text-center text-green-700"><i class="fas fa-check-circle"></i></td>
+            <td class="text-center text-orange-600">△</td>
+            <td class="text-xs"><a href="https://ppp-education-dx.jp/ServiceCatalog/adaptive/474/" target="_blank" class="text-blue-600 underline">教育DXマップ</a>／ICT CONNECT 21報告書</td>
+          </tr>
+          <tr>
+            <td>Qubena スターター版<br><span class="text-xs text-gray-600">株式会社COMPASS</span></td>
+            <td class="text-center">0円</td>
+            <td class="text-center">約 <strong>95万円</strong><br><span class="text-xs text-gray-500">(1,320円×721名)</span></td>
+            <td class="text-center text-red-600">× 非対応</td>
+            <td class="text-center text-orange-600">△ 機能限定</td>
+            <td class="text-center text-gray-400">-</td>
+            <td class="text-xs"><a href="https://qubena.com/blog/pr-20250619" target="_blank" class="text-blue-600 underline">COMPASS公式</a>（2025/6）</td>
+          </tr>
+          <tr>
+            <td>navima（ナビマ）<br><span class="text-xs text-gray-600">TOPPANエデュケーション</span></td>
+            <td class="text-center">非公開<br><span class="text-xs text-gray-500">(個別見積)</span></td>
+            <td class="text-center">約 <strong>250〜400万円</strong><br><span class="text-xs text-gray-500">(4,000〜6,000円×721)</span></td>
+            <td class="text-center text-orange-600">△</td>
+            <td class="text-center text-green-700"><i class="fas fa-check-circle"></i></td>
+            <td class="text-center text-orange-600">△</td>
+            <td class="text-xs"><a href="https://solution.toppan.co.jp/education/service/navima.html" target="_blank" class="text-blue-600 underline">凸版公式</a>／業界標準価格帯</td>
+          </tr>
+          <tr>
+            <td>ミライシード<br><span class="text-xs text-gray-600">ベネッセコーポレーション</span></td>
+            <td class="text-center">導入費別途</td>
+            <td class="text-center">約 <strong>350〜500万円</strong><br><span class="text-xs text-gray-500">(5,000〜7,000円×721)</span></td>
+            <td class="text-center text-red-600">× 非対応</td>
+            <td class="text-center text-orange-600">△</td>
+            <td class="text-center text-orange-600">△</td>
+            <td class="text-xs">自治体導入実績から推定</td>
+          </tr>
+          <tr>
+            <td>スタディサプリ for TEACHERS<br><span class="text-xs text-gray-600">株式会社リクルート</span></td>
+            <td class="text-center">0円</td>
+            <td class="text-center">約 <strong>140〜220万円</strong><br><span class="text-xs text-gray-500">(2,000〜3,000円×721)</span></td>
+            <td class="text-center text-red-600">× 動画中心</td>
+            <td class="text-center text-orange-600">△</td>
+            <td class="text-center text-green-700"><i class="fas fa-check-circle"></i></td>
+            <td class="text-xs">リクルート公式 法人プラン</td>
+          </tr>
+          <tr>
+            <td>すらら<br><span class="text-xs text-gray-600">株式会社すららネット</span></td>
+            <td class="text-center">10万円</td>
+            <td class="text-center">約 <strong>600〜720万円</strong><br><span class="text-xs text-gray-500">(8,000〜10,000円×721)</span></td>
+            <td class="text-center text-green-700"><i class="fas fa-check-circle"></i> 対応</td>
+            <td class="text-center text-green-700"><i class="fas fa-check-circle"></i></td>
+            <td class="text-center text-orange-600">△</td>
+            <td class="text-xs">すららネット公式 学校向け価格</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="text-xs text-gray-600 mb-6">
+      ※ 各社年額は松川村規模（児童生徒671名＋教員含む約721名）で試算した概算値です。正式見積は各社にご確認ください。<br>
+      ※ 本提案の初期費用は <strong>0 円</strong>（指導主事が GenSpark で全面内製化済）。年額の 120 万円は <strong>GenSpark AI 利用料の実費</strong>で、EdTech補助金 2/3 適用後は実質ご負担 <strong>40 万円/年</strong>となります。
+    </p>
+
+    <!-- グラフ -->
+    <div class="bg-white rounded-lg p-6 shadow-md mb-6">
+      <h3 class="font-bold text-lg mb-4 text-center">年額費用 比較グラフ（721名規模・単位：万円）</h3>
+      <canvas id="compareChart" height="200"></canvas>
+    </div>
+
+    <div class="bg-blue-50 rounded-lg p-6 border-l-4 border-blue-500">
+      <h4 class="font-bold text-blue-900 mb-2"><i class="fas fa-trophy mr-2"></i>本提案の3つの優位性（実名比較で明確）</h4>
+      <ol class="list-decimal pl-5 text-sm text-gray-700 space-y-2">
+        <li><strong>コスト：</strong>年120万円（GenSpark実費のみ）は Qubena通常版の約 1/5、navima の約 1/3、すららの約 1/5.5 の費用。補助金後は 40万円/年で Qubena通常版の約 1/14。</li>
+        <li><strong>機能：</strong>自由進度学習を「フル対応」しているのは、実在サービス中でも本提案とすらら（費用5〜6倍）のみ</li>
+        <li><strong>カスタマイズ：</strong>松川村専用環境・ロゴ・運用ルール反映に対応。指導主事が GenSpark で自由に改修可能。パッケージ型の他社は不可</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 6-5. 松川村ご参画による減額 ========== -->
+<section id="matsukawa-involvement" class="py-12 px-4 bg-gradient-to-br from-green-50 to-emerald-50">
+  <div class="max-w-5xl mx-auto">
+    <div class="flex items-center mb-6">
+      <span class="bg-green-700 text-white text-lg font-bold px-4 py-2 rounded mr-4">6.5</span>
+      <h2 class="text-3xl font-bold">松川村（指導主事・学校職員）ご参画による全面内製化</h2>
+    </div>
+
+    <div class="bg-white rounded-xl p-6 shadow-md mb-6 border-l-4 border-green-600">
+      <p class="text-lg mb-3">
+        <i class="fas fa-user-tie text-green-700 mr-2"></i>
+        <strong>松川村の指導主事／学校職員として本プロジェクトにご参画いただく前提</strong>で、
+        一般的に外部委託で発生する <strong>システム構築費・継続運営費（初期7項目・継続9項目）をすべて 0 円化</strong>します。
+      </p>
+      <p class="text-sm text-gray-700 mb-2">
+        指導主事が「環境構築・生徒データ登録・カスタマイズ・教員研修・保護者説明・サポートデスク・月次レポート作成・コンテンツ更新・継続研修」を
+        <strong>GenSpark を活用して村内で全面内製化</strong>されるため、
+        当社からの外部派遣・外部委託費は一切発生しません。
+      </p>
+      <p class="text-xs text-amber-700 bg-amber-50 p-2 rounded">
+        <i class="fas fa-exclamation-circle mr-1"></i>
+        <strong>実際に発生する費用は、指導主事がこれらの業務で実際にお使いになっている GenSpark AI ツールの従量課金実費（月額約10万円・変動あり）のみ</strong>です。詳細は下段でご説明します。
+      </p>
+    </div>
+
+    <h3 class="text-2xl font-bold text-green-900 mb-4"><i class="fas fa-minus-circle mr-2"></i>全面内製化対象項目（通常外部委託費との差分）</h3>
+
+    <div class="bg-blue-50 border-l-4 border-blue-500 rounded p-3 mb-4 text-sm text-gray-700">
+      <i class="fas fa-info-circle text-blue-600 mr-1"></i>
+      一般的にはSaaS事業者へ外部委託で年間合計 <strong>約150万円</strong>（初期70万円＋継続年80.4万円）発生する 16 項目を、
+      指導主事が GenSpark を活用して<strong>すべて村内で内製化</strong>されているため、松川村へのご負担は 0 円となります。
+    </div>
+
+    <div class="overflow-x-auto mb-6">
+      <table class="breakdown-table w-full bg-white rounded-lg shadow-lg">
+        <thead>
+          <tr>
+            <th class="p-3 text-left">分類</th>
+            <th class="p-3 text-left">項目</th>
+            <th class="p-3 text-right">外部委託<br>相場（円）</th>
+            <th class="p-3 text-right">松川村<br>ご負担</th>
+            <th class="p-3 text-left">指導主事がGenSparkで対応</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td rowspan="8" class="bg-amber-50 text-amber-900 font-bold text-center align-middle">初期<br>（一時金）</td><td>① 環境構築</td><td class="num">200,000</td><td class="num text-green-700">0 円</td><td class="text-xs">Cloudflare環境構築・DB設計</td></tr>
+          <tr><td>② 児童生徒データ初期登録</td><td class="num">100,000</td><td class="num text-green-700">0 円</td><td class="text-xs">CSV取込機能を内製化</td></tr>
+          <tr><td>③ カスタマイズ</td><td class="num">80,000</td><td class="num text-green-700">0 円</td><td class="text-xs">松川村用ロゴ・UI調整</td></tr>
+          <tr><td>④ 教員研修</td><td class="num">150,000</td><td class="num text-green-700">0 円</td><td class="text-xs">校内研修を自ら計画・実施</td></tr>
+          <tr><td>⑤ 保護者向け説明資料</td><td class="num">70,000</td><td class="num text-green-700">0 円</td><td class="text-xs">資料作成・説明会とも対応</td></tr>
+          <tr><td>⑥ セキュリティ初期設定</td><td class="num">50,000</td><td class="num text-green-700">0 円</td><td class="text-xs">AES-256-GCM 暗号化実装</td></tr>
+          <tr><td>⑦ 既存データ連携</td><td class="num">50,000</td><td class="num text-green-700">0 円</td><td class="text-xs">校内対応（当社は仕様提供のみ）</td></tr>
+          <tr class="bg-amber-100 font-bold"><td>初期費用 小計</td><td class="num">700,000</td><td class="num text-green-700 text-lg">0 円</td><td class="text-xs text-green-800">指導主事が完全内製化</td></tr>
+
+          <tr><td rowspan="11" class="bg-emerald-50 text-emerald-900 font-bold text-center align-middle">継続<br>（年額）</td><td>⑧ サーバー利用料</td><td class="num">96,000</td><td class="num text-green-700">0 円</td><td class="text-xs">Cloudflare無料枠で運用</td></tr>
+          <tr><td>⑨ AI利用料（生成AI）</td><td class="num">180,000</td><td class="num text-green-700">0 円</td><td class="text-xs">Gemini API無料枠で運用</td></tr>
+          <tr><td>⑩ システム保守</td><td class="num">120,000</td><td class="num text-green-700">0 円</td><td class="text-xs">指導主事がGenSparkで対応</td></tr>
+          <tr><td>⑪ サポートデスク</td><td class="num">144,000</td><td class="num text-green-700">0 円</td><td class="text-xs">校内で一次対応</td></tr>
+          <tr><td>⑫ 月次レポート作成</td><td class="num">60,000</td><td class="num text-green-700">0 円</td><td class="text-xs">GenSparkでレポート生成・分析</td></tr>
+          <tr><td>⑬ コンテンツ更新</td><td class="num">78,000</td><td class="num text-green-700">0 円</td><td class="text-xs">校内で教材更新</td></tr>
+          <tr><td>⑭ 継続研修</td><td class="num">60,000</td><td class="num text-green-700">0 円</td><td class="text-xs">校内研修で対応</td></tr>
+          <tr><td>⑮ 賠償責任保険</td><td class="num">18,000</td><td class="num text-green-700">0 円</td><td class="text-xs">当社側で負担</td></tr>
+          <tr><td>⑯ その他運営費</td><td class="num">48,000</td><td class="num text-green-700">0 円</td><td class="text-xs">校内事務局で対応</td></tr>
+          <tr class="bg-emerald-100 font-bold"><td>継続費用 小計（年額）</td><td class="num">804,000</td><td class="num text-green-700 text-lg">0 円</td><td class="text-xs text-green-800">指導主事が完全内製化</td></tr>
+
+          <tr class="bg-green-200 font-bold">
+            <td colspan="2" class="text-green-900">年間合計（初期 ＋ 継続）</td>
+            <td class="num">1,504,000</td>
+            <td class="num text-green-900 text-2xl">0 円</td>
+            <td class="text-xs text-green-900">外部委託なら年 約150万円 ← 全額 0 円化</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- GenSpark AI 利用料 -->
+    <h3 class="text-2xl font-bold text-amber-900 mb-4 mt-10">
+      <i class="fas fa-robot mr-2"></i>追加計上項目：GenSpark AI 利用料（実費）
+    </h3>
+
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-5 mb-4 rounded">
+      <p class="text-gray-800 mb-3">
+        <i class="fas fa-info-circle text-amber-600 mr-1"></i>
+        指導主事が本プロジェクトの <strong>提案書作成・費用分析・資料修正・セキュリティ対応・データ分析レポート生成・システム改修依頼</strong> 等で、
+        AIプラットフォーム <strong>「GenSpark」</strong> をご利用になります。
+        その利用料を <strong>実費として計上</strong>いたします（人件費削減の代わりに発生する実経費）。
+      </p>
+      <div class="bg-white rounded p-4 mb-3">
+        <div class="grid md:grid-cols-4 gap-3 text-center">
+          <div>
+            <p class="text-xs text-gray-600">月額（目安）</p>
+            <p class="text-2xl font-bold text-amber-900">約 100,000 円</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-600">年額（12ヶ月）</p>
+            <p class="text-2xl font-bold text-amber-900">約 1,200,000 円</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-600">変動幅（実績）</p>
+            <p class="text-lg font-bold text-gray-700">7〜13万円/月</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-600">課金方式</p>
+            <p class="text-sm font-bold text-gray-700">従量課金<br>（実費精算）</p>
+          </div>
+        </div>
+      </div>
+      <p class="text-xs text-gray-600">
+        ※ GenSpark の利用量は、資料改訂頻度・分析依頼・システム改修規模に応じて<strong>月により変動</strong>します。
+        繁忙月（提案書作成期・年度末レポート期）は13万円前後、閑散月は7万円前後が実績値です。
+        <strong>実使用量に応じた実費精算</strong>とし、使用明細を月次でご報告いたします。
+      </p>
+    </div>
+
+    <!-- GenSpark用途内訳 -->
+    <div class="bg-white rounded-lg p-5 shadow-md mb-6">
+      <h4 class="font-bold text-gray-800 mb-3"><i class="fas fa-list-check mr-2 text-amber-600"></i>GenSparkの主な利用用途（指導主事の業務支援）</h4>
+      <div class="grid md:grid-cols-2 gap-3 text-sm">
+        <div class="bg-gray-50 rounded p-3">
+          <p class="font-bold text-amber-900 mb-1">📝 提案書・見積書作成</p>
+          <p class="text-xs text-gray-700">教育委員会向け資料、村長報告書、議会提出資料の自動生成</p>
+        </div>
+        <div class="bg-gray-50 rounded p-3">
+          <p class="font-bold text-amber-900 mb-1">📊 データ分析・レポート</p>
+          <p class="text-xs text-gray-700">学習ログ分析、月次レポート、学力向上エビデンス作成</p>
+        </div>
+        <div class="bg-gray-50 rounded p-3">
+          <p class="font-bold text-amber-900 mb-1">🔒 セキュリティ対応</p>
+          <p class="text-xs text-gray-700">脆弱性対応、暗号化実装、セキュリティレポート作成</p>
+        </div>
+        <div class="bg-gray-50 rounded p-3">
+          <p class="font-bold text-amber-900 mb-1">🛠 システム改修依頼</p>
+          <p class="text-xs text-gray-700">機能追加・UI改善・バグ修正の仕様書作成と実装</p>
+        </div>
+        <div class="bg-gray-50 rounded p-3">
+          <p class="font-bold text-amber-900 mb-1">👨‍👩‍👧 保護者・教員資料</p>
+          <p class="text-xs text-gray-700">説明会資料、研修テキスト、FAQ集の自動生成</p>
+        </div>
+        <div class="bg-gray-50 rounded p-3">
+          <p class="font-bold text-amber-900 mb-1">💡 教材・コンテンツ作成</p>
+          <p class="text-xs text-gray-700">個別学習問題、解説動画スクリプト、ワークシート作成</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 実発生費用：GenSparkのみ -->
+    <div class="bg-gradient-to-br from-amber-100 to-emerald-100 rounded-xl p-6 border-2 border-emerald-500">
+      <h3 class="text-xl font-bold text-emerald-900 mb-4">
+        <i class="fas fa-balance-scale mr-2"></i>実発生費用の整理（松川村にとっての実コスト）
+      </h3>
+      <table class="w-full text-lg">
+        <tr class="text-gray-500">
+          <td class="py-2 line-through">外部委託なら発生する費用（初期70万+継続年80.4万）</td>
+          <td class="py-2 text-right font-bold line-through">1,504,000 円</td>
+        </tr>
+        <tr class="text-green-700">
+          <td class="py-2">指導主事 × GenSpark による全面内製化</td>
+          <td class="py-2 text-right font-bold">- 1,504,000 円</td>
+        </tr>
+        <tr class="text-amber-700 border-t border-emerald-300">
+          <td class="py-2">実発生：GenSpark AI 利用料（月約10万円×12ヶ月）</td>
+          <td class="py-2 text-right font-bold">+ 1,200,000 円</td>
+        </tr>
+        <tr class="border-t-2 border-emerald-600 text-emerald-900">
+          <td class="py-3 font-bold">実コスト（年額・補助金前）</td>
+          <td class="py-3 text-right font-bold text-xl">1,200,000 円</td>
+        </tr>
+      </table>
+      <p class="text-sm text-gray-700 mt-3">
+        <i class="fas fa-lightbulb text-amber-600 mr-1"></i>
+        従来型の大手EdTechサービスなら年間 <strong>数百万円単位</strong>の外部委託費が発生しますが、
+        本提案は指導主事の内製化により <strong>GenSpark AI 実費のみ</strong>で運用可能です。
+      </p>
+    </div>
+
+    <!-- 新料金表 STEP別 -->
+    <h3 class="text-2xl font-bold text-green-900 mb-4 mt-10"><i class="fas fa-calculator mr-2"></i>STEP別 最終お見積り（実コスト＝GenSpark AI 利用料のみ）</h3>
+
+    <p class="text-sm text-gray-700 mb-4">
+      下記は<strong>システム構築費・継続運営費すべて 0 円 ＋ GenSpark AI 利用料（実費）のみ</strong>の最終金額です。初期費用は発生しません。
+    </p>
+
+    <div class="grid md:grid-cols-2 gap-4 mb-6">
+      <!-- STEP A -->
+      <div class="bg-white rounded-xl p-6 shadow-md border-2 border-green-400 ring-4 ring-green-200">
+        <div class="bg-green-600 text-white text-xs font-bold px-2 py-0.5 rounded inline-block mb-2">推奨</div>
+        <h4 class="font-bold text-green-900 text-xl mb-3">STEP A 学校単位</h4>
+        <div class="text-xs text-gray-600 space-y-1 mb-3">
+          <div class="flex justify-between"><span>初期費用</span><span class="text-green-700 font-bold">0 円</span></div>
+          <div class="flex justify-between"><span>継続費用（保守等）</span><span class="text-green-700 font-bold">0 円</span></div>
+          <div class="flex justify-between mt-2"><span class="text-amber-700">GenSpark AI 実費（年）</span><span class="text-amber-700 font-bold">約 1,200,000 円</span></div>
+          <div class="text-xs text-gray-500 pl-4">（月約 100,000 円×12）</div>
+        </div>
+        <div class="bg-green-50 rounded p-2 text-center border-t-2 border-green-500">
+          <div class="text-xs text-gray-600">年額総額（実発生費用）</div>
+          <div class="text-2xl font-bold text-green-900">約 1,200,000 円</div>
+          <div class="text-xs text-green-700 mt-1">補助金後 実質 約 40万円/年</div>
+        </div>
+        <p class="text-xs text-gray-500 mt-2">※ 変動幅 月7〜13万円（年84〜156万円）</p>
+      </div>
+      <!-- STEP B -->
+      <div class="bg-white rounded-xl p-6 shadow-md border-2 border-purple-300">
+        <h4 class="font-bold text-purple-900 text-xl mb-3">STEP B 村全体</h4>
+        <div class="text-xs text-gray-600 space-y-1 mb-3">
+          <div class="flex justify-between"><span>初期費用</span><span class="text-green-700 font-bold">0 円</span></div>
+          <div class="flex justify-between"><span>継続費用（保守等）</span><span class="text-green-700 font-bold">0 円</span></div>
+          <div class="flex justify-between mt-2"><span class="text-amber-700">GenSpark AI 実費（年）</span><span class="text-amber-700 font-bold">約 1,560,000 円</span></div>
+          <div class="text-xs text-gray-500 pl-4">（月約 130,000 円×12・規模大）</div>
+        </div>
+        <div class="bg-purple-50 rounded p-2 text-center border-t-2 border-purple-500">
+          <div class="text-xs text-gray-600">年額総額（実発生費用）</div>
+          <div class="text-2xl font-bold text-purple-900">約 1,560,000 円</div>
+          <div class="text-xs text-green-700 mt-1">補助金後 実質 約 52万円/年</div>
+        </div>
+        <p class="text-xs text-gray-500 mt-2">※ 全教科・全学年対応のため使用量増</p>
+      </div>
+    </div>
+
+    <div class="highlight-box">
+      <p class="text-lg mb-2">
+        <i class="fas fa-star text-amber-600 mr-2"></i>
+        <strong>STEP A（学校単位・推奨プラン）</strong>の最終ご負担額：
+      </p>
+      <div class="grid md:grid-cols-4 gap-3 text-center my-3">
+        <div class="bg-white rounded p-3">
+          <div class="text-xs text-gray-600">初期費用</div>
+          <div class="text-xl font-bold text-green-700">0 円</div>
+          <div class="text-xs text-gray-500">指導主事が対応済</div>
+        </div>
+        <div class="bg-white rounded p-3">
+          <div class="text-xs text-gray-600">継続費用（保守等）</div>
+          <div class="text-xl font-bold text-green-700">0 円</div>
+          <div class="text-xs text-gray-500">指導主事が対応</div>
+        </div>
+        <div class="bg-white rounded p-3">
+          <div class="text-xs text-amber-700">GenSpark 実費（年）</div>
+          <div class="text-xl font-bold text-amber-700">120 万円</div>
+          <div class="text-xs text-gray-500">（月約10万円）</div>
+        </div>
+        <div class="bg-amber-200 rounded p-3 border-2 border-amber-500">
+          <div class="text-xs text-amber-900">補助金 2/3 適用後</div>
+          <div class="text-xl font-bold text-amber-900">40 万円/年</div>
+          <div class="text-xs text-gray-600">実質ご負担</div>
+        </div>
+      </div>
+      <p class="text-sm text-gray-700 text-center mt-3">
+        児童生徒1人あたり <strong class="text-green-700 text-lg">年間約 596円</strong>（月約50円、1日約1.6円）<br>
+        <span class="text-xs text-gray-600">※ GenSpark利用料は変動あり（月7〜13万円）。上記は月10万円想定の基準額</span>
+      </p>
+    </div>
+
+    <!-- 指導主事の役割 -->
+    <h3 class="text-2xl font-bold text-green-900 mb-4 mt-10"><i class="fas fa-handshake mr-2"></i>役割分担イメージ</h3>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="bg-white rounded-lg p-5 shadow-md border-t-4 border-green-500">
+        <h4 class="font-bold text-green-900 mb-2"><i class="fas fa-user mr-2"></i>松川村（指導主事）の役割</h4>
+        <ul class="text-sm text-gray-700 space-y-1 list-disc pl-5">
+          <li>システム構築・カスタマイズ（GenSpark活用）</li>
+          <li>校内教員研修の計画・実施（初期・継続）</li>
+          <li>保護者説明会の登壇・質疑応答・資料作成</li>
+          <li>日常の操作サポート（校内一次対応）</li>
+          <li>月次レポートの生成・分析・活用（GenSparkで自動生成）</li>
+          <li>セキュリティ対応・システム改修（GenSparkで実装）</li>
+          <li>校内運用ルールの策定・成果事例共有</li>
+        </ul>
+        <p class="text-xs text-green-700 mt-2 bg-green-50 p-2 rounded">
+          <i class="fas fa-check-circle mr-1"></i>すべての業務を GenSpark で対応するため、実費として AI 利用料（月約10万円）が発生します
+        </p>
+      </div>
+      <div class="bg-white rounded-lg p-5 shadow-md border-t-4 border-amber-500">
+        <h4 class="font-bold text-amber-900 mb-2"><i class="fas fa-cog mr-2"></i>当社の役割（全て無償・外部委託費ゼロ）</h4>
+        <ul class="text-sm text-gray-700 space-y-1 list-disc pl-5">
+          <li>既存 AI 学習システムのベースコード提供</li>
+          <li>技術的な質問への助言（メール・無償）</li>
+          <li>Cloudflare / Gemini API 無料枠の範囲で運用可能であることの技術保証</li>
+          <li>セキュリティ仕様書・ベストプラクティスの提供</li>
+          <li>補助金申請書類の作成代行（無償）</li>
+          <li>緊急時のバックアップ対応（SLA範囲内・無償）</li>
+        </ul>
+        <p class="text-xs text-amber-700 mt-2 bg-amber-50 p-2 rounded">
+          <i class="fas fa-info-circle mr-1"></i>当社は「技術監修・無償バックアップ」に徹し、人件費請求は一切行いません
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 7. 5年間TCO ========== -->
+<section id="tco" class="py-12 px-4 bg-white">
+  <div class="max-w-5xl mx-auto">
+    <div class="flex items-center mb-6">
+      <span class="bg-amber-600 text-white text-lg font-bold px-4 py-2 rounded mr-4">7</span>
+      <h2 class="text-3xl font-bold">5年間 TCO（総保有コスト）分析</h2>
+    </div>
+
+    <p class="text-gray-700 mb-6">
+      単年度だけでなく、<strong>5年間の累計コスト</strong>と<strong>同期間の経済効果</strong>を試算しました
+      （STEP A 学校単位・推奨プラン／<strong>実発生費用＝GenSpark AI 利用料のみ・補助金活用後</strong>）。
+    </p>
+
+    <div class="bg-blue-50 border-l-4 border-blue-500 rounded p-3 mb-4 text-sm text-gray-700">
+      <i class="fas fa-info-circle text-blue-600 mr-1"></i>
+      初期費用・継続費用（保守・サポート等）はすべて指導主事の内製化により <strong>0 円</strong>。実発生する費用は GenSpark AI 利用料（年120万円想定）のみです。
+    </div>
+
+    <div class="overflow-x-auto mb-6">
+      <table class="breakdown-table w-full bg-white rounded-lg shadow-lg">
+        <thead>
+          <tr>
+            <th class="p-3 text-left">年度</th>
+            <th class="p-3 text-right">初期費用</th>
+            <th class="p-3 text-right">継続費用<br>（保守等）</th>
+            <th class="p-3 text-right text-amber-700">GenSpark<br>AI 実費</th>
+            <th class="p-3 text-right">補助金<br>（2/3）</th>
+            <th class="p-3 text-right">松川村<br>実質負担</th>
+            <th class="p-3 text-right">累計</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1年目（導入）</td>
+            <td class="num text-green-700">0</td>
+            <td class="num text-green-700">0</td>
+            <td class="num text-amber-700">1,200,000</td>
+            <td class="num text-green-700">-800,000</td>
+            <td class="num font-bold">400,000 円</td>
+            <td class="num">400,000 円</td>
+          </tr>
+          <tr>
+            <td>2年目</td>
+            <td class="num text-green-700">0</td>
+            <td class="num text-green-700">0</td>
+            <td class="num text-amber-700">1,200,000</td>
+            <td class="num text-green-700">-800,000</td>
+            <td class="num font-bold">400,000 円</td>
+            <td class="num">800,000 円</td>
+          </tr>
+          <tr>
+            <td>3年目</td>
+            <td class="num text-green-700">0</td>
+            <td class="num text-green-700">0</td>
+            <td class="num text-amber-700">1,200,000</td>
+            <td class="num text-green-700">-800,000</td>
+            <td class="num font-bold">400,000 円</td>
+            <td class="num">1,200,000 円</td>
+          </tr>
+          <tr>
+            <td>4年目</td>
+            <td class="num text-green-700">0</td>
+            <td class="num text-green-700">0</td>
+            <td class="num text-amber-700">1,200,000</td>
+            <td class="num text-green-700">-800,000</td>
+            <td class="num font-bold">400,000 円</td>
+            <td class="num">1,600,000 円</td>
+          </tr>
+          <tr>
+            <td>5年目</td>
+            <td class="num text-green-700">0</td>
+            <td class="num text-green-700">0</td>
+            <td class="num text-amber-700">1,200,000</td>
+            <td class="num text-green-700">-800,000</td>
+            <td class="num font-bold">400,000 円</td>
+            <td class="num">2,000,000 円</td>
+          </tr>
+          <tr class="bg-amber-100 font-bold">
+            <td>5年間 合計</td>
+            <td class="num text-green-700">0</td>
+            <td class="num text-green-700">0</td>
+            <td class="num text-amber-700">6,000,000</td>
+            <td class="num text-green-700">-4,000,000</td>
+            <td class="num text-amber-900 text-lg">2,000,000 円</td>
+            <td class="num text-amber-900">年平均<br>400,000 円</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="text-xs text-gray-500 mb-4">
+      ※ GenSpark 利用料は従量課金・変動あり。年120万円（月10万円）は標準的な想定値で、実使用量により年84〜156万円の範囲で変動します。<br>
+      ※ 補助金額は GenSpark 実費額の 2/3 を想定。補助金対象額は実発生額に連動します。
+    </p>
+
+    <!-- 投資効果 -->
+    <h3 class="text-xl font-bold text-amber-900 mt-8 mb-4"><i class="fas fa-chart-line mr-2"></i>同期間の経済効果（試算）</h3>
+    <div class="overflow-x-auto mb-6">
+      <table class="breakdown-table w-full bg-white rounded-lg shadow-lg">
+        <thead>
+          <tr>
+            <th class="p-3 text-left">効果項目</th>
+            <th class="p-3 text-right">5年間 試算額</th>
+            <th class="p-3 text-left">根拠</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>教員の残業削減<br><span class="text-xs">（50時間/月×12×5年×50名）</span></td>
+            <td class="num text-green-700">約 450 万円</td>
+            <td class="text-xs">時給換算2,500円で算出。文科省「学校における働き方改革」試算準拠</td>
+          </tr>
+          <tr>
+            <td>視察受入収益<br><span class="text-xs">（年10件×5年）</span></td>
+            <td class="num text-green-700">約 100 万円</td>
+            <td class="text-xs">モデル校として全国から視察想定（1件2万円）</td>
+          </tr>
+          <tr>
+            <td>メディア露出 広告換算価値</td>
+            <td class="num text-green-700">約 500 万円</td>
+            <td class="text-xs">信濃毎日新聞・NHK長野・教育新聞掲載想定</td>
+          </tr>
+          <tr>
+            <td>移住促進効果<br><span class="text-xs">（教育魅力→人口1家族定住）</span></td>
+            <td class="num text-green-700">約 300 万円</td>
+            <td class="text-xs">住民税・消費税の5年分貢献</td>
+          </tr>
+          <tr>
+            <td>学力向上による将来の経済効果</td>
+            <td class="num text-green-700">約 800 万円</td>
+            <td class="text-xs">文科省「教育投資のリターン」試算モデル準拠</td>
+          </tr>
+          <tr class="bg-green-100 font-bold">
+            <td>経済効果 合計</td>
+            <td class="num text-green-900 text-lg">約 2,150 万円</td>
+            <td class="text-xs">控えめな試算</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="highlight-box text-center">
+      <p class="text-lg mb-2">5年間で</p>
+      <p class="text-3xl md:text-4xl font-bold text-amber-900 mb-2">
+        約200万円の投資 → 約2,150万円の価値創出
+      </p>
+      <p class="text-xl md:text-2xl font-bold text-green-700">
+        投資対効果（ROI）：<span class="text-3xl md:text-4xl">約 10.8 倍</span>
+      </p>
+      <p class="text-xs text-gray-600 mt-2">※ GenSpark利用料を年額120万円（月10万円想定）で計上した保守的試算／補助金2/3 活用時</p>
+    </div>
+
+    <!-- グラフ -->
+    <div class="bg-white rounded-lg p-6 shadow-md mt-6">
+      <h3 class="font-bold text-lg mb-4 text-center">5年間 累積コスト vs 累積効果</h3>
+      <canvas id="tcoChart" height="200"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 8. Q&A ========== -->
+<section id="faq" class="py-12 px-4 bg-gray-50">
+  <div class="max-w-5xl mx-auto">
+    <div class="flex items-center mb-6">
+      <span class="bg-amber-600 text-white text-lg font-bold px-4 py-2 rounded mr-4">8</span>
+      <h2 class="text-3xl font-bold">費用に関する Q&amp;A</h2>
+    </div>
+
+    <div class="space-y-3">
+      <details class="bg-white rounded-lg p-5 shadow-sm" open>
+        <summary class="font-bold text-lg cursor-pointer"><i class="fas fa-question-circle text-amber-600 mr-2"></i>Q0. 指導主事が関わる場合、本当に費用が下がりますか？</summary>
+        <div class="mt-3 text-gray-700 text-sm">
+          A. はい。本ご提案では<strong>指導主事・学校職員の方に直接ご関与いただく前提</strong>で、
+          通常なら外部委託で発生する 16 項目（初期 7項目＋継続 9項目／年合計約 150 万円）を<strong>すべて 0 円</strong>としています：
+          <ul class="list-disc pl-5 mt-2">
+            <li>初期 7項目（環境構築・データ登録・カスタマイズ・教員研修・保護者資料・セキュリティ・データ連携）合計 70万円 → <strong class="text-green-700">0円</strong></li>
+            <li>継続 9項目（サーバー・AI・保守・サポート・月次レポート・コンテンツ更新・継続研修・保険・運営費）合計 年80.4万円 → <strong class="text-green-700">0円</strong></li>
+          </ul>
+          <p class="mt-3">
+            すべての業務を指導主事が GenSpark を活用して村内で内製化されるため、当社からの外部派遣・外部委託費は一切発生しません。
+            <strong>松川村にご負担いただく実発生費用は、指導主事が業務で実際にお使いになっている GenSpark AI 利用料（月約10万円・年約120万円・変動あり）のみ</strong>です。
+          </p>
+        </div>
+      </details>
+
+      <details class="bg-white rounded-lg p-5 shadow-sm" open>
+        <summary class="font-bold text-lg cursor-pointer"><i class="fas fa-question-circle text-amber-600 mr-2"></i>Q0-2. GenSpark AI利用料はなぜ発生するのですか？月額10万円の根拠は？</summary>
+        <div class="mt-3 text-gray-700 text-sm">
+          A. 指導主事が本プロジェクトで <strong>提案書作成・費用分析・資料修正・セキュリティ対応・月次レポート生成・システム改修依頼</strong> 等の業務を
+          AIプラットフォーム「GenSpark」で実施されるため、その利用料を <strong>実費として計上</strong>しています。
+          <div class="bg-amber-50 p-3 rounded my-3">
+            <p class="font-bold text-amber-900 mb-1">実績ベースの月額変動幅：</p>
+            <ul class="list-disc pl-5">
+              <li>繁忙月（提案書作成・年度末レポート期）：<strong>約 13万円</strong></li>
+              <li>通常月：<strong>約 10万円</strong></li>
+              <li>閑散月：<strong>約 7万円</strong></li>
+              <li>年間平均：<strong>約 120万円</strong>（月10万円想定）</li>
+            </ul>
+          </div>
+          <p><strong>従量課金・実費精算</strong>のため、使わなければ課金されません。
+          毎月使用明細をご報告し、予算管理いただけます。また、利用量を抑えたい場合は
+          対象教科・学年を絞り込むことで月5万円程度まで縮小することも可能です。</p>
+        </div>
+      </details>
+
+      <details class="bg-white rounded-lg p-5 shadow-sm">
+        <summary class="font-bold text-lg cursor-pointer"><i class="fas fa-question-circle text-amber-600 mr-2"></i>Q1. 比較した他社は実在する会社ですか？</summary>
+        <div class="mt-3 text-gray-700 text-sm">
+          A. はい、<strong>すべて実在する国内大手EdTechサービス</strong>です：
+          <ul class="list-disc pl-5 mt-2">
+            <li><strong>Qubena（キュビナ）</strong>：株式会社COMPASS（福岡市全中学校71校採用など全国170自治体以上）</li>
+            <li><strong>navima（ナビマ）</strong>：TOPPANエデュケーション（凸版印刷グループ）</li>
+            <li><strong>ミライシード</strong>：株式会社ベネッセコーポレーション（進研ゼミの運営会社）</li>
+            <li><strong>スタディサプリ for TEACHERS</strong>：株式会社リクルート</li>
+            <li><strong>すらら</strong>：株式会社すららネット（東証グロース上場）</li>
+          </ul>
+          <p class="mt-2">価格は各社公式サイト・プレスリリース・<a href="https://ppp-education-dx.jp/" target="_blank" class="text-blue-600 underline">教育DXサービスマップ</a>・ICT CONNECT 21の実証報告書等、公開情報に基づく概算です。</p>
+        </div>
+      </details>
+
+      <details class="bg-white rounded-lg p-5 shadow-sm">
+        <summary class="font-bold text-lg cursor-pointer"><i class="fas fa-question-circle text-amber-600 mr-2"></i>Q2. 追加費用が発生する可能性はありますか？</summary>
+        <div class="mt-3 text-gray-700 text-sm">
+          A. 原則として、お見積書に記載のない追加費用は発生しません。ただし以下の場合は別途ご相談となります：
+          <ul class="list-disc pl-5 mt-2">
+            <li>児童生徒数が大幅に増加した場合（100名以上の増）</li>
+            <li>当社でサポートしていない特殊な外部システムとの連携</li>
+            <li><strong>GenSpark利用量が月13万円を大幅に超過した場合</strong>（超過分のみ実費精算）</li>
+            <li>指導主事の参画が不可能になった場合（外部委託への切替により年間約150万円の外部委託費が再計上）</li>
+          </ul>
+          <p class="mt-2">いずれも<strong>事前お見積り・ご承認制</strong>のため、勝手に請求されることはありません。
+          GenSparkについては<strong>月次の使用明細</strong>をご報告し、予算管理いただけます。</p>
+        </div>
+      </details>
+
+      <details class="bg-white rounded-lg p-5 shadow-sm">
+        <summary class="font-bold text-lg cursor-pointer"><i class="fas fa-question-circle text-amber-600 mr-2"></i>Q3. 途中解約時の違約金は？</summary>
+        <div class="mt-3 text-gray-700 text-sm">
+          A. <strong>違約金は一切ございません。</strong>GenSpark 利用料は従量課金・月次実費精算のため、
+          解約月以降の課金は発生しません。初期費用も 0 円のため、返金の論点も発生しません。
+        </div>
+      </details>
+
+      <details class="bg-white rounded-lg p-5 shadow-sm">
+        <summary class="font-bold text-lg cursor-pointer"><i class="fas fa-question-circle text-amber-600 mr-2"></i>Q4. 補助金が採択されなかった場合は？</summary>
+        <div class="mt-3 text-gray-700 text-sm">
+          A. 以下3つの対応を用意しています：
+          <ol class="list-decimal pl-5 mt-2 space-y-1">
+            <li><strong>他の補助金への切替申請</strong>（最大4制度あり）</li>
+            <li><strong>GenSpark 利用量を月5万円程度まで縮小</strong>（年60万円・全額自費でも Qubena スターター版 95万円より安価）</li>
+            <li><strong>支払いの繰延プラン</strong>（補助金採択まで最大6ヶ月待機）</li>
+          </ol>
+        </div>
+      </details>
+
+      <details class="bg-white rounded-lg p-5 shadow-sm">
+        <summary class="font-bold text-lg cursor-pointer"><i class="fas fa-question-circle text-amber-600 mr-2"></i>Q5. 他社（Qubena等）と比較して本当に安いのですか？</summary>
+        <div class="mt-3 text-gray-700 text-sm">
+          A. はい。第6章の比較表をご覧ください。松川村規模721名で試算すると：
+          <ul class="list-disc pl-5 mt-2">
+            <li>本提案（補助金後 STEP A）：<strong>40万円/年</strong></li>
+            <li>本提案（補助金前 GenSpark実費 STEP A）：<strong>120万円/年</strong></li>
+            <li>Qubena 通常版：約571万円/年（本提案の約5〜14倍）</li>
+            <li>navima：約250〜400万円/年（本提案の約2〜10倍）</li>
+            <li>ミライシード：約350〜500万円/年（本提案の約3〜12倍）</li>
+            <li>すらら：約600〜720万円/年（本提案の約5〜18倍）</li>
+          </ul>
+          <p class="mt-2">理由：①エッジクラウドの無料枠で運用 ②営業・広告費ゼロ ③指導主事参画で外部委託費ゼロ ④実発生は GenSpark AI 利用料の実費のみ。</p>
+        </div>
+      </details>
+
+      <details class="bg-white rounded-lg p-5 shadow-sm">
+        <summary class="font-bold text-lg cursor-pointer"><i class="fas fa-question-circle text-amber-600 mr-2"></i>Q6. 費用の支払い方法・タイミングは？</summary>
+        <div class="mt-3 text-gray-700 text-sm">
+          A. 以下の3パターンから選択いただけます：
+          <ul class="list-disc pl-5 mt-2 space-y-1">
+            <li><strong>年払い</strong>：契約時に年額を一括（推奨・5%割引あり）</li>
+            <li><strong>半期払い</strong>：4月・10月の2回払い</li>
+            <li><strong>月払い</strong>：毎月の請求書払い（自治体向けに対応）</li>
+          </ul>
+          <p class="mt-2">請求書・領収書・見積書は<strong>公費請求に対応した様式</strong>で発行します。</p>
+        </div>
+      </details>
+
+      <details class="bg-white rounded-lg p-5 shadow-sm">
+        <summary class="font-bold text-lg cursor-pointer"><i class="fas fa-question-circle text-amber-600 mr-2"></i>Q7. 児童生徒数が減少した場合、費用は下がりますか？</summary>
+        <div class="mt-3 text-gray-700 text-sm">
+          A. はい。<strong>毎年4月の児童生徒数に応じて、年額を自動調整</strong>します。松川村の少子化傾向を踏まえ、費用負担が増大しない仕組みです。逆に増えた場合も<strong>100名までは追加料金なし</strong>です。
+        </div>
+      </details>
+
+    </div>
+  </div>
+</section>
+
+<!-- ========== クロージング ========== -->
+<section class="py-16 px-4 hero-gradient text-white">
+  <div class="max-w-4xl mx-auto text-center">
+    <h2 class="text-3xl md:text-4xl font-bold mb-6">ご質問・個別お見積り、承ります</h2>
+    <p class="text-lg opacity-95 mb-8">
+      本お見積りは松川村専用・指導主事ご参画前提のご提案です。<br>
+      さらに詳しい内訳・個別カスタマイズのご希望がございましたら、お気軽にご相談ください。
+    </p>
+    <div class="grid md:grid-cols-3 gap-4 mb-8">
+      <div class="bg-white/10 backdrop-blur rounded-lg p-5">
+        <i class="fas fa-file-invoice-dollar text-3xl mb-2"></i>
+        <h3 class="font-bold mb-1">正式見積書の発行</h3>
+        <p class="text-sm opacity-90">公費請求対応の正式書類を即日発行</p>
+      </div>
+      <div class="bg-white/10 backdrop-blur rounded-lg p-5">
+        <i class="fas fa-handshake text-3xl mb-2"></i>
+        <h3 class="font-bold mb-1">現地ご説明</h3>
+        <p class="text-sm opacity-90">松川村にお伺いし、内訳を直接ご説明</p>
+      </div>
+      <div class="bg-white/10 backdrop-blur rounded-lg p-5">
+        <i class="fas fa-comments text-3xl mb-2"></i>
+        <h3 class="font-bold mb-1">技術的なご質問対応</h3>
+        <p class="text-sm opacity-90">システム・運用に関するご相談はいつでも</p>
+      </div>
+    </div>
+    <div class="flex gap-4 justify-center flex-wrap">
+      <a href="/matsukawa-proposal.html" class="bg-white text-amber-700 font-bold px-8 py-3 rounded-lg hover:bg-amber-50">
+        <i class="fas fa-arrow-left mr-2"></i>提案書に戻る
+      </a>
+      <a href="/matsukawa-slides.html" class="bg-amber-900 text-white font-bold px-8 py-3 rounded-lg hover:bg-amber-800">
+        <i class="fas fa-tv mr-2"></i>スライド版を見る
+      </a>
+    </div>
+  </div>
+</section>
+
+<footer class="bg-gray-800 text-gray-400 py-6 text-center text-sm">
+  <p>松川村教育委員会 専用費用内訳書｜指導主事（私）参画版</p>
+  <p class="mt-1">本資料は松川村との協議用参考資料です。正式見積書は別途発行いたします。他社価格は2025年時点の公開情報に基づく概算値です。</p>
+</footer>
+
+<script>
+  // タブ切替
+  function showPlan(plan) {
+    document.querySelectorAll('.plan-panel').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('.step-tab').forEach(el => el.classList.remove('active'));
+    document.getElementById('plan-' + plan).classList.remove('hidden');
+    document.getElementById('tab-' + plan).classList.add('active');
+  }
+
+  // グラフ1：他社比較（実名・721名規模）
+  const ctx1 = document.getElementById('compareChart').getContext('2d');
+  new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels: [
+        '本提案（補助金後・STEP A）',
+        '本提案（補助金前・STEP A）',
+        'Qubena スターター',
+        'スタディサプリ',
+        'navima',
+        'ミライシード',
+        'Qubena 通常版',
+        'すらら'
+      ],
+      datasets: [{
+        label: '年額（万円）',
+        data: [40, 120, 95, 180, 325, 425, 571, 660],
+        backgroundColor: [
+          '#059669', '#d97706', '#94a3b8', '#94a3b8',
+          '#94a3b8', '#94a3b8', '#94a3b8', '#94a3b8'
+        ],
+        borderColor: [
+          '#047857', '#92400e', '#64748b', '#64748b',
+          '#64748b', '#64748b', '#64748b', '#64748b'
+        ],
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (c) => c.parsed.x + ' 万円/年' } }
+      },
+      scales: {
+        x: { beginAtZero: true, ticks: { callback: v => v + ' 万円' } }
+      }
+    }
+  });
+
+  // グラフ2：5年TCO（指導主事参画・補助金適用後 vs 累積効果）
+  const ctx2 = document.getElementById('tcoChart').getContext('2d');
+  new Chart(ctx2, {
+    type: 'line',
+    data: {
+      labels: ['1年目', '2年目', '3年目', '4年目', '5年目'],
+      datasets: [
+        {
+          label: '累積 松川村負担（万円）',
+          data: [40, 80, 120, 160, 200],
+          borderColor: '#d97706',
+          backgroundColor: 'rgba(217,119,6,0.1)',
+          fill: true,
+          tension: 0.3
+        },
+        {
+          label: '累積 経済効果',
+          data: [250, 600, 1050, 1550, 2150],
+          borderColor: '#059669',
+          backgroundColor: 'rgba(5,150,105,0.1)',
+          fill: true,
+          tension: 0.3
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        tooltip: { callbacks: { label: (c) => c.dataset.label + ': ' + c.parsed.y + ' 万円' } }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: v => v + ' 万円' } }
+      }
+    }
+  });
+</script>
+
+</body>
+</html>

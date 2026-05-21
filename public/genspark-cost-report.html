@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>GenSpark 月別支払い実績レポート｜小林寿英</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  @page { size: A4; margin: 15mm 14mm; }
+  html, body { font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif; color: #1f2937; background: #f3f4f6; }
+  body { font-size: 10.5pt; line-height: 1.55; }
+  .a4-page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 8mm auto;
+    background: white;
+    padding: 15mm 14mm;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    page-break-after: always;
+    box-sizing: border-box;
+    position: relative;
+  }
+  .a4-page:last-child { page-break-after: auto; }
+  h1.doc-title { font-size: 18pt; font-weight: 800; color: #064e3b; letter-spacing: 0.02em; }
+  h2.sec { font-size: 13pt; font-weight: 800; color: #065f46; border-left: 5px solid #10b981; padding-left: 8px; margin: 14px 0 8px; background:#ecfdf5; padding-top:3px; padding-bottom:3px; }
+  h3.sub { font-size: 11.5pt; font-weight: 700; color: #047857; margin: 10px 0 4px; }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+  .tbl th, .tbl td { border: 1px solid #d1d5db; padding: 5px 7px; vertical-align: middle; }
+  .tbl th { background: #ecfdf5; color: #065f46; font-weight: 700; }
+  .tbl .num { text-align: right; font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+  .tbl .ctr { text-align: center; }
+  .stamp-box { border: 1.5px solid #065f46; padding: 6px 10px; font-size: 9pt; color: #064e3b; background: #ecfdf5; display: inline-block; border-radius: 4px; }
+  .note { font-size: 8.5pt; color: #4b5563; }
+  .highlight { background: linear-gradient(90deg, #fef3c7, #fde68a); padding: 10px 14px; border-radius: 6px; border-left: 4px solid #d97706; }
+  .flag-real { display: inline-block; font-size: 7.5pt; background: #dcfce7; color: #14532d; padding: 1px 6px; border-radius: 3px; vertical-align: middle; margin-left: 4px; font-weight: 700; }
+  .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; }
+  .summary-grid .card { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 8px 10px; text-align: center; }
+  .summary-grid .card .label { font-size: 8.5pt; color: #065f46; }
+  .summary-grid .card .val { font-size: 16pt; font-weight: 800; color: #064e3b; }
+  .summary-grid .card .sub { font-size: 8pt; color: #374151; }
+  .chart-wrap { width: 100%; max-width: 170mm; margin: 0 auto; }
+  .meta-row { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 6px; }
+  .meta-row .left, .meta-row .right { font-size: 9.5pt; }
+  .signature { margin-top: 14px; padding: 10px 14px; border: 1px solid #d1d5db; background: #f9fafb; border-radius: 4px; }
+  .warn { background: #fef2f2; border-left: 4px solid #dc2626; padding: 8px 12px; border-radius: 4px; font-size: 10pt; }
+  .page-num { position: absolute; bottom: 10mm; right: 14mm; font-size: 8.5pt; color: #64748b; }
+  .footer-note { position: absolute; bottom: 10mm; left: 14mm; font-size: 8.5pt; color: #94a3b8; }
+  @media print {
+    body { background: white; font-size: 10.5pt; }
+    .a4-page { margin: 0; box-shadow: none; padding: 15mm 14mm; }
+    .no-print { display: none !important; }
+  }
+  .print-btn { position: fixed; right: 16px; bottom: 16px; z-index: 100; background: #065f46; color: white; font-weight: 700; padding: 10px 16px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); cursor: pointer; border: none; }
+</style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()"><i class="fas fa-print mr-1"></i>印刷 / PDF保存</button>
+
+<!-- ======================== ページ 1 ======================== -->
+<div class="a4-page">
+
+  <div class="meta-row">
+    <div class="left">
+      <div class="stamp-box"><i class="fas fa-file-invoice-dollar mr-1"></i>実績レポート（添付資料）</div>
+    </div>
+    <div class="right text-gray-700">
+      文書番号：KBY-2026-0422-A<br>
+      作成日：2026年4月22日（集計日：2026年4月23日）
+    </div>
+  </div>
+
+  <h1 class="doc-title mt-4">GenSpark 月別支払い 実績レポート</h1>
+  <p class="text-gray-600 text-sm">— 2025年10月〜2026年4月（個人アカウント運用期間・Gmail領収書ベース）—</p>
+  <hr class="my-3 border-emerald-700">
+
+  <div class="text-sm">
+    <div><strong>宛先：</strong>松川村教育委員会　教育長　古畑 元大 様</div>
+    <div><strong>集計者：</strong>松川村トコトン指導主事　小林 寿英</div>
+    <div><strong>データ出所：</strong>Gmail 受信メール（MainFunc PTE. LTD. / Stripe 領収書）</div>
+    <div><strong>対象：</strong>GenSpark 個人アカウント決済（小林名義・VISA カード）</div>
+    <div><strong>目的：</strong>別添「Genspark（AIワークスペース）導入に関するご提案」の費用根拠資料</div>
+  </div>
+
+  <h2 class="sec">1. 要旨（ひと目で把握）</h2>
+  <div class="summary-grid">
+    <div class="card">
+      <div class="label">集計期間（6ヶ月実績）<span class="flag-real">実データ</span></div>
+      <div class="val" style="font-size:13pt;">2025年10月〜2026年3月</div>
+      <div class="sub">55 件 / $1,805.15</div>
+    </div>
+    <div class="card">
+      <div class="label">6ヶ月合計（円換算）<span class="flag-real">実データ</span></div>
+      <div class="val">約 273,600 円</div>
+      <div class="sub">小林個人 VISA 決済</div>
+    </div>
+    <div class="card" style="background:#fef2f2; border-color:#fecaca;">
+      <div class="label" style="color:#991b1b;">2026年4月〜（Pro）</div>
+      <div class="val" style="color:#991b1b;">約 98,000 円/月</div>
+      <div class="sub">$659.99（税込）固定継続</div>
+    </div>
+  </div>
+
+  <div class="warn">
+    <p class="text-sm">
+      <i class="fas fa-exclamation-triangle mr-1"></i>
+      <strong>実費の急増：</strong>2025年12月 約 7,500 円 → 2026年2月 約 111,200 円（<strong>約 15 倍</strong>）。
+      自由進度学習・協働ナビシステムの開発本格化に伴い AI クレジット消費が急増。
+      2026年3月以降は Pro プランへ移行し、<strong>月額 約 9.8 万円の固定費が継続発生</strong>しております。
+      全額が小林個人の VISA カードで立替決済されており、<strong>公費精算の仕組みがない</strong>ことが課題です。
+    </p>
+  </div>
+
+  <h2 class="sec">2. 月別支払い集計（実績）</h2>
+  <p class="note">※ Gmail 受信メール（MainFunc PTE. LTD. / Stripe 領収書）からの自動集計。<span class="flag-real">実データ</span></p>
+
+  <table class="tbl mt-2">
+    <thead>
+      <tr>
+        <th style="width:13%;">月</th>
+        <th style="width:8%;">件数</th>
+        <th style="width:15%;">合計（USD）</th>
+        <th style="width:15%;">概算（JPY）</th>
+        <th>主な内訳</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="ctr">2025年10月</td>
+        <td class="ctr">4 件</td>
+        <td class="num">$137.49</td>
+        <td class="num">約 20,600 円</td>
+        <td>Plus 月額 ×1、Mega Pack ×2、Credits Pack ×1</td>
+      </tr>
+      <tr>
+        <td class="ctr">2025年11月</td>
+        <td class="ctr">5 件</td>
+        <td class="num">$203.49</td>
+        <td class="num">約 30,900 円</td>
+        <td>Plus 月額 ×1、Mega Pack ×4</td>
+      </tr>
+      <tr>
+        <td class="ctr">2025年12月</td>
+        <td class="ctr">2 件</td>
+        <td class="num">$49.49</td>
+        <td class="num">約 7,500 円</td>
+        <td>Plus 月額 ×1、Credits Pack ×1</td>
+      </tr>
+      <tr>
+        <td class="ctr">2026年1月</td>
+        <td class="ctr">11 件</td>
+        <td class="num">$269.49</td>
+        <td class="num">約 41,800 円</td>
+        <td>Plus 月額 ×1、Mega Pack ×1、Credits Pack ×9</td>
+      </tr>
+      <tr style="background:#fef3c7;">
+        <td class="ctr">2026年2月</td>
+        <td class="ctr">30 件</td>
+        <td class="num">$731.49</td>
+        <td class="num"><strong>約 111,200 円</strong></td>
+        <td>Plus 月額 ×1、Mega Pack ×3、Credits Pack ×26（集中購入）</td>
+      </tr>
+      <tr>
+        <td class="ctr">2026年3月</td>
+        <td class="ctr">3 件</td>
+        <td class="num">$413.70</td>
+        <td class="num">約 61,600 円</td>
+        <td>Pro 月額（初回）×1、按分 ×2</td>
+      </tr>
+      <tr style="background:#ecfdf5; font-weight:700;">
+        <td class="ctr">合計</td>
+        <td class="ctr">55 件</td>
+        <td class="num">$1,805.15</td>
+        <td class="num">約 273,600 円</td>
+        <td>6 ヶ月累計</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="note mt-2">
+    <strong>為替レート注記：</strong>
+    円換算は各月の概算為替レートを使用（2025年10月〜11月：150〜152 円/ドル、2026年1月〜2月：152〜155 円/ドル、3月：149 円/ドル）。
+  </p>
+
+  <h2 class="sec">3. 月別推移グラフ（実データ）</h2>
+  <div class="chart-wrap">
+    <canvas id="monthlyChart" height="140"></canvas>
+  </div>
+  <p class="note text-center">緑棒：月別円換算額（実績）／青線：USD 課金額（実績）</p>
+
+  <div class="page-num">1 / 3</div>
+  <div class="footer-note">GenSpark 月別支払い実績レポート｜小林寿英</div>
+</div>
+
+<!-- ======================== ページ 2 ======================== -->
+<div class="a4-page">
+
+  <h2 class="sec">4. プラン変遷と費用の推移</h2>
+  <p class="note">個人アカウントで契約してきたプランの変遷および月額費用の推移。</p>
+
+  <table class="tbl mt-2">
+    <thead>
+      <tr>
+        <th>期間</th>
+        <th>プラン</th>
+        <th>月額（税込）</th>
+        <th>概算月額（JPY）</th>
+        <th>備考</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>〜 2025年11月</td>
+        <td>Genspark <strong>Plus</strong></td>
+        <td class="num">$27.49 / 月</td>
+        <td class="num">約 4,100 円</td>
+        <td>基本プラン利用期</td>
+      </tr>
+      <tr>
+        <td>2025年10月〜2026年2月</td>
+        <td>Credits Pack（都度購入）</td>
+        <td class="num">$22〜$44 / 回</td>
+        <td class="num">変動（最大月 $731）</td>
+        <td>開発タスク集中による従量購入</td>
+      </tr>
+      <tr>
+        <td>2026年3月〜</td>
+        <td>Genspark <strong>Pro</strong></td>
+        <td class="num">$249.99（税込 $274.99）</td>
+        <td class="num">約 41,000 円</td>
+        <td>Pro 切替え（初回按分）</td>
+      </tr>
+      <tr style="background:#fef2f2;">
+        <td><strong>2026年4月〜（現在）</strong></td>
+        <td><strong>Genspark Pro</strong></td>
+        <td class="num"><strong>$599.99（税込 $659.99）</strong></td>
+        <td class="num"><strong>約 98,000 円</strong></td>
+        <td>正式月額・固定費継続</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 class="sec">5. 月別詳細明細（主要日付・抜粋）</h2>
+  <p class="note">Gmail 領収書メールから日付・金額を抽出（Stripe／MainFunc PTE. LTD. 発行分）。</p>
+
+  <table class="tbl mt-2">
+    <thead>
+      <tr>
+        <th style="width:20%;">月</th>
+        <th style="width:20%;">日付</th>
+        <th style="width:18%;">金額（USD）</th>
+        <th>項目</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td rowspan="4" class="ctr">2025年10月</td><td class="ctr">10/07</td><td class="num">$22.00</td><td>Credits Pack</td></tr>
+      <tr><td class="ctr">10/18</td><td class="num">$27.49</td><td>Plus 月額</td></tr>
+      <tr><td class="ctr">10/27</td><td class="num">$44.00</td><td>Mega Pack</td></tr>
+      <tr><td class="ctr">10/31</td><td class="num">$44.00</td><td>Mega Pack</td></tr>
+      <tr><td class="ctr">2025年11月</td><td class="ctr" colspan="2">5 件合計</td><td>Plus 月額 ×1、Mega Pack ×4</td></tr>
+      <tr><td class="ctr">2025年12月</td><td class="ctr" colspan="2">2 件合計</td><td>Plus 月額 ×1、Credits Pack ×1</td></tr>
+      <tr><td class="ctr">2026年1月</td><td class="ctr" colspan="2">11 件合計</td><td>Plus 月額 ×1、Mega Pack ×1、Credits Pack ×9</td></tr>
+      <tr style="background:#fef3c7;"><td class="ctr">2026年2月</td><td class="ctr" colspan="2">30 件合計</td><td>2/18 Plus 購読 $27.49 を含む。<strong>集中購入により月額が大幅増加</strong></td></tr>
+      <tr><td rowspan="3" class="ctr">2026年3月</td><td class="ctr">3/14</td><td class="num">$23.58</td><td>按分</td></tr>
+      <tr><td class="ctr">3/18</td><td class="num">$274.99</td><td>Pro 月額（初回）</td></tr>
+      <tr><td class="ctr">3/27</td><td class="num">$115.13</td><td>按分</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="sec">6. 考察（費用急増の要因）</h2>
+
+  <h3 class="sub">6-1. 急増の直接要因</h3>
+  <ul class="list-disc pl-6 text-sm">
+    <li>2025年12月（約 7,500 円）→ 2026年2月（約 111,200 円）で <strong>約 15 倍</strong>に急増</li>
+    <li>自由進度学習システムおよび協働ナビシステムの開発本格化に伴う AI クレジット消費の増加</li>
+    <li>Plus プラン（$27.49/月）のクレジットでは業務量に対応できず、Mega Pack・Credits Pack の都度購入が常態化</li>
+    <li>2026年3月に Pro プラン（$599.99/月）へ切替えることで <strong>上限なしの安定運用</strong>に切替</li>
+  </ul>
+
+  <h3 class="sub">6-2. Pro プラン移行後（2026年4月〜）の継続負担</h3>
+  <div class="summary-grid">
+    <div class="card" style="background:#fef2f2; border-color:#fecaca;">
+      <div class="label" style="color:#991b1b;">月額（税込）</div>
+      <div class="val" style="color:#991b1b;">約 98,000 円</div>
+      <div class="sub">$659.99/月 固定</div>
+    </div>
+    <div class="card" style="background:#fef2f2; border-color:#fecaca;">
+      <div class="label" style="color:#991b1b;">年間換算</div>
+      <div class="val" style="color:#991b1b;">約 117.6 万円</div>
+      <div class="sub">12 ヶ月固定</div>
+    </div>
+    <div class="card" style="background:#fef2f2; border-color:#fecaca;">
+      <div class="label" style="color:#991b1b;">負担主体</div>
+      <div class="val" style="color:#991b1b; font-size:13pt;">小林個人</div>
+      <div class="sub">VISA カード立替</div>
+    </div>
+  </div>
+
+  <div class="page-num">2 / 3</div>
+  <div class="footer-note">GenSpark 月別支払い実績レポート｜小林寿英</div>
+</div>
+
+<!-- ======================== ページ 3 ======================== -->
+<div class="a4-page">
+
+  <h2 class="sec">7. まとめと考察</h2>
+
+  <h3 class="sub">7-1. 費用構造の現状</h3>
+  <div class="warn">
+    <ul class="list-disc pl-6 text-sm">
+      <li>6 ヶ月実績：<strong>合計 55 件 / $1,805.15 / 約 273,600 円</strong>（2025年10月〜2026年3月）</li>
+      <li>2026年4月以降は Pro プラン固定で <strong>月額 約 9.8 万円（年 約 117.6 万円）</strong>が継続発生</li>
+      <li>全費用が <strong>小林個人の VISA カード決済</strong>（公費精算・請求書発行の仕組みなし）</li>
+      <li>組織としての契約主体・管理権限・監査ログが存在しない（ガバナンス不在）</li>
+    </ul>
+  </div>
+
+  <h3 class="sub">7-2. Team プラン 10 名構成への移行による改善効果（試算）</h3>
+  <div class="good sans" style="background:#f0fdf4; border-color:#86efac; margin-bottom:8px;">
+    <p style="font-size:9.5pt;">
+      <i class="fas fa-balance-scale mr-1"></i>
+      <strong>プラン選定の根拠：</strong>
+      2026年2月の実績（使用額 $731.49・Credits Pack 26 件）から、
+      小林の月間作業量は <strong>120,000 〜 200,000 クレジット相当</strong>と推定されます。
+      Team プランは 1 名あたり月 12,000 クレジットが付与され、ワークスペース内で共有できるため、
+      <strong>10 名構成（月 120,000 クレジット）</strong>で現行の作業量を維持できます。
+      最小構成（2 名・月 24,000 クレジット）では作業量不足となるため不採用としました。
+    </p>
+  </div>
+  <table class="tbl mt-2">
+    <thead>
+      <tr>
+        <th>項目</th>
+        <th>現状（Pro 個人）1 名</th>
+        <th>移行後（Team 10 名）</th>
+        <th>差額</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>月額費用</td>
+        <td class="num">約 98,000 円<br><span class="text-xs text-red-700">※ 2月は Pack 追加で 約 11 万円到達</span></td>
+        <td class="num">約 46,000 円</td>
+        <td class="num text-green-700">▲ 約 52,000 円</td>
+      </tr>
+      <tr>
+        <td>年間費用</td>
+        <td class="num">約 117.6 万円</td>
+        <td class="num">約 55.0 万円</td>
+        <td class="num text-green-700"><strong>▲ 約 62.6 万円（約 53% 削減）</strong></td>
+      </tr>
+      <tr>
+        <td>確保クレジット量（月）</td>
+        <td class="num">125,000（1 名）</td>
+        <td class="num"><strong>120,000（12,000 × 10 名・共有可）</strong></td>
+        <td class="ctr">同等</td>
+      </tr>
+      <tr>
+        <td>利用者数</td>
+        <td class="num">1 名（小林のみ）</td>
+        <td class="num"><strong>10 名（教育委員会・ICT 担当教員等）</strong></td>
+        <td class="num text-green-700">10 倍拡大</td>
+      </tr>
+      <tr>
+        <td>契約主体</td>
+        <td>小林個人</td>
+        <td><strong>松川村教育委員会</strong></td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>決済</td>
+        <td>個人 VISA カード</td>
+        <td><strong>公費・請求書払い</strong></td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>セキュリティ</td>
+        <td>個人アカウント</td>
+        <td><strong>SOC2・ISO27001 準拠</strong></td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>監査ログ・一元管理</td>
+        <td class="ctr">×</td>
+        <td class="ctr"><strong>○</strong></td>
+        <td>—</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="highlight mt-3">
+    <p>
+      <i class="fas fa-lightbulb text-amber-700 mr-1"></i>
+      <strong>結論：</strong>
+      Team プラン 10 名構成への移行により、年額 <strong>約 117 万円 → 約 55 万円（約 53% 削減・利用者 10 倍）</strong>が実現可能。
+      現行の作業量を保ちながら使用者を教育委員会・各校 ICT 担当教員に拡張でき、
+      <strong>組織契約化によるガバナンス強化・セキュリティ向上・担当者交代リスク解消・付帯效果の組織内展開</strong>という
+      4 重の効果が得られます。
+    </p>
+  </div>
+
+  <h2 class="sec">8. Gmail 領収書の確認方法（検証可能性）</h2>
+  <p class="text-sm">本レポートの全数値は、以下の Gmail 検索クエリで確認・検証できます。ご要請があれば原本 PDF を提出いたします。</p>
+  <table class="tbl mt-2">
+    <thead>
+      <tr><th style="width:30%;">検索条件</th><th>検索クエリ（Gmail 検索窓に貼付）</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>発行元（MainFunc PTE. LTD.）</td><td><code>from:(noreply@mainfunc.ai OR receipts@stripe.com) MainFunc</code></td></tr>
+      <tr><td>件名（領収書）</td><td><code>subject:(receipt OR invoice OR payment OR 領収書)</code></td></tr>
+      <tr><td>対象期間（6ヶ月実績）</td><td><code>after:2025/10/01 before:2026/04/30</code></td></tr>
+      <tr><td>一括検索（推奨）</td><td><code>from:stripe.com MainFunc after:2025/10/01 before:2026/04/30</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="sec">9. 本レポートの位置づけ</h2>
+  <p class="text-sm">
+    本レポートは、別添「Genspark（AIワークスペース）導入に関するご提案」（2026年4月22日付）の
+    費用根拠資料として作成したものです。
+    現状の個人アカウント運用を、<strong>松川村教育委員会名義の Team プラン契約へ移行</strong>することにより、
+    費用・セキュリティ・ガバナンスの 3 側面で抜本的な改善が可能です。
+    ご判断の一助となれば幸甚です。
+  </p>
+
+  <div class="signature">
+    <div class="flex justify-between items-end">
+      <div>
+        <div class="text-xs text-gray-600">作成・集計</div>
+        <div class="font-bold">松川村トコトン指導主事</div>
+        <div class="font-bold text-lg">小林 寿英</div>
+        <div class="text-xs text-gray-500 mt-1">（小林個人 VISA カード決済実績に基づく）</div>
+      </div>
+      <div class="text-right">
+        <div class="text-xs text-gray-600">提出先</div>
+        <div class="font-bold">松川村教育委員会</div>
+        <div class="font-bold text-lg">教育長 古畑 元大 様</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="meta-row mt-4">
+    <div class="left text-gray-600 text-xs">本資料の元データは Gmail 受信メール（Stripe／MainFunc PTE. LTD. 発行領収書）。集計日：2026年4月23日。</div>
+  </div>
+
+  <div class="page-num">3 / 3</div>
+  <div class="footer-note">GenSpark 月別支払い実績レポート｜小林寿英</div>
+</div>
+
+<script>
+  const ctx = document.getElementById('monthlyChart').getContext('2d');
+  new Chart(ctx, {
+    data: {
+      labels: ['25/10', '25/11', '25/12', '26/01', '26/02', '26/03'],
+      datasets: [
+        {
+          type: 'bar',
+          label: '円換算額（円・実績）',
+          data: [20600, 30900, 7500, 41800, 111200, 61600],
+          backgroundColor: ['rgba(16, 185, 129, 0.5)', 'rgba(16, 185, 129, 0.5)', 'rgba(16, 185, 129, 0.5)', 'rgba(16, 185, 129, 0.6)', 'rgba(220, 38, 38, 0.7)', 'rgba(245, 158, 11, 0.7)'],
+          borderColor: ['#065f46', '#065f46', '#065f46', '#065f46', '#991b1b', '#b45309'],
+          borderWidth: 1.5,
+          yAxisID: 'y',
+          order: 2
+        },
+        {
+          type: 'line',
+          label: 'USD 課金額（$・実績）',
+          data: [137.49, 203.49, 49.49, 269.49, 731.49, 413.70],
+          borderColor: '#1e40af',
+          backgroundColor: 'rgba(30, 64, 175, 0.1)',
+          borderWidth: 2.5,
+          pointRadius: 4,
+          pointBackgroundColor: '#1e40af',
+          yAxisID: 'y1',
+          order: 1,
+          tension: 0.2
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { position: 'top', labels: { font: { size: 10 } } },
+        title: {
+          display: true,
+          text: '2025年10月〜2026年3月 GenSpark 月別支払い実績推移',
+          font: { size: 11, weight: 'bold' }
+        }
+      },
+      scales: {
+        y:  { position: 'left', title: { display: true, text: '円換算額（円）', font: { size: 10 } }, ticks: { callback: v => v.toLocaleString() + '円', font: { size: 9 } } },
+        y1: { position: 'right', title: { display: true, text: 'USD ($)', font: { size: 10 } }, grid: { drawOnChartArea: false }, ticks: { callback: v => '$' + v, font: { size: 9 } } },
+        x: { ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+</script>
+
+</body>
+</html>
