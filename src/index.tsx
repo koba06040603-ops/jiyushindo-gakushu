@@ -27805,50 +27805,128 @@ app.post('/api/ai/generate-tactile-widget', async (c) => {
     const editNote = edit_instruction ? `\n\n【修正指示】${edit_instruction}` : ''
     const forbiddenNote = forbidden_answer ? `\n\n【★★★ 絶対に表示してはいけない禁止ワード ★★★】\n「${forbidden_answer}」という単語・文字列を図の中に絶対に表示してはいけません。\nこのワードは問題の正解なので、見えてしまうとヒントになりません。\n代わりに「？」マークや空欄にしてください。` : ''
 
-    const prompt = `あなたはNano Banana 2（日本の教育AIアシスタント）です。
-子どもが画面上で「さわって考えて学べる」**質の高いインタラクティブHTML/SVG教材** を1つ生成してください。
+    // ========================================
+    // 🎓 STAGE 1: 学習設計分析 — 「何を学ばせるべきか」と「具体例データ」を先に抽出
+    // パターン適用ありきでは本質から離れた教材になるため、まずAIに学習目標を整理させる
+    // ========================================
+    let designSpec = ''
+    try {
+      const stage1Prompt = `あなたは経験豊富な教育デザイナーです。以下の学習カードの内容を分析し、本質的に学ぶべきことを整理してください。
 
-【★★★ 最重要：浅いウィジェットは絶対禁止 ★★★】
-- 「丸を1個ドラッグするだけ」「ボタンを1つ押すだけ」「正解の単語をタップするだけ」のような **思考プロセスが1ステップで終わる教材は不合格** です
-- 児童が **複数の判断・分類・順序づけ・関係性の構築** をしないと正解に到達できない構造にしてください
-- 「答えがその場で見えるヒント表示」も禁止（=「答えはどれ？」と選ばせるだけのウィジェット）
-- このウィジェットは **「自分で考えて操作することで概念が腑に落ちる」** ためのもの
+【学習カード情報】
+${context}
 
-【★★★ 9つの教育インタラクションパターン — どれか1つを必ず採用 ★★★】
-1. **分類 (Classification)**: 複数の項目を2〜4のグループにドラッグして仕分ける（例: 譜代大名/外様大名/親藩 を江戸からの距離で配置）
-2. **順序づけ (Ordering)**: イベントや概念を時系列・大小・因果の順に並べ替える（例: 江戸幕府の出来事を年代順に並べる）
-3. **対応づけ (Matching)**: 左右2列の項目を線で結ぶ・ペア化する（例: 人物 ↔ 業績、用語 ↔ 定義）
-4. **構築 (Construction)**: 部品を組み合わせて図・式・文を完成させる（例: 漢字パーツを組み合わせて漢字を作る、分数の分子分母を組む）
-5. **比較 (Comparison)**: 2つ以上の対象をパラメータで比較し違いを可視化（例: スライダーで2つの図形の面積を変えて比較）
-6. **シミュレーション (Simulation)**: 入力を変えると結果がリアルタイムに変わる（例: 角度スライダーで光の屈折を見る、人口を変えて密度を計算）
-7. **推理 (Deduction)**: ヒントを順に開示し、消去法・条件絞り込みで答えに迫る（例: 3つの手がかりから人物を当てる謎解き）
-8. **探索 (Exploration)**: マップ・図上をクリックすると情報が現れる（例: 日本地図をタップして各地方の特産を学ぶ）
-9. **創造 (Creation)**: 児童が自分で要素を配置・描画して作品を作り、ルールに沿っているか即フィードバック（例: 都市計画ゲームで人口を伸ばす）
+以下のJSON形式で回答してください（説明文不要、JSONのみ）:
+{
+  "core_concept": "この問題で本当に学ばせたい『本質的な概念』を1文で。表面的な事実ではなく『なぜ・どう関係しているか』のレベル（例: ×『大名は3種類に分類できる』 ○『徳川幕府は信頼度に応じて大名を地理的に配置することで反乱を防いだ』）",
+  "key_insight": "この概念を理解したときに児童が『あっ！なるほど！』と気づく **因果関係・しくみ・パターン** を1文（例: 『信頼できる家臣ほど江戸の近くに、危険な大名ほど遠くに置いた』）",
+  "concrete_examples": [
+    {"name": "具体例の固有名詞1", "category": "属するカテゴリ1", "note": "学習者が知っておきたい補足"},
+    {"name": "具体例の固有名詞2", "category": "属するカテゴリ2", "note": "..."}
+  ],
+  "comparison_axis": "concrete_examplesを分類・順序・比較するための『軸』（例: 『江戸からの距離と家臣の古さ』のように、key_insightを浮かび上がらせる軸）",
+  "interaction_intent": "児童が操作することで何を『発見』してほしいか（例: 『近い場所には親藩・譜代が集まり、遠い場所には外様が並ぶパターンに気づく』）",
+  "best_pattern": "この内容に最適なインタラクションパターン: classification(分類) / ordering(順序づけ) / matching(対応づけ) / construction(構築) / comparison(比較) / simulation(シミュレーション) / deduction(推理) / exploration(探索) / creation(創造)"
+}
 
-【★★★ 品質要件：以下を**すべて**満たすこと ★★★】
-[A] **複数ステップの思考**: 児童が3つ以上の操作・判断をしないと完成しない
-[B] **状態の保持**: 操作した結果が画面に残り、全体像を見ながら考えられる（=ドラッグした位置がリセットされない、選んだ項目がハイライトされ続ける）
-[C] **段階的フィードバック**: 全部正解する前でも「ここまでは合ってるよ」「あと2つ」のような中間フィードバックを表示
-[D] **複数の正解パス**: 解き方が1つに固定されず、児童の判断で違うアプローチも試せる
-[E] **概念の可視化**: 操作することで「なぜそうなるか」の構造が見えてくる（=分類軸・関係図・順序の矢印などが現れる）
-[F] **要素数の充実**: 操作対象が **最低5個以上** あること（1〜2個では浅い）
-[G] **「もう一度」「最初に戻す」ボタン必須**: 児童が何度も試行錯誤できるよう、リセット機能を必ず実装
+【★ 重要 ★】
+- core_conceptとkey_insightは「教科書の事実の羅列」ではなく「なぜそうなったかの因果関係」を含めること
+- concrete_examplesは ★必ず実在する固有名詞を最低8個★ 列挙すること（架空の名前禁止、抽象的な「大名A」のような名前も禁止）
+- 大名の例なら「前田家」「井伊家」「毛利家」「島津家」「伊達家」「徳川御三家(尾張・紀州・水戸)」など教科書に出る実名
+- 光合成なら「水」「二酸化炭素」「日光」「葉緑体」「酸素」「デンプン」「気孔」「葉脈」など実際の要素名
+- 答えそのもの「${forbidden_answer || '(問題の答え)'}」をconcrete_examplesのnameに含めないこと`
 
-【★★★ 最最重要ルール: 答えを絶対に見せないこと ★★★】
-- 問題の正解・解答をそのまま表示してはいけません
-- 答えの文字列を画面に直接配置してはダメ
-- ヒントとなる「考え方の枠組み」「分類軸」「比較指標」のみ提供
-- ★正しい: 時間の流れの概念図、分類の枠組み、思考の手順を示す
-- ★間違い: 答えの選択肢を並べてタップさせる、答えをハイライトして見せる
+      const stage1Controller = new AbortController()
+      const stage1Timeout = setTimeout(() => stage1Controller.abort(), 15000)
+      const stage1Models = [GEMINI_MODEL_QUALITY, GEMINI_MODEL_FALLBACK_PRIMARY, GEMINI_MODEL_FALLBACK]
+      let stage1Resp: Response | null = null
+      for (const m of stage1Models) {
+        try {
+          const r = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${geminiApiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              signal: stage1Controller.signal,
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: stage1Prompt }] }],
+                generationConfig: { temperature: 0.6, maxOutputTokens: 1500 }
+              })
+            }
+          )
+          if (r.ok) { stage1Resp = r; break }
+        } catch (_) { /* try next */ }
+      }
+      clearTimeout(stage1Timeout)
+      if (stage1Resp) {
+        const stage1Data = await stage1Resp.json() as any
+        const stage1Text = stage1Data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        const stage1Json = stage1Text.match(/\{[\s\S]*\}/)
+        if (stage1Json) {
+          try {
+            const spec = JSON.parse(stage1Json[0])
+            if (spec.core_concept && Array.isArray(spec.concrete_examples) && spec.concrete_examples.length >= 5) {
+              const exampleNames = spec.concrete_examples.map((e: any) => e.name || String(e)).filter(Boolean)
+              designSpec = `
+【★★★ 教育デザイン仕様 — 必ずこの仕様に従って教材を作ること ★★★】
+■ 本質的な学習目標 (core_concept): ${spec.core_concept}
+■ 児童に気づかせたいパターン (key_insight): ${spec.key_insight}
+■ 採用パターン (best_pattern): ${spec.best_pattern}
+■ 分類・比較軸 (comparison_axis): ${spec.comparison_axis}
+■ 操作で発見させたいこと (interaction_intent): ${spec.interaction_intent}
 
-【パターン選択の判断フロー】
-- 学習内容に「分類できる項目」がある → パターン1 (分類)
-- 「時系列・順番」が重要 → パターン2 (順序づけ)
-- 「対応関係」がある → パターン3 (対応づけ)
-- 「部品の組み合わせ」 → パターン4 (構築)
-- 「数値の変化と結果」 → パターン6 (シミュレーション)
-- 「位置情報」 → パターン8 (探索)
-- 上記が複数当てはまる場合は、より深い思考が必要なものを優先
+■ ★★★ 教材に必ず登場させる具体例（このリストの実名を使い、架空名は禁止）★★★
+${spec.concrete_examples.map((e: any, i: number) => `  ${i + 1}. ${e.name || e} [${e.category || ''}] ${e.note ? '— ' + e.note : ''}`).join('\n')}
+→ これらは ★HTML内に実際にドラッグ可能な要素として最低${Math.min(exampleNames.length, 8)}個レンダリングすること★
+→ 「あと○つ」とカウンタだけ表示して肝心の駒が画面にないのは**絶対NG**。要素を実際にHTML内に書き出すこと
+`
+              console.log(`✅ STAGE 1: 教育デザイン仕様取得 — concept="${spec.core_concept.substring(0, 50)}", examples=${exampleNames.length}個, pattern=${spec.best_pattern}`)
+            }
+          } catch (_) { /* JSON parse failed, fall through */ }
+        }
+      }
+    } catch (stage1Err: any) {
+      console.warn(`⚠️ STAGE 1 教育デザイン仕様の抽出スキップ: ${stage1Err.message}`)
+    }
+
+    const prompt = `あなたは「教科の本質を掴ませる」教育教材デザイナーです。
+子どもが画面上で「さわって・考えて・気づく」教材HTMLを1つ生成してください。
+${designSpec}
+【学習カード情報】
+${context}
+${editNote}
+${forbiddenNote}
+
+【★★★★★ 最重要 ★★★★★】
+- この教材の使命は「**本質的な学習目標の理解**」であり、ゲームを楽しませることではない
+- 「ドラッグして数を数える」のような **作業ゲーム化は絶対禁止**
+- 児童が **操作することで因果関係・パターン・しくみに『気づく』** 構造にすること
+- 表面的な分類作業（例: 「江戸からの距離」だけで分類）ではなく、その分類によって **「なぜそう配置されたのか」のしくみ** が見えてくる設計にすること
+
+【★★★ 絶対に守る制約 ★★★】
+[必須1] 上記の「具体例リスト」の **固有名詞を最低6個** をドラッグ可能な要素として実際にHTMLに配置すること
+[必須2] その6個以上の要素を **児童が実際に操作（ドラッグ・タップ・並べ替え等）できる** こと
+[必須3] 「あと○個」のカウンタを出すなら、その個数分の要素が画面に **見えて、動かせる状態で存在** すること。カウンタだけ出して肝心の駒が画面にないのは最悪のバグ
+[必須4] 操作した結果が **画面に保持され**、児童が全体パターンを俯瞰できること
+[必須5] 全部正解前から「**この置き方だと〜〜の特徴があるね**」のような **しくみへの気づきメッセージ** を段階的に表示
+[必須6] 「もう一度」ボタンを配置
+[必須7] 答えそのもの「${forbidden_answer || '(なし)'}」を画面に表示しない
+
+【★ 良い設計例 ★】
+[本質]「徳川幕府は信頼度で大名を配置した」
+- 良い: 8人の大名カード（前田・井伊・毛利・島津・伊達・徳川御三家など実名）を、「親藩」「譜代」「外様」3つのゾーンに分類するドラッグ。配置すると地図上にその大名の領地がハイライトされ、「親藩は江戸の周りに集まったね」「外様は遠方に置かれているね」と気づきメッセージ。→ 操作と気づきが連動
+- 悪い: 名前のない丸を3つドラッグして終わり、カウンタだけ表示 ← 本質ゼロ
+
+[本質]「光合成は3つの材料から2つの産物を作る」
+- 良い: 「水」「二酸化炭素」「日光」「葉緑体」「酸素」「デンプン」「土」「酸性雨」の8カードから、「材料」「装置」「産物」「無関係」4ゾーンに振り分け。間違ったゾーンに置くと「これは光合成に必要ないよ」と即時フィードバック。
+- 悪い: スライダー1個で何かが動くだけ ← 何を学んだか不明
+
+【★ 悪い設計例 — 絶対にやってはいけない ★】
+- 「丸が1個もない画面で『あと8つ配置してね』と書く」→ 動かないウィジェット、最悪
+- 「江戸からの距離だけで分類させる」→ 本質である『なぜそう配置したか』に触れていない
+- 「具体例の名前を使わず、抽象的な丸だけ」→ 学習にならない
+- 「タイマー表示で焦らせる」→ 思考を妨げる、削除すること
+- 「カウンタ『あと8つ』を表示しているのに、画面に動かせる駒がない」→ 動かないバグ、絶対禁止
 
 【生成ルール ★必ず守ること★】
 1. HTMLコード1つだけ出力。<div>で始まり</div>で終わる
@@ -27856,54 +27934,39 @@ app.post('/api/ai/generate-tactile-widget', async (c) => {
 3. ★★★ JavaScriptは必ず以下のどちらかの方法で記述：
    方法A（推奨）: onclick="(function(){ ... })()" のようにイベント属性内に即時実行関数で記述
    方法B: <script>タグを<div>の内部に配置（外部に置かない）
-   ★ドラッグ操作の場合は必ず以下のパターンを使用：
-   onpointerdown="(function(e){e.preventDefault(); var el=e.target; var svg=el.closest('svg')||el.parentElement; var move=function(ev){var r=svg.getBoundingClientRect(); var x=ev.clientX-r.left; el.setAttribute('cx',Math.max(0,Math.min(x,r.width)));}.bind(this); var up=function(){document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);};document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);})(event)"
    ★ window.xxx = function() {} のようなグローバル関数定義は禁止
    ★ すべてのロジックをイベント属性内のインライン関数として完結させること
 4. 外部ライブラリ不使用（純粋HTML/SVG/CSS/JSのみ）
-5. 問題の数値・データを正確に反映
-6. タップ・ドラッグ・スライダーなど触って操作できる要素を必ず含む（最低5個以上）
-7. フィードバック（色変化、数値更新、進捗バー、○×表示等）を即時表示
-8. **状態保持**: ドラッグした位置・選んだ項目を保持し、全体像を確認できるようにする
+5. タップ・ドラッグ・並べ替えなど操作要素を **最低6個** 含む
+6. 操作対象の要素には **具体例の固有名詞を表示**（「前田家」「水」など。抽象的な丸だけはダメ）
+7. フィードバック（色変化、配置数、気づきメッセージ等）を即時表示
+8. ドラッグした位置・選択状態は保持
 9. 日本語ラベル、カラフルで楽しいデザイン、角丸、影つき
 10. 最大幅100%、レスポンシブ対応
-11. 子どもが直感的に操作を理解できるUI（操作方法を画面上部に1〜2文で明示）
-12. touch-action:noneをドラッグ要素に設定してスクロールを防止
-13. cursor:grab をドラッグ可能な要素に設定
-14. ★「もう一度」ボタンを必ず配置（onclick で初期状態に戻す）
+11. 画面上部に「何をして何に気づくか」を1〜2文で明示
+12. touch-action:noneをドラッグ要素に設定
+13. ★タイマー表示や進捗％表示は禁止（焦らせない・思考重視）
+14. ★「もう一度」ボタン必須
 
-【良い例 — このレベルを目指すこと】
-- 【パターン1: 分類】江戸幕府の大名（10人）を「江戸からの距離（近い/中間/遠い）」3つのゾーンにドラッグ。配置した数に応じて「近い: 3個、遠い: 4個」と即時カウント表示。全部置けば「親藩・譜代は江戸の近くだね！」と気づきメッセージ。
-- 【パターン2: 順序づけ】光合成のステップ6枚のカード（「日光が当たる」「葉緑体が反応」「水と二酸化炭素を取り込む」「デンプンができる」「酸素を出す」「成長する」）を上下にドラッグして正しい順に並べる。並べ替えるたびに「順番が合うと矢印が緑になる」フィードバック。
-- 【パターン3: 対応づけ】左に歴史人物5人、右に業績5つ。指でなぞって線を引き、対応を作る。間違った線は赤、正しい線は緑に。
-- 【パターン4: 構築】漢字「明」を作るため、左から「日」「月」「日」「火」のパーツをドラッグして組み合わせ枠に置く。正しい組み合わせを発見させる。
-- 【パターン6: シミュレーション】スライダーで「人口」「面積」を変えると「人口密度」がリアルタイム計算され、棒グラフで他都市と比較。
+【ドラッグ操作の正しい実装例】
+HTML要素のドラッグ（推奨・固有名詞をカードに表示する場合）:
+<div draggable="true" id="card1" ondragstart="event.dataTransfer.setData('text/plain', this.id); this.style.opacity='0.5'" ondragend="this.style.opacity='1'" style="cursor:grab;padding:8px 12px;background:#FFE5E5;border:2px solid #FF6B6B;border-radius:8px;display:inline-block;margin:4px;touch-action:none;">前田家</div>
+<div ondragover="event.preventDefault(); this.style.background='#FFF8DC'" ondragleave="this.style.background='#F8F8F8'" ondrop="(function(e){e.preventDefault(); e.currentTarget.style.background='#F8F8F8'; var id=e.dataTransfer.getData('text/plain'); var el=document.getElementById(id); if(el){e.currentTarget.appendChild(el);} /* ここで気づきメッセージや配置数を更新する処理を入れる */})(event)" style="min-height:120px;border:2px dashed #aaa;border-radius:12px;padding:12px;background:#F8F8F8;">親藩ゾーン</div>
 
-【悪い例 — 絶対にやらないこと】
-- 円を1個ドラッグして「江戸」に近づける（1ステップで終わる、要素1個）→ NG
-- 「正解はどれ？」と3択タップ（=単なるクイズ）→ NG
-- 答えの文字列が画面に表示されている → NG
-- 操作後すぐ消えるアニメーションだけ（状態が残らない）→ NG
-
-【ドラッグ操作の正しい実装例（SVG円をドラッグ）】
+SVG要素のドラッグ:
 <circle cx="100" cy="100" r="20" fill="#FF6B6B" style="cursor:grab;touch-action:none;"
   onpointerdown="(function(e){e.preventDefault();e.stopPropagation();var c=e.target;c.style.cursor='grabbing';var svg=c.closest('svg');var move=function(ev){ev.preventDefault();var r=svg.getBoundingClientRect();c.setAttribute('cx',Math.max(20,Math.min(ev.clientX-r.left,r.width-20)));c.setAttribute('cy',Math.max(20,Math.min(ev.clientY-r.top,r.height-20)));};var up=function(){c.style.cursor='grab';document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);};document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);})(event)" />
 
-【学習カード情報】
-${context}
-${editNote}
-${forbiddenNote}
-
-【★ 出力前のセルフチェック ★】出力する前に以下を確認:
-□ 9パターンのどれを採用したか明確か？
-□ 操作対象は5個以上あるか？
-□ 児童が3ステップ以上考える設計か？
-□ 状態が保持されて全体像が見えるか？
-□ 中間フィードバックがあるか？
+【★★★ 出力前の自己チェック ★★★】
+□ 上記の具体例の固有名詞が **実際にHTML内に最低6個ある** か？（要素を数えて確認）
+□ それらが **draggable または onpointerdown でドラッグ可能** か？
+□ 操作によって「**なぜそうなのか**」のしくみが見えてくるか？単なる仕分け作業になっていないか？
+□ タイマー表示・進捗％表示を入れていないか？
 □ 「もう一度」ボタンがあるか？
-□ 答えそのものを表示していないか？
+□ 答えそのものを画面に表示していないか？
+□ カウンタを表示するなら、その個数分の駒が画面にあるか？
 
-この学習内容に最適な**深い思考を要するインタラクティブ教材**をHTMLコードだけで出力してください。
+この学習内容の **本質を体感させる** 教材をHTMLコードだけで出力してください。
 コードブロック(\`\`\`)で囲まないこと。説明文不要。HTMLのみ。`
 
     // Nano Banana 2 でウィジェットHTML + 説明画像を生成
@@ -27988,22 +28051,44 @@ ${forbiddenNote}
       }
     }
 
-    // ★ 品質チェック: インタラクティブ要素数と思考の深さを評価
-    const interactiveElements = (widgetHtml.match(/onpointerdown|onclick|onchange|oninput|draggable=/gi) || []).length
-    const stateElements = (widgetHtml.match(/<circle|<rect|<button|<input|<li/gi) || []).length
+    // ★ 品質チェック: 「動くか」「学習目的にかなっているか」を検証
+    // 動かないウィジェット（ドラッグ可能要素が画面にない）を弾くため、複数指標で評価
+    const draggableMatches = widgetHtml.match(/draggable\s*=\s*["']true["']/gi) || []
+    const pointerHandlers = widgetHtml.match(/onpointerdown\s*=/gi) || []
+    const dragHandlers = widgetHtml.match(/ondragstart\s*=/gi) || []
+    const clickHandlers = widgetHtml.match(/onclick\s*=/gi) || []
+    const draggableElementCount = draggableMatches.length + pointerHandlers.length + dragHandlers.length
+    const interactiveElements = draggableElementCount + clickHandlers.length
+    const stateElements = (widgetHtml.match(/<circle\b|<rect\b|<button\b|<input\b|<li\b|<div\b/gi) || []).length
     const hasReset = /もう一度|最初に戻す|リセット|やり直/i.test(widgetHtml)
+    // 「あと○個」「あと○つ」表記とドラッグ可能要素数の整合性
+    const counterMatch = widgetHtml.match(/あと\s*(\d+)\s*[つ個枚]/u)
+    const counterValue = counterMatch ? parseInt(counterMatch[1], 10) : 0
+    const counterMismatch = counterValue > 0 && draggableElementCount < counterValue
+    
     const qualityScore = {
+      draggable_elements: draggableElementCount,
       interactive_handlers: interactiveElements,
       visual_elements: stateElements,
       has_reset_button: hasReset,
-      is_deep_enough: interactiveElements >= 3 && stateElements >= 5
+      counter_value: counterValue,
+      counter_mismatch: counterMismatch,
+      is_deep_enough: draggableElementCount >= 3 && interactiveElements >= 4 && stateElements >= 5 && !counterMismatch
+    }
+    
+    // ★★★ 致命的バグ検出: 「あとN個」と表示しているのに駒が画面にない場合 → 警告強化
+    if (counterMismatch) {
+      console.error(`❌ NB2 tactile致命的バグ: カウンタ「あと${counterValue}個」表示しているが、ドラッグ可能要素は${draggableElementCount}個しかない（=動かないウィジェット）`)
+    }
+    if (draggableElementCount === 0 && /ドラッグ|ドロップ|配置|置いて/i.test(widgetHtml)) {
+      console.error(`❌ NB2 tactile致命的バグ: 「ドラッグして」と書いているのに、draggable/onpointerdown要素が0個 — 動かないウィジェット`)
     }
     if (!qualityScore.is_deep_enough) {
-      console.warn(`⚠️ NB2 tactile品質警告: インタラクティブ${interactiveElements}個、要素${stateElements}個 — 浅いウィジェットの可能性`)
+      console.warn(`⚠️ NB2 tactile品質警告: draggable=${draggableElementCount}, インタラクティブ=${interactiveElements}, 要素=${stateElements}, counterMismatch=${counterMismatch} — 浅い/壊れたウィジェットの可能性`)
     }
 
     const genTime = Date.now() - startTime
-    console.log(`✅ NB2 tactile widget生成: ${genTime}ms, HTML=${widgetHtml.length}文字, インタラクション=${interactiveElements}, 要素=${stateElements}, リセット=${hasReset}, 画像=${illustrationUrl ? 'あり' : 'なし'}`)
+    console.log(`✅ NB2 tactile widget生成: ${genTime}ms, HTML=${widgetHtml.length}文字, ドラッグ要素=${draggableElementCount}, インタラクション=${interactiveElements}, 要素=${stateElements}, リセット=${hasReset}, 画像=${illustrationUrl ? 'あり' : 'なし'}`)
 
     return c.json({
       success: true,
@@ -28013,7 +28098,7 @@ ${forbiddenNote}
       quality_score: qualityScore,
       generation_time_ms: genTime,
       model: 'Nano Banana 2 (gemini-3.1-flash-image)',
-      message: widgetHtml ? 'ウィジェットを生成しました' : '画像のみ生成しました'
+      message: widgetHtml ? (counterMismatch ? '⚠️ 動かない要素を検出しました。「もう一度生成」をお試しください' : 'ウィジェットを生成しました') : '画像のみ生成しました'
     })
   } catch (e: any) {
     console.error('NB2 tactile error:', e.message)
