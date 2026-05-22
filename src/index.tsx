@@ -16719,7 +16719,7 @@ ${candidateBlock}
             signal: controller.signal,
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.8, maxOutputTokens: 500 }
+              generationConfig: { temperature: 0.8, maxOutputTokens: 500, responseMimeType: 'application/json' }
             })
           }
         )
@@ -27859,7 +27859,7 @@ ${context}
               signal: stage1Controller.signal,
               body: JSON.stringify({
                 contents: [{ parts: [{ text: stage1Prompt }] }],
-                generationConfig: { temperature: 0.6, maxOutputTokens: 1500 }
+                generationConfig: { temperature: 0.6, maxOutputTokens: 1500, responseMimeType: 'application/json' }
               })
             }
           )
@@ -27942,11 +27942,13 @@ ${forbiddenNote}
 【生成ルール ★必ず守ること★】
 1. HTMLコード1つだけ出力。<div>で始まり</div>で終わる
 2. すべてのCSSはインラインstyle属性（<style>タグ不使用）
-3. ★★★ JavaScriptは必ず以下のどちらかの方法で記述：
-   方法A（推奨）: onclick="(function(){ ... })()" のようにイベント属性内に即時実行関数で記述
-   方法B: <script>タグを<div>の内部に配置（外部に置かない）
+3. ★★★ JavaScriptは必ず <script> タグを <div> の内部（末尾）に配置して記述：
+   ・<script>(function(){ ... })();</script> のように即時実行関数でラップ
+   ・複雑なドラッグ処理（pointerdown/move/up）は <script> 内にまとめる
+   ・onclick="..." のような短い単発処理だけは属性値に書いてもよいが、その場合も改行を含めず1行で完結させる
+   ★ onpointerdown="..." の属性値に長いコードや改行を入れることは絶対禁止（HTMLパース失敗の原因）
    ★ window.xxx = function() {} のようなグローバル関数定義は禁止
-   ★ すべてのロジックをイベント属性内のインライン関数として完結させること
+   ★ すべての変数宣言は (function(){ ... })() で囲んでスコープ汚染を防ぐ
 4. 外部ライブラリ不使用（純粋HTML/SVG/CSS/JSのみ）
 5. タップ・ドラッグ・並べ替えなど操作要素を **最低6個** 含む
 6. 操作対象の要素には **具体例の固有名詞を表示**（「前田家」「水」など。抽象的な丸だけはダメ）
@@ -27972,49 +27974,65 @@ ${forbiddenNote}
 
 【★★★ ドラッグ操作の正しい実装例 — このパターンをそのまま使うこと ★★★】
 
-■ HTMLカードを Pointer Events でドラッグ + ドロップ判定（推奨）:
+■ 必須: JavaScriptは <script> タグ内に書くこと（イベント属性に長いコードを入れない）
+■ HTML属性値内に改行を入れない（onpointerdown="..." の値は1行で完結させる）
+■ 推奨パターン: 「クラス指定」+「<script>でまとめてリスナー登録」
 
-<div style="position:relative;width:100%;min-height:400px;">
-  <!-- ドラッグ可能カード（固有名詞を表示） -->
-  <div id="cardA" style="position:absolute;left:20px;top:300px;cursor:grab;touch-action:none;user-select:none;padding:8px 14px;background:#FFE5E5;border:2px solid #FF6B6B;border-radius:10px;font-weight:bold;z-index:10;"
-    onpointerdown="(function(e){
-      e.preventDefault();
-      var card = e.currentTarget;
-      card.setPointerCapture(e.pointerId);
-      card.style.cursor='grabbing';
-      card.style.zIndex='100';
-      var startX = e.clientX - card.offsetLeft;
-      var startY = e.clientY - card.offsetTop;
-      var move = function(ev){
-        card.style.left = (ev.clientX - startX) + 'px';
-        card.style.top = (ev.clientY - startY) + 'px';
-      };
-      var up = function(ev){
-        card.removeEventListener('pointermove', move);
-        card.removeEventListener('pointerup', up);
-        card.releasePointerCapture(e.pointerId);
-        card.style.cursor='grab';
-        card.style.zIndex='10';
-        var cardRect = card.getBoundingClientRect();
-        var cx = cardRect.left + cardRect.width/2;
-        var cy = cardRect.top + cardRect.height/2;
-        var zones = document.querySelectorAll('.drop-zone');
-        zones.forEach(function(z){
-          var r = z.getBoundingClientRect();
-          if(cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom){
-            z.style.background = '#FFF8DC';
-            card.dataset.zone = z.id;
-            /* 気づきメッセージや配置数を更新する処理をここに */
+<div style="position:relative;width:100%;min-height:400px;background:#F0F8FF;border-radius:12px;padding:20px;">
+  <!-- ドラッグ可能カード: class="drag-card" を付ける。固有名詞を表示 -->
+  <div class="drag-card" data-name="前田家" style="position:absolute;left:20px;top:300px;cursor:grab;touch-action:none;user-select:none;padding:8px 14px;background:#FFE5E5;border:2px solid #FF6B6B;border-radius:10px;font-weight:bold;z-index:10;">前田家</div>
+  <div class="drag-card" data-name="伊達家" style="position:absolute;left:120px;top:300px;cursor:grab;touch-action:none;user-select:none;padding:8px 14px;background:#FFE5E5;border:2px solid #FF6B6B;border-radius:10px;font-weight:bold;z-index:10;">伊達家</div>
+  <div class="drag-card" data-name="井伊家" style="position:absolute;left:220px;top:300px;cursor:grab;touch-action:none;user-select:none;padding:8px 14px;background:#FFE5E5;border:2px solid #FF6B6B;border-radius:10px;font-weight:bold;z-index:10;">井伊家</div>
+
+  <!-- ドロップゾーン: 必ずHTMLのdivで作る。class="drop-zone" を付ける -->
+  <div class="drop-zone" data-zone="親藩" style="position:absolute;left:200px;top:50px;width:140px;height:100px;border:2px dashed #888;border-radius:12px;background:#F8F8F8;display:flex;align-items:center;justify-content:center;font-weight:bold;">親藩ゾーン</div>
+  <div class="drop-zone" data-zone="外様" style="position:absolute;left:400px;top:50px;width:140px;height:100px;border:2px dashed #888;border-radius:12px;background:#F8F8F8;display:flex;align-items:center;justify-content:center;font-weight:bold;">外様ゾーン</div>
+
+  <!-- 気づきメッセージ表示エリア -->
+  <div id="msgArea" style="position:absolute;bottom:10px;left:10px;right:10px;padding:10px;background:#FFFACD;border-radius:8px;min-height:30px;text-align:center;font-size:14px;"></div>
+
+  <!-- ★★★ 全ドラッグ処理を <script> 内にまとめる。属性値内に書かない ★★★ -->
+  <script>
+    (function(){
+      var cards = document.querySelectorAll('.drag-card');
+      var zones = document.querySelectorAll('.drop-zone');
+      var msg = document.getElementById('msgArea');
+      cards.forEach(function(card){
+        card.addEventListener('pointerdown', function(e){
+          e.preventDefault();
+          card.setPointerCapture(e.pointerId);
+          card.style.cursor = 'grabbing';
+          card.style.zIndex = '100';
+          var startX = e.clientX - card.offsetLeft;
+          var startY = e.clientY - card.offsetTop;
+          function onMove(ev){
+            card.style.left = (ev.clientX - startX) + 'px';
+            card.style.top = (ev.clientY - startY) + 'px';
           }
+          function onUp(ev){
+            card.removeEventListener('pointermove', onMove);
+            card.removeEventListener('pointerup', onUp);
+            try { card.releasePointerCapture(e.pointerId); } catch(_){}
+            card.style.cursor = 'grab';
+            card.style.zIndex = '10';
+            var rect = card.getBoundingClientRect();
+            var cx = rect.left + rect.width/2;
+            var cy = rect.top + rect.height/2;
+            zones.forEach(function(z){
+              var r = z.getBoundingClientRect();
+              if(cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom){
+                z.style.background = '#FFF8DC';
+                card.dataset.placedZone = z.dataset.zone;
+                msg.textContent = card.dataset.name + 'は' + z.dataset.zone + 'に置かれました！';
+              }
+            });
+          }
+          card.addEventListener('pointermove', onMove);
+          card.addEventListener('pointerup', onUp);
         });
-      };
-      card.addEventListener('pointermove', move);
-      card.addEventListener('pointerup', up);
-    })(event)">前田家</div>
-
-  <!-- ドロップゾーン: 必ずHTMLのdivで作る -->
-  <div class="drop-zone" id="zoneShinpan" style="position:absolute;left:200px;top:50px;width:140px;height:100px;border:2px dashed #888;border-radius:12px;background:#F8F8F8;display:flex;align-items:center;justify-content:center;">親藩ゾーン</div>
-  <div class="drop-zone" id="zoneTozama" style="position:absolute;left:400px;top:50px;width:140px;height:100px;border:2px dashed #888;border-radius:12px;background:#F8F8F8;display:flex;align-items:center;justify-content:center;">外様ゾーン</div>
+      });
+    })();
+  </script>
 </div>
 
 ■ SVGは「視覚的な地図の背景」のみに使用。SVG上にHTML divを position:absolute で重ねる構造にする。
@@ -28111,6 +28129,17 @@ ${forbiddenNote}
         }
         widgetHtml = widgetHtml.replace(/<\/div>\s*<script[\s\S]*$/i, cleanedScripts + '</div>')
       }
+
+      // ★★★ 自動修復: イベント属性値内の改行・タブを空白に置換（HTMLパース失敗の救済）
+      // on(pointerdown|click|...)="..." の属性値内に改行があるとブラウザがHTMLパース失敗してJSがテキスト表示される
+      widgetHtml = widgetHtml.replace(
+        /\b(on(?:pointerdown|pointermove|pointerup|click|mousedown|mousemove|mouseup|touchstart|touchmove|touchend|dragstart|drag|dragend|dragover|drop))\s*=\s*"([^"]*)"/gi,
+        (_match, attr, value) => {
+          // 改行・タブを単一空白に置換し、連続空白を1つにまとめる
+          const fixed = value.replace(/[\r\n\t]+/g, ' ').replace(/ {2,}/g, ' ').trim()
+          return `${attr}="${fixed}"`
+        }
+      )
     }
 
     // ★ 品質チェック: 「動くか」「学習目的にかなっているか」を検証
@@ -28131,6 +28160,12 @@ ${forbiddenNote}
     // ★★★ HTML5 D&D-only バグ検出: draggable="true" / ondragstart はあるが onpointerdown が無い場合
     // SVGドロップターゲットやモバイルで動作しないため、Pointer Events への置き換えが必須
     const isHtml5DndOnly = (draggableMatches.length > 0 || dragHandlers.length > 0) && pointerHandlers.length === 0
+
+    // ★★★ HTML属性値内に長いJSコード/改行を含むバグ検出: onpointerdown="..." の属性値内に改行があると
+    // ブラウザがHTMLパース失敗してJSコードがテキスト表示される（過去のバグ原因）
+    const longInlineAttr = widgetHtml.match(/on(pointerdown|click|pointermove|pointerup)\s*=\s*"[^"]{300,}"/gi) || []
+    const multilineInlineAttr = widgetHtml.match(/on(pointerdown|click|pointermove|pointerup)\s*=\s*"[^"]*\n[^"]*"/gi) || []
+    const hasBrokenInlineJs = longInlineAttr.length > 0 || multilineInlineAttr.length > 0
     
     const qualityScore = {
       draggable_elements: draggableElementCount,
@@ -28140,7 +28175,8 @@ ${forbiddenNote}
       counter_value: counterValue,
       counter_mismatch: counterMismatch,
       html5_dnd_only: isHtml5DndOnly,
-      is_deep_enough: draggableElementCount >= 3 && interactiveElements >= 4 && stateElements >= 5 && !counterMismatch && !isHtml5DndOnly
+      broken_inline_js: hasBrokenInlineJs,
+      is_deep_enough: draggableElementCount >= 3 && interactiveElements >= 4 && stateElements >= 5 && !counterMismatch && !isHtml5DndOnly && !hasBrokenInlineJs
     }
     
     // ★★★ 致命的バグ検出: 「あとN個」と表示しているのに駒が画面にない場合 → 警告強化
@@ -28149,6 +28185,9 @@ ${forbiddenNote}
     }
     if (isHtml5DndOnly) {
       console.error(`❌ NB2 tactile致命的バグ: HTML5 D&D-only（draggable=${draggableMatches.length}, ondragstart=${dragHandlers.length}, onpointerdown=0）— SVG/モバイルで動作しない可能性が高い`)
+    }
+    if (hasBrokenInlineJs) {
+      console.error(`❌ NB2 tactile致命的バグ: 属性値内の長いJS/改行を検出（長すぎる=${longInlineAttr.length}, 改行入り=${multilineInlineAttr.length}）— HTMLパース失敗でJSがテキスト表示される`)
     }
     if (draggableElementCount === 0 && /ドラッグ|ドロップ|配置|置いて/i.test(widgetHtml)) {
       console.error(`❌ NB2 tactile致命的バグ: 「ドラッグして」と書いているのに、draggable/onpointerdown要素が0個 — 動かないウィジェット`)
@@ -28168,7 +28207,7 @@ ${forbiddenNote}
       quality_score: qualityScore,
       generation_time_ms: genTime,
       model: 'Nano Banana 2 (gemini-3.1-flash-image)',
-      message: widgetHtml ? ((counterMismatch || isHtml5DndOnly) ? '⚠️ 動かない要素を検出しました。「もう一度生成」をお試しください' : 'ウィジェットを生成しました') : '画像のみ生成しました'
+      message: widgetHtml ? ((counterMismatch || isHtml5DndOnly || hasBrokenInlineJs) ? '⚠️ 動かない要素を検出しました。「もう一度生成」をお試しください' : 'ウィジェットを生成しました') : '画像のみ生成しました'
     })
   } catch (e: any) {
     console.error('NB2 tactile error:', e.message)
