@@ -7951,7 +7951,9 @@ async function loadCardPage(cardId) {
       async function tryFixExample(retryNum) {
         const maxRetries = 5
         try {
-          const fixResp = await axios.post('/api/fix-example', { card_id: fixCardId })
+          // ★ force: true — SSR が _needsExampleFix=true と判定した時点で再生成必須なので、
+          //    サーバ側の重複判定（同期されない可能性あり）をスキップして必ず再生成させる
+          const fixResp = await axios.post('/api/fix-example', { card_id: fixCardId, force: true })
           if (fixResp.data?.success && fixResp.data?.fixed) {
             const newProblem = fixResp.data.example_problem || ''
             const newSolution = fixResp.data.example_solution || ''

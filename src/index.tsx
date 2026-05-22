@@ -16414,7 +16414,7 @@ app.post('/api/fix-example', async (c) => {
   const { env } = c
   try {
     const body = await c.req.json()
-    const { card_id, edit_instruction } = body
+    const { card_id, edit_instruction, force } = body
     if (!card_id) return c.json({ success: false, error: 'card_id required' }, 400)
 
     const geminiApiKey = env.GEMINI_API_KEY
@@ -16428,8 +16428,10 @@ app.post('/api/fix-example', async (c) => {
     const exampleAnswer = (card.example_answer || '').trim()
     const exampleSolution = (card.example_solution || '').trim()
 
-    // edit_instructionがある場合は常に修正実行
-    if (!edit_instruction) {
+    // edit_instructionがある場合、または force=true で呼ばれた場合は常に修正実行
+    // ★★★ force フラグ：SSR で _needsExampleFix=true と判定されたカードは、
+    // サーバ側の重複チェック（同期されない可能性あり）をスキップして必ず再生成する
+    if (!edit_instruction && !force) {
       // 例題の解き方テキストから答えを抽出して比較
       const solutionContainsAnswer = exampleSolution && mainAnswer && 
         exampleSolution.includes(mainAnswer)
@@ -28150,8 +28152,15 @@ ${forbiddenNote}
       // 既存実装の有無に関わらず、ドラッグ対象に「pointer events未設定」のものがあれば救済される設計
       const universalDragScript = `<script>(function(){
   try {
-    // 既に処理済みなら何もしない
-    if (window.__universalDragInit) return;
+    console.log('[UD] 万能ドラッグスクリプト 開始');
+    // 既に初期化済みなら rebind だけ走らせる（新ウィジェットの動的追加に対応）
+    if (window.__universalDragInit) {
+      if (typeof window.__universalDragRebind === 'function') {
+        console.log('[UD] 既存初期化済 → rebind のみ実行');
+        window.__universalDragRebind();
+      }
+      return;
+    }
     window.__universalDragInit = true;
     var DRAG_SELECTORS = [
       '[draggable="true"]',
@@ -28192,12 +28201,12 @@ ${forbiddenNote}
       // 必要なスタイル
       try {
         var st = el.style;
-        if (!st.touchAction) st.touchAction = 'none';
-        if (!st.userSelect) st.userSelect = 'none';
+        st.touchAction = 'none';
+        st.userSelect = 'none';
         if (!st.cursor) st.cursor = 'grab';
-        var cs = getComputedStyle(el);
-        // 親要素に position:relative または absolute がないと left/top が効かないので相対化
-        if (cs.position === 'static') st.position = 'relative';
+        // ★ pointer-events: auto を明示（親の pointer-events:none に勝つ）
+        st.pointerEvents = 'auto';
+        // transform 方式なので position はそのままでOK。flex/grid 配下でも動く
       } catch(_){}
       el.addEventListener('pointerdown', function(e){
         // ドロップゾーン自身はドラッグ対象から除外
@@ -28207,16 +28216,21 @@ ${forbiddenNote}
         var card = el;
         try { card.setPointerCapture(e.pointerId); } catch(_){}
         var startPointerX = e.clientX, startPointerY = e.clientY;
-        var startLeft = parseFloat(card.style.left) || 0;
-        var startTop = parseFloat(card.style.top) || 0;
+        // ★ transform: translate 方式 — flex/grid 親要素配下でも視覚移動できる
+        //   既存の translate(x,y) を解析して累積、なければ 0,0 から開始
+        var prevTransform = card.style.transform || '';
+        var tm = prevTransform.match(/translate\\(\\s*(-?[0-9.]+)px\\s*,\\s*(-?[0-9.]+)px\\s*\\)/);
+        var startTx = tm ? parseFloat(tm[1]) : 0;
+        var startTy = tm ? parseFloat(tm[2]) : 0;
+        var otherTransform = prevTransform.replace(/translate\\([^)]*\\)/g, '').trim();
         var prevZ = card.style.zIndex;
         card.style.cursor = 'grabbing';
         card.style.zIndex = '9999';
+        card.style.transition = 'none';
         function onMove(ev){
           var dx = ev.clientX - startPointerX;
           var dy = ev.clientY - startPointerY;
-          card.style.left = (startLeft + dx) + 'px';
-          card.style.top  = (startTop  + dy) + 'px';
+          card.style.transform = 'translate(' + (startTx + dx) + 'px, ' + (startTy + dy) + 'px) ' + otherTransform;
         }
         function onUp(ev){
           card.removeEventListener('pointermove', onMove);
@@ -28255,8 +28269,11 @@ ${forbiddenNote}
       });
     }
     function rebind(){
-      getAllDragTargets().forEach(bindDrag);
+      var targets = getAllDragTargets();
+      console.log('[UD] rebind: ドラッグ対象数=', targets.length, targets);
+      targets.forEach(bindDrag);
     }
+    window.__universalDragRebind = rebind;
     rebind();
     // MutationObserver で動的追加にも対応
     try {
