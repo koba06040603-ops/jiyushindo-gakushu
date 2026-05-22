@@ -12815,12 +12815,12 @@ function initVisualWidgets() {
           <div style="padding:14px;" id="nb2-visual-content-${cardId}">${safeHtml}</div>
         </div>
       `
-      // ★ innerHTML で挿入された <script> を実行
+      // ★ innerHTML で挿入された <script> を実行（サーバ側で全削除されているはずだが念のため）
       try {
         const bodyEl = document.getElementById('nb2-visual-content-' + cardId)
         if (bodyEl) {
           const scripts = bodyEl.querySelectorAll('script')
-          console.log('[NB2] script実行:', scripts.length, '個')
+          console.warn('[NB2] script実行:', scripts.length, '個')
           scripts.forEach(oldScript => {
             const newScript = document.createElement('script')
             if (oldScript.src) newScript.src = oldScript.src
@@ -12829,18 +12829,118 @@ function initVisualWidgets() {
           })
         }
       } catch (e) { console.warn('NB2 script実行:', e) }
-      // ★ 万能ドラッグスクリプトを複数回 rebind して、innerHTML 後の DOM 確定タイミングを確実にキャッチ
-      const rebindDrag = () => {
+      // ★★★ 万能ドラッグスクリプトをクライアント側で直接適用（innerHTML+scriptタグに依存しない）★★★
+      const applyUniversalDrag = (targetCardId) => {
         try {
-          if (typeof window.__universalDragRebind === 'function') {
-            window.__universalDragRebind()
-          }
-        } catch(e) { console.warn('UD rebind error:', e) }
+          const container = document.getElementById('nb2-visual-content-' + targetCardId)
+          if (!container) { console.warn('[UD] container見つからず'); return }
+          // セレクタ
+          const SELECTORS = [
+            '[draggable="true"]', '[data-draggable="true"]',
+            '[class*="drag-card"]', '[class*="draggable"]',
+            '[class*="daimyo"]', '[class*="piece"]', '[class*="token"]',
+            '[class*="chip"]', '[class*="tile"]',
+            '[data-drag]', '[data-name]'
+          ]
+          const set = new Set()
+          SELECTORS.forEach(sel => {
+            try { container.querySelectorAll(sel).forEach(el => set.add(el)) } catch(_){}
+          })
+          // cursor:grab/move/pointer のついた要素も追加（buttonとa以外）
+          try {
+            container.querySelectorAll('[style*="cursor"]').forEach(el => {
+              if (el.tagName === 'BUTTON' || el.tagName === 'A') return
+              const cs = getComputedStyle(el)
+              if (cs.cursor === 'grab' || cs.cursor === 'move') set.add(el)
+            })
+          } catch(_){}
+          // 除外: drop-zone系
+          const targets = Array.from(set).filter(el => {
+            const cls = (el.className && typeof el.className === 'string') ? el.className : ''
+            if (/drop-zone|^zone$|\\bzone-|container|wrapper|panel|board/i.test(cls)) {
+              if (!el.dataset.name && !el.dataset.drag) return false
+            }
+            return true
+          })
+          console.warn('[UD] 対象数=', targets.length, '/', set.size, 'cardId=', targetCardId)
+          targets.forEach(el => {
+            if (el.dataset.udBound === '1') return
+            el.dataset.udBound = '1'
+            // HTML5 D&D無効化
+            try {
+              if (el.getAttribute('draggable') === 'true') el.setAttribute('draggable', 'false')
+            } catch(_){}
+            // スタイル強制
+            el.style.touchAction = 'none'
+            el.style.userSelect = 'none'
+            el.style.webkitUserSelect = 'none'
+            el.style.pointerEvents = 'auto'
+            if (!el.style.cursor) el.style.cursor = 'grab'
+            // pointerdown
+            el.addEventListener('pointerdown', function(e) {
+              if (el.classList && (el.classList.contains('drop-zone') || el.classList.contains('zone'))) return
+              e.preventDefault()
+              e.stopPropagation()
+              try { el.setPointerCapture(e.pointerId) } catch(_){}
+              const startX = e.clientX, startY = e.clientY
+              const prevTransform = el.style.transform || ''
+              const tm = prevTransform.match(/translate\\(\\s*(-?[0-9.]+)px\\s*,\\s*(-?[0-9.]+)px\\s*\\)/)
+              const startTx = tm ? parseFloat(tm[1]) : 0
+              const startTy = tm ? parseFloat(tm[2]) : 0
+              const otherTransform = prevTransform.replace(/translate\\([^)]*\\)/g, '').trim()
+              const prevZ = el.style.zIndex
+              el.style.cursor = 'grabbing'
+              el.style.zIndex = '9999'
+              el.style.transition = 'none'
+              function onMove(ev) {
+                const dx = ev.clientX - startX
+                const dy = ev.clientY - startY
+                el.style.transform = 'translate(' + (startTx + dx) + 'px, ' + (startTy + dy) + 'px) ' + otherTransform
+              }
+              function onUp(ev) {
+                el.removeEventListener('pointermove', onMove)
+                el.removeEventListener('pointerup', onUp)
+                el.removeEventListener('pointercancel', onUp)
+                try { el.releasePointerCapture(e.pointerId) } catch(_){}
+                el.style.cursor = 'grab'
+                el.style.zIndex = prevZ || ''
+                // ドロップ判定
+                const r = el.getBoundingClientRect()
+                const cx = r.left + r.width / 2
+                const cy = r.top + r.height / 2
+                const zones = container.querySelectorAll('.drop-zone, .zone, [data-zone]')
+                let hit = null
+                zones.forEach(z => {
+                  const zr = z.getBoundingClientRect()
+                  if (cx >= zr.left && cx <= zr.right && cy >= zr.top && cy <= zr.bottom) hit = z
+                })
+                if (hit) {
+                  try { hit.style.background = '#FFF8DC' } catch(_){}
+                  try { el.dataset.placedZone = hit.dataset.zone || hit.id || '' } catch(_){}
+                  try {
+                    const msg = container.querySelector('#msgArea, .msg-area, [data-msg]')
+                    if (msg) {
+                      const name = el.dataset.name || el.textContent.trim()
+                      const zoneName = hit.dataset.zone || hit.textContent.trim().split(/\\s/)[0]
+                      msg.textContent = name + 'を' + zoneName + 'に置きました'
+                    }
+                  } catch(_){}
+                }
+              }
+              el.addEventListener('pointermove', onMove)
+              el.addEventListener('pointerup', onUp)
+              el.addEventListener('pointercancel', onUp)
+            })
+          })
+        } catch(err) {
+          console.error('[UD] applyUniversalDrag error:', err)
+        }
       }
-      setTimeout(rebindDrag, 50)
-      setTimeout(rebindDrag, 300)
-      setTimeout(rebindDrag, 1000)
-      setTimeout(rebindDrag, 2000)
+      // 複数回適用してDOM確定タイミングを確実に捕捉
+      setTimeout(() => applyUniversalDrag(cardId), 50)
+      setTimeout(() => applyUniversalDrag(cardId), 300)
+      setTimeout(() => applyUniversalDrag(cardId), 1000)
+      setTimeout(() => applyUniversalDrag(cardId), 2500)
       // ★ DOMクリーンアップ（問題の図・編集・差し替え・削除ボタンを除去）
       // nb2-visual-content だけでなく、nb2-visual 全体を対象にする
       function cleanNB2(cid) {

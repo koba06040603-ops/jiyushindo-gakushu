@@ -16741,18 +16741,51 @@ ${candidateBlock}
     
     // ★Markdownコードフェンス (```json ... ```) を除去してからJSON抽出
     const textCleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
-    const jsonMatch = textCleaned.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      console.error('🔧 例題修正: JSON解析失敗 (raw head):', text.slice(0, 200))
-      return c.json({ success: false, error: 'AI response parse error' })
+    // ★ 最も外側の { ... } を取得（最後の } まで）— greedy で末尾まで
+    const firstBrace = textCleaned.indexOf('{')
+    const lastBrace = textCleaned.lastIndexOf('}')
+    const jsonStr = (firstBrace >= 0 && lastBrace > firstBrace) ? textCleaned.slice(firstBrace, lastBrace + 1) : ''
+    if (!jsonStr) {
+      console.error('🔧 例題修正: JSON解析失敗 (full text):', text.slice(0, 800))
+      return c.json({ success: false, error: 'AI response parse error', _debug_raw: text.slice(0, 500) })
+    }
+
+    // ★ 不正な制御文字/改行を文字列値内でエスケープ（Geminiが時々改行を入れる）
+    function sanitizeJsonString(s: string): string {
+      let out = ''
+      let inString = false
+      let escape = false
+      for (let i = 0; i < s.length; i++) {
+        const ch = s[i]
+        if (escape) { out += ch; escape = false; continue }
+        if (ch === '\\') { out += ch; escape = true; continue }
+        if (ch === '"') { inString = !inString; out += ch; continue }
+        if (inString) {
+          // 文字列内の生の改行・タブを \n / \t に変換
+          if (ch === '\n') { out += '\\n'; continue }
+          if (ch === '\r') { out += '\\r'; continue }
+          if (ch === '\t') { out += '\\t'; continue }
+          // 制御文字 (0x00-0x1F) を除去
+          if (ch.charCodeAt(0) < 0x20) continue
+        }
+        out += ch
+      }
+      return out
     }
 
     let result: any
     try {
-      result = JSON.parse(jsonMatch[0])
+      result = JSON.parse(jsonStr)
     } catch (parseErr: any) {
-      console.error('🔧 例題修正: JSON.parse失敗:', parseErr?.message, 'extracted:', jsonMatch[0].slice(0, 200))
-      return c.json({ success: false, error: 'AI response JSON.parse error' })
+      // 第2チャンス：制御文字エスケープしてリトライ
+      try {
+        const sanitized = sanitizeJsonString(jsonStr)
+        result = JSON.parse(sanitized)
+        console.log(`🔧 例題修正: JSON.parse 第2チャンス成功（制御文字エスケープ後）`)
+      } catch (parseErr2: any) {
+        console.error('🔧 例題修正: JSON.parse失敗:', parseErr?.message, '/ 第2:', parseErr2?.message, '/ extracted (first 800):', jsonStr.slice(0, 800))
+        return c.json({ success: false, error: 'AI response JSON.parse error', _debug_raw: jsonStr.slice(0, 500) })
+      }
     }
     
     // 答えが同じでないか最終チェック（語幹比較も含む）
