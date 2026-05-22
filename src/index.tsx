@@ -16564,7 +16564,9 @@ ${edit_instruction}
       if (stage1Resp) {
         const stage1Data = await stage1Resp.json() as any
         const stage1Text = stage1Data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
-        const stage1Json = stage1Text.match(/\{[\s\S]*\}/)
+        // ★Markdownコードフェンス (```json ... ```) を除去してからJSON抽出
+        const stage1Cleaned = stage1Text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
+        const stage1Json = stage1Cleaned.match(/\{[\s\S]*\}/)
         if (stage1Json) {
           try {
             const parsed = JSON.parse(stage1Json[0])
@@ -16736,14 +16738,21 @@ ${candidateBlock}
     const data = await response.json() as any
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
     
-    // JSONを抽出
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    // ★Markdownコードフェンス (```json ... ```) を除去してからJSON抽出
+    const textCleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
+    const jsonMatch = textCleaned.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
-      console.error('🔧 例題修正: JSON解析失敗')
+      console.error('🔧 例題修正: JSON解析失敗 (raw head):', text.slice(0, 200))
       return c.json({ success: false, error: 'AI response parse error' })
     }
 
-    const result = JSON.parse(jsonMatch[0])
+    let result: any
+    try {
+      result = JSON.parse(jsonMatch[0])
+    } catch (parseErr: any) {
+      console.error('🔧 例題修正: JSON.parse失敗:', parseErr?.message, 'extracted:', jsonMatch[0].slice(0, 200))
+      return c.json({ success: false, error: 'AI response JSON.parse error' })
+    }
     
     // 答えが同じでないか最終チェック（語幹比較も含む）
     const resultAnswer = (result.example_answer || '').trim()
@@ -27861,7 +27870,9 @@ ${context}
       if (stage1Resp) {
         const stage1Data = await stage1Resp.json() as any
         const stage1Text = stage1Data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
-        const stage1Json = stage1Text.match(/\{[\s\S]*\}/)
+        // ★Markdownコードフェンス (```json ... ```) を除去してからJSON抽出
+        const stage1Cleaned = stage1Text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
+        const stage1Json = stage1Cleaned.match(/\{[\s\S]*\}/)
         if (stage1Json) {
           try {
             const spec = JSON.parse(stage1Json[0])
@@ -27944,18 +27955,69 @@ ${forbiddenNote}
 9. 日本語ラベル、カラフルで楽しいデザイン、角丸、影つき
 10. 最大幅100%、レスポンシブ対応
 11. 画面上部に「何をして何に気づくか」を1〜2文で明示
-12. touch-action:noneをドラッグ要素に設定
+12. 全ドラッグ可能要素に "touch-action:none; user-select:none;" を設定
 13. ★タイマー表示や進捗％表示は禁止（焦らせない・思考重視）
 14. ★「もう一度」ボタン必須
 
-【ドラッグ操作の正しい実装例】
-HTML要素のドラッグ（推奨・固有名詞をカードに表示する場合）:
-<div draggable="true" id="card1" ondragstart="event.dataTransfer.setData('text/plain', this.id); this.style.opacity='0.5'" ondragend="this.style.opacity='1'" style="cursor:grab;padding:8px 12px;background:#FFE5E5;border:2px solid #FF6B6B;border-radius:8px;display:inline-block;margin:4px;touch-action:none;">前田家</div>
-<div ondragover="event.preventDefault(); this.style.background='#FFF8DC'" ondragleave="this.style.background='#F8F8F8'" ondrop="(function(e){e.preventDefault(); e.currentTarget.style.background='#F8F8F8'; var id=e.dataTransfer.getData('text/plain'); var el=document.getElementById(id); if(el){e.currentTarget.appendChild(el);} /* ここで気づきメッセージや配置数を更新する処理を入れる */})(event)" style="min-height:120px;border:2px dashed #aaa;border-radius:12px;padding:12px;background:#F8F8F8;">親藩ゾーン</div>
+【★★★ ドラッグ実装の絶対ルール（過去のバグ原因・必ず守ること） ★★★】
+❌ **HTML5 Drag & Drop API は使用禁止**
+   ・draggable="true" / ondragstart / ondragover / ondrop は **絶対に使わない**
+   ・理由: SVG要素には dragover/drop イベントが届かない、モバイル端末で動かない、画面によって挙動不安定
+✅ **必ず Pointer Events (onpointerdown) で実装すること**
+   ・HTML divのドラッグも、SVG要素のドラッグも、すべて onpointerdown で統一
+   ・ドロップ判定は getBoundingClientRect で「ポインタ/カードの中心が当たり判定矩形に入っているか」を計算
+✅ **ドロップゾーンも必ずHTMLの<div>で作ること**
+   ・SVGの<rect>や<circle>をドロップターゲットにしない
+   ・地図はSVGでよいが、ドロップ先は **HTMLのdivをSVGの上に position:absolute で重ねる**
 
-SVG要素のドラッグ:
-<circle cx="100" cy="100" r="20" fill="#FF6B6B" style="cursor:grab;touch-action:none;"
-  onpointerdown="(function(e){e.preventDefault();e.stopPropagation();var c=e.target;c.style.cursor='grabbing';var svg=c.closest('svg');var move=function(ev){ev.preventDefault();var r=svg.getBoundingClientRect();c.setAttribute('cx',Math.max(20,Math.min(ev.clientX-r.left,r.width-20)));c.setAttribute('cy',Math.max(20,Math.min(ev.clientY-r.top,r.height-20)));};var up=function(){c.style.cursor='grab';document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);};document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);})(event)" />
+【★★★ ドラッグ操作の正しい実装例 — このパターンをそのまま使うこと ★★★】
+
+■ HTMLカードを Pointer Events でドラッグ + ドロップ判定（推奨）:
+
+<div style="position:relative;width:100%;min-height:400px;">
+  <!-- ドラッグ可能カード（固有名詞を表示） -->
+  <div id="cardA" style="position:absolute;left:20px;top:300px;cursor:grab;touch-action:none;user-select:none;padding:8px 14px;background:#FFE5E5;border:2px solid #FF6B6B;border-radius:10px;font-weight:bold;z-index:10;"
+    onpointerdown="(function(e){
+      e.preventDefault();
+      var card = e.currentTarget;
+      card.setPointerCapture(e.pointerId);
+      card.style.cursor='grabbing';
+      card.style.zIndex='100';
+      var startX = e.clientX - card.offsetLeft;
+      var startY = e.clientY - card.offsetTop;
+      var move = function(ev){
+        card.style.left = (ev.clientX - startX) + 'px';
+        card.style.top = (ev.clientY - startY) + 'px';
+      };
+      var up = function(ev){
+        card.removeEventListener('pointermove', move);
+        card.removeEventListener('pointerup', up);
+        card.releasePointerCapture(e.pointerId);
+        card.style.cursor='grab';
+        card.style.zIndex='10';
+        var cardRect = card.getBoundingClientRect();
+        var cx = cardRect.left + cardRect.width/2;
+        var cy = cardRect.top + cardRect.height/2;
+        var zones = document.querySelectorAll('.drop-zone');
+        zones.forEach(function(z){
+          var r = z.getBoundingClientRect();
+          if(cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom){
+            z.style.background = '#FFF8DC';
+            card.dataset.zone = z.id;
+            /* 気づきメッセージや配置数を更新する処理をここに */
+          }
+        });
+      };
+      card.addEventListener('pointermove', move);
+      card.addEventListener('pointerup', up);
+    })(event)">前田家</div>
+
+  <!-- ドロップゾーン: 必ずHTMLのdivで作る -->
+  <div class="drop-zone" id="zoneShinpan" style="position:absolute;left:200px;top:50px;width:140px;height:100px;border:2px dashed #888;border-radius:12px;background:#F8F8F8;display:flex;align-items:center;justify-content:center;">親藩ゾーン</div>
+  <div class="drop-zone" id="zoneTozama" style="position:absolute;left:400px;top:50px;width:140px;height:100px;border:2px dashed #888;border-radius:12px;background:#F8F8F8;display:flex;align-items:center;justify-content:center;">外様ゾーン</div>
+</div>
+
+■ SVGは「視覚的な地図の背景」のみに使用。SVG上にHTML divを position:absolute で重ねる構造にする。
 
 【★★★ 出力前の自己チェック ★★★】
 □ 上記の具体例の固有名詞が **実際にHTML内に最低6個ある** か？（要素を数えて確認）
@@ -28065,6 +28127,10 @@ SVG要素のドラッグ:
     const counterMatch = widgetHtml.match(/あと\s*(\d+)\s*[つ個枚]/u)
     const counterValue = counterMatch ? parseInt(counterMatch[1], 10) : 0
     const counterMismatch = counterValue > 0 && draggableElementCount < counterValue
+
+    // ★★★ HTML5 D&D-only バグ検出: draggable="true" / ondragstart はあるが onpointerdown が無い場合
+    // SVGドロップターゲットやモバイルで動作しないため、Pointer Events への置き換えが必須
+    const isHtml5DndOnly = (draggableMatches.length > 0 || dragHandlers.length > 0) && pointerHandlers.length === 0
     
     const qualityScore = {
       draggable_elements: draggableElementCount,
@@ -28073,12 +28139,16 @@ SVG要素のドラッグ:
       has_reset_button: hasReset,
       counter_value: counterValue,
       counter_mismatch: counterMismatch,
-      is_deep_enough: draggableElementCount >= 3 && interactiveElements >= 4 && stateElements >= 5 && !counterMismatch
+      html5_dnd_only: isHtml5DndOnly,
+      is_deep_enough: draggableElementCount >= 3 && interactiveElements >= 4 && stateElements >= 5 && !counterMismatch && !isHtml5DndOnly
     }
     
     // ★★★ 致命的バグ検出: 「あとN個」と表示しているのに駒が画面にない場合 → 警告強化
     if (counterMismatch) {
       console.error(`❌ NB2 tactile致命的バグ: カウンタ「あと${counterValue}個」表示しているが、ドラッグ可能要素は${draggableElementCount}個しかない（=動かないウィジェット）`)
+    }
+    if (isHtml5DndOnly) {
+      console.error(`❌ NB2 tactile致命的バグ: HTML5 D&D-only（draggable=${draggableMatches.length}, ondragstart=${dragHandlers.length}, onpointerdown=0）— SVG/モバイルで動作しない可能性が高い`)
     }
     if (draggableElementCount === 0 && /ドラッグ|ドロップ|配置|置いて/i.test(widgetHtml)) {
       console.error(`❌ NB2 tactile致命的バグ: 「ドラッグして」と書いているのに、draggable/onpointerdown要素が0個 — 動かないウィジェット`)
@@ -28098,7 +28168,7 @@ SVG要素のドラッグ:
       quality_score: qualityScore,
       generation_time_ms: genTime,
       model: 'Nano Banana 2 (gemini-3.1-flash-image)',
-      message: widgetHtml ? (counterMismatch ? '⚠️ 動かない要素を検出しました。「もう一度生成」をお試しください' : 'ウィジェットを生成しました') : '画像のみ生成しました'
+      message: widgetHtml ? ((counterMismatch || isHtml5DndOnly) ? '⚠️ 動かない要素を検出しました。「もう一度生成」をお試しください' : 'ウィジェットを生成しました') : '画像のみ生成しました'
     })
   } catch (e: any) {
     console.error('NB2 tactile error:', e.message)
