@@ -16428,10 +16428,9 @@ app.post('/api/fix-example', async (c) => {
     const exampleAnswer = (card.example_answer || '').trim()
     const exampleSolution = (card.example_solution || '').trim()
 
-    // edit_instructionがある場合、または force=true で呼ばれた場合は常に修正実行
-    // ★★★ force フラグ：SSR で _needsExampleFix=true と判定されたカードは、
-    // サーバ側の重複チェック（同期されない可能性あり）をスキップして必ず再生成する
-    if (!edit_instruction && !force) {
+    // ★★★ ユーザー要望により早期リターン完全撤廃：呼ばれたら必ず例題を生成する ★★★
+    // （以前は重複チェックで「No fix needed」を返していたが、SSR判定と非同期で矛盾するため廃止）
+    if (false) {
       // 例題の解き方テキストから答えを抽出して比較
       const solutionContainsAnswer = exampleSolution && mainAnswer && 
         exampleSolution.includes(mainAnswer)
@@ -28143,11 +28142,23 @@ ${forbiddenNote}
         }
       )
 
+      // ★★★ AIが書いた <script> タグを全削除（競合・バグの温床を排除） ★★★
+      // AI実装のドラッグスクリプトは「querySelectorのタイミング不一致」「変数スコープ」
+      // 「不完全なイベント解除」など複数の原因で動かないことが多い。
+      // → 全て除去して、後述の万能ドラッグスクリプトだけに任せる
+      const removedScriptCount = (widgetHtml.match(/<script[\s\S]*?<\/script>/gi) || []).length
+      widgetHtml = widgetHtml.replace(/<script[\s\S]*?<\/script>/gi, '')
+      // ★ HTML5 D&D 属性も無効化（モバイル/SVGで動かないため）
+      widgetHtml = widgetHtml.replace(/\sdraggable\s*=\s*"true"/gi, ' data-draggable="true"')
+      // ★ ondragstart/ondragover/ondrop 等のインライン属性も除去（AIの不完全実装が残ると動かない）
+      widgetHtml = widgetHtml.replace(/\son(dragstart|dragend|dragover|drop|drag|dragenter|dragleave)\s*=\s*"[^"]*"/gi, '')
+      console.log(`🧹 AI生成scriptを${removedScriptCount}個除去 + draggable無効化`)
+
       // ★★★ 万能ドラッグスクリプト自動注入 ★★★
       // AIがドラッグ実装を忘れた・HTML5 D&D-onlyで動かない・<script>内の実装が壊れている場合
       // を救済するため、ウィジェット末尾に「draggable=true / class*=drag / class*=card / data-drag / cursor:grab 持ち」
       // 要素を全部ドラッグ可能にする汎用Pointer Eventsスクリプトを必ず注入する
-      const hasPointerInScript = /addEventListener\s*\(\s*['"]pointerdown['"]/i.test(widgetHtml)
+      const hasPointerInScript = false  // 上で除去済み
       const hasOnPointerAttr = /onpointerdown\s*=/i.test(widgetHtml)
       // 既存実装の有無に関わらず、ドラッグ対象に「pointer events未設定」のものがあれば救済される設計
       const universalDragScript = `<script>(function(){
@@ -28164,25 +28175,60 @@ ${forbiddenNote}
     window.__universalDragInit = true;
     var DRAG_SELECTORS = [
       '[draggable="true"]',
+      '[data-draggable="true"]',
       '[class*="drag-card"]',
       '[class*="draggable"]',
       '[class*="daimyo"]',
       '[class*="piece"]',
       '[class*="token"]',
+      '[class*="card"]',
+      '[class*="item"]',
+      '[class*="chip"]',
+      '[class*="tile"]',
       '[data-drag]',
-      '[data-name]'
+      '[data-name]',
+      '[data-id]'
     ];
+    // ★ 親に nb2-visual-content を持つ要素のみ対象（他のUIカードを誤検出しないため）
+    function isInsideWidget(el){
+      var p = el.parentElement;
+      while (p) {
+        if (p.id && p.id.indexOf('nb2-visual-content-') === 0) return true;
+        // 通常のウィジェットコンテナも対象
+        if (p.classList && (p.classList.contains('tactile-widget') || p.classList.contains('widget-container'))) return true;
+        p = p.parentElement;
+      }
+      return false;
+    }
+    // ★ ドロップゾーン・コンテナとして使われる要素は除外
+    function isExcluded(el){
+      if (!el || !el.classList) return true;
+      var cls = (el.className && typeof el.className === 'string') ? el.className : '';
+      if (/drop-zone|zone-|^zone$|container|wrapper|panel|board|map|area-/i.test(cls)) {
+        // ただし name 属性を持つなら駒として扱う
+        if (!el.dataset || (!el.dataset.name && !el.dataset.drag)) return true;
+      }
+      // 親要素が同じセレクタにヒットする場合は親側を優先（最も具体的な子だけ拾う）
+      return false;
+    }
     function getAllDragTargets(){
       var set = new Set();
       DRAG_SELECTORS.forEach(function(sel){
-        try { document.querySelectorAll(sel).forEach(function(el){ set.add(el); }); } catch(_){}
+        try {
+          document.querySelectorAll(sel).forEach(function(el){
+            if (isInsideWidget(el) && !isExcluded(el)) set.add(el);
+          });
+        } catch(_){}
       });
-      // cursor:grab がついている要素も対象
+      // cursor:grab がついている要素も対象（ウィジェット内のみ）
       try {
-        document.querySelectorAll('*').forEach(function(el){
+        document.querySelectorAll('[style*="cursor"]').forEach(function(el){
           try {
+            if (!isInsideWidget(el)) return;
             var cs = getComputedStyle(el);
-            if ((cs.cursor==='grab' || cs.cursor==='move') && el.tagName!=='HTML' && el.tagName!=='BODY') set.add(el);
+            if ((cs.cursor==='grab' || cs.cursor==='move' || cs.cursor==='pointer') && el.tagName!=='HTML' && el.tagName!=='BODY' && el.tagName!=='BUTTON') {
+              if (!isExcluded(el)) set.add(el);
+            }
           } catch(_){}
         });
       } catch(_){}

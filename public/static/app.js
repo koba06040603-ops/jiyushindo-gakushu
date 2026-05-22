@@ -12820,6 +12820,7 @@ function initVisualWidgets() {
         const bodyEl = document.getElementById('nb2-visual-content-' + cardId)
         if (bodyEl) {
           const scripts = bodyEl.querySelectorAll('script')
+          console.log('[NB2] script実行:', scripts.length, '個')
           scripts.forEach(oldScript => {
             const newScript = document.createElement('script')
             if (oldScript.src) newScript.src = oldScript.src
@@ -12828,6 +12829,18 @@ function initVisualWidgets() {
           })
         }
       } catch (e) { console.warn('NB2 script実行:', e) }
+      // ★ 万能ドラッグスクリプトを複数回 rebind して、innerHTML 後の DOM 確定タイミングを確実にキャッチ
+      const rebindDrag = () => {
+        try {
+          if (typeof window.__universalDragRebind === 'function') {
+            window.__universalDragRebind()
+          }
+        } catch(e) { console.warn('UD rebind error:', e) }
+      }
+      setTimeout(rebindDrag, 50)
+      setTimeout(rebindDrag, 300)
+      setTimeout(rebindDrag, 1000)
+      setTimeout(rebindDrag, 2000)
       // ★ DOMクリーンアップ（問題の図・編集・差し替え・削除ボタンを除去）
       // nb2-visual-content だけでなく、nb2-visual 全体を対象にする
       function cleanNB2(cid) {
