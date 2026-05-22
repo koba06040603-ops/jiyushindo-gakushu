@@ -12941,6 +12941,20 @@ function initVisualWidgets() {
       setTimeout(() => applyUniversalDrag(cardId), 300)
       setTimeout(() => applyUniversalDrag(cardId), 1000)
       setTimeout(() => applyUniversalDrag(cardId), 2500)
+      // ★ MutationObserver で動的追加に対応
+      try {
+        const containerForObs = document.getElementById('nb2-visual-content-' + cardId)
+        if (containerForObs) {
+          let obsDebounce = null
+          const obs = new MutationObserver(() => {
+            if (obsDebounce) clearTimeout(obsDebounce)
+            obsDebounce = setTimeout(() => applyUniversalDrag(cardId), 200)
+          })
+          obs.observe(containerForObs, { childList: true, subtree: true })
+          // 30秒後にObserver停止（過剰監視防止）
+          setTimeout(() => { try { obs.disconnect() } catch(_){} }, 30000)
+        }
+      } catch(e) { console.warn('[UD] MutationObserver error:', e) }
       // ★ DOMクリーンアップ（問題の図・編集・差し替え・削除ボタンを除去）
       // nb2-visual-content だけでなく、nb2-visual 全体を対象にする
       function cleanNB2(cid) {

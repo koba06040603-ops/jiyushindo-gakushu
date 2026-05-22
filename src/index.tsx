@@ -16720,7 +16720,7 @@ ${candidateBlock}
             signal: controller.signal,
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.8, maxOutputTokens: 500, responseMimeType: 'application/json' }
+              generationConfig: { temperature: 0.8, maxOutputTokens: 2048, responseMimeType: 'application/json' }
             })
           }
         )
@@ -16738,6 +16738,12 @@ ${candidateBlock}
 
     const data = await response.json() as any
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    const finishReason = data?.candidates?.[0]?.finishReason || 'UNKNOWN'
+    console.log(`🔧 例題修正 STAGE2 応答: textLen=${text.length}, finishReason=${finishReason}`)
+    if (!text) {
+      console.warn(`🔧 例題修正: 空テキスト応答 / data=${JSON.stringify(data).slice(0, 500)}`)
+      return c.json({ success: false, error: 'Empty AI response', _debug_finishReason: finishReason })
+    }
     
     // ★Markdownコードフェンス (```json ... ```) を除去してからJSON抽出
     const textCleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
