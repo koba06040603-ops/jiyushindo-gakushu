@@ -16766,7 +16766,7 @@ ${candidateBlock}
       v === resultLower || v === resultStemLower || v.includes(resultLower) || resultLower.includes(v)
     )
     if (isSameResult) {
-      console.warn(`🔧 例題修正: AIが同じ答えを返した (${resultAnswer} ≈ ${mainAnswer})`)
+      console.warn(`🔧 例題修正失敗[same-answer]: AIが同じ答えを返した (${resultAnswer} ≈ ${mainAnswer}) / 問題=「${(result.example_problem||'').slice(0,100)}」`)
       return c.json({ success: false, error: 'AI returned same answer' })
     }
 
@@ -16800,7 +16800,7 @@ ${candidateBlock}
         if (cc / sh.length > 0.7) tooSimilarResult = true
       }
       if (tooSimilarResult) {
-        console.warn(`🔧 例題修正: AIが本題と類似した問題文を返した`)
+        console.warn(`🔧 例題修正失敗[similar-problem]: AIが本題と類似した問題文を返した / 例題=「${resultProblem.slice(0,100)}」 vs 本題=「${originalProblem.slice(0,100)}」`)
         return c.json({ success: false, error: 'AI returned similar problem' })
       }
     }
@@ -16814,12 +16814,12 @@ ${candidateBlock}
       const raCore = resultAnswer.trim().replace(/[系語族型類科目派流業がのをはでにとも出るからですますだよねた。、]+$/u, '').toLowerCase()
       // 答えが問題文にそのまま含まれている（括弧書き含む）
       if (rpLower.includes(raLower) || (raStem.length >= 2 && rpLower.includes(raStem))) {
-        console.warn(`🔧 例題修正: トートロジー検出 — 例題の答え "${resultAnswer}" が問題文に含まれている`)
+        console.warn(`🔧 例題修正失敗[tautology]: 答え "${resultAnswer}" が問題文に含まれる / 問題=「${resultProblem.slice(0,100)}」`)
         return c.json({ success: false, error: 'Tautological question - answer already in problem text' })
       }
       // コアキーワードが問題文に含まれている（例: 答え「二酸化炭素が出るから」のコア「二酸化炭素」が問題文にある）
       if (raCore.length >= 2 && raCore !== raLower && rpLower.includes(raCore)) {
-        console.warn(`🔧 例題修正: トートロジー検出（コアキーワード） — "${raCore}" (from "${resultAnswer}") が問題文に含まれている`)
+        console.warn(`🔧 例題修正失敗[tautology-core]: コア "${raCore}" (from "${resultAnswer}") が問題文に含まれる / 問題=「${resultProblem.slice(0,100)}」`)
         return c.json({ success: false, error: 'Tautological question - answer core keyword in problem text' })
       }
       // 括弧書き内に答えのコアがある: 「（二酸化炭素）」のようなパターン
@@ -16828,7 +16828,7 @@ ${candidateBlock}
         for (const bc of bracketContent) {
           const inner = bc.replace(/[（()）]/g, '').trim().toLowerCase()
           if (inner === raLower || inner === raCore || (raCore.length >= 2 && (inner.includes(raCore) || raCore.includes(inner)))) {
-            console.warn(`🔧 例題修正: トートロジー検出（括弧書き） — 「${bc}」に答え "${resultAnswer}" のコアが含まれている`)
+            console.warn(`🔧 例題修正失敗[tautology-bracket]: 括弧「${bc}」に答え "${resultAnswer}" のコアが含まれる`)
             return c.json({ success: false, error: 'Tautological question - answer in brackets in problem text' })
           }
         }
@@ -16890,7 +16890,7 @@ ${candidateBlock}
         if (coherenceJsonMatch) {
           const coherenceResult = JSON.parse(coherenceJsonMatch[0])
           if (coherenceResult.coherent === false) {
-            console.warn(`🔧 例題修正: 論理的一貫性なし — 問い「${resultProblem}」→答え「${resultAnswer}」: ${coherenceResult.reason || '不整合'}`)
+            console.warn(`🔧 例題修正失敗[incoherent]: 問い「${resultProblem.slice(0,80)}」→答え「${resultAnswer}」: ${coherenceResult.reason || '不整合'}`)
             return c.json({ success: false, error: `Incoherent Q&A: ${coherenceResult.reason || 'answer does not match question'}` })
           }
           if (coherenceResult.relevant === false) {
@@ -28140,6 +28140,141 @@ ${forbiddenNote}
           return `${attr}="${fixed}"`
         }
       )
+
+      // ★★★ 万能ドラッグスクリプト自動注入 ★★★
+      // AIがドラッグ実装を忘れた・HTML5 D&D-onlyで動かない・<script>内の実装が壊れている場合
+      // を救済するため、ウィジェット末尾に「draggable=true / class*=drag / class*=card / data-drag / cursor:grab 持ち」
+      // 要素を全部ドラッグ可能にする汎用Pointer Eventsスクリプトを必ず注入する
+      const hasPointerInScript = /addEventListener\s*\(\s*['"]pointerdown['"]/i.test(widgetHtml)
+      const hasOnPointerAttr = /onpointerdown\s*=/i.test(widgetHtml)
+      // 既存実装の有無に関わらず、ドラッグ対象に「pointer events未設定」のものがあれば救済される設計
+      const universalDragScript = `<script>(function(){
+  try {
+    // 既に処理済みなら何もしない
+    if (window.__universalDragInit) return;
+    window.__universalDragInit = true;
+    var DRAG_SELECTORS = [
+      '[draggable="true"]',
+      '[class*="drag-card"]',
+      '[class*="draggable"]',
+      '[class*="daimyo"]',
+      '[class*="piece"]',
+      '[class*="token"]',
+      '[data-drag]',
+      '[data-name]'
+    ];
+    function getAllDragTargets(){
+      var set = new Set();
+      DRAG_SELECTORS.forEach(function(sel){
+        try { document.querySelectorAll(sel).forEach(function(el){ set.add(el); }); } catch(_){}
+      });
+      // cursor:grab がついている要素も対象
+      try {
+        document.querySelectorAll('*').forEach(function(el){
+          try {
+            var cs = getComputedStyle(el);
+            if ((cs.cursor==='grab' || cs.cursor==='move') && el.tagName!=='HTML' && el.tagName!=='BODY') set.add(el);
+          } catch(_){}
+        });
+      } catch(_){}
+      return Array.from(set);
+    }
+    function isAlreadyBound(el){
+      return el.dataset && el.dataset.udBound === '1';
+    }
+    function bindDrag(el){
+      if (isAlreadyBound(el)) return;
+      el.dataset.udBound = '1';
+      // HTML5 D&D属性を無効化（モバイル/SVGで動かないため）
+      try {
+        if (el.getAttribute('draggable') === 'true') el.setAttribute('draggable','false');
+      } catch(_){}
+      // 必要なスタイル
+      try {
+        var st = el.style;
+        if (!st.touchAction) st.touchAction = 'none';
+        if (!st.userSelect) st.userSelect = 'none';
+        if (!st.cursor) st.cursor = 'grab';
+        var cs = getComputedStyle(el);
+        // 親要素に position:relative または absolute がないと left/top が効かないので相対化
+        if (cs.position === 'static') st.position = 'relative';
+      } catch(_){}
+      el.addEventListener('pointerdown', function(e){
+        // ドロップゾーン自身はドラッグ対象から除外
+        if (el.classList && (el.classList.contains('drop-zone') || el.classList.contains('zone'))) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var card = el;
+        try { card.setPointerCapture(e.pointerId); } catch(_){}
+        var startPointerX = e.clientX, startPointerY = e.clientY;
+        var startLeft = parseFloat(card.style.left) || 0;
+        var startTop = parseFloat(card.style.top) || 0;
+        var prevZ = card.style.zIndex;
+        card.style.cursor = 'grabbing';
+        card.style.zIndex = '9999';
+        function onMove(ev){
+          var dx = ev.clientX - startPointerX;
+          var dy = ev.clientY - startPointerY;
+          card.style.left = (startLeft + dx) + 'px';
+          card.style.top  = (startTop  + dy) + 'px';
+        }
+        function onUp(ev){
+          card.removeEventListener('pointermove', onMove);
+          card.removeEventListener('pointerup', onUp);
+          card.removeEventListener('pointercancel', onUp);
+          try { card.releasePointerCapture(e.pointerId); } catch(_){}
+          card.style.cursor = 'grab';
+          card.style.zIndex = prevZ || '';
+          // ドロップ判定: カード中心が drop-zone / zone クラス・data-zone 持ちと重なるか
+          var r = card.getBoundingClientRect();
+          var cx = r.left + r.width/2;
+          var cy = r.top + r.height/2;
+          var zones = document.querySelectorAll('.drop-zone, .zone, [data-zone]');
+          var hit = null;
+          zones.forEach(function(z){
+            var zr = z.getBoundingClientRect();
+            if (cx>=zr.left && cx<=zr.right && cy>=zr.top && cy<=zr.bottom) hit = z;
+          });
+          if (hit){
+            try { hit.style.background = '#FFF8DC'; } catch(_){}
+            try { card.dataset.placedZone = hit.dataset.zone || hit.id || ''; } catch(_){}
+            // メッセージエリアがあれば表示
+            try {
+              var msg = document.getElementById('msgArea') || document.querySelector('.msg-area, [data-msg]');
+              if (msg) {
+                var name = card.dataset.name || card.textContent.trim();
+                var zoneName = hit.dataset.zone || hit.textContent.trim().split(/\\s/)[0];
+                msg.textContent = name + 'を' + zoneName + 'に置きました';
+              }
+            } catch(_){}
+          }
+        }
+        card.addEventListener('pointermove', onMove);
+        card.addEventListener('pointerup', onUp);
+        card.addEventListener('pointercancel', onUp);
+      });
+    }
+    function rebind(){
+      getAllDragTargets().forEach(bindDrag);
+    }
+    rebind();
+    // MutationObserver で動的追加にも対応
+    try {
+      var mo = new MutationObserver(function(){ rebind(); });
+      mo.observe(document.body, { childList: true, subtree: true });
+    } catch(_){}
+  } catch(err) {
+    console.warn('universalDrag init error:', err);
+  }
+})();</script>`
+      // ウィジェットHTMLの末尾 </div> の直前にスクリプトを挿入
+      const lastDivClose = widgetHtml.lastIndexOf('</div>')
+      if (lastDivClose >= 0) {
+        widgetHtml = widgetHtml.slice(0, lastDivClose) + universalDragScript + widgetHtml.slice(lastDivClose)
+      } else {
+        widgetHtml = widgetHtml + universalDragScript
+      }
+      console.log(`🔧 万能ドラッグスクリプト注入: 既存実装(onpointerdown属性=${hasOnPointerAttr}, script内addEventListener=${hasPointerInScript})`)
     }
 
     // ★ 品質チェック: 「動くか」「学習目的にかなっているか」を検証
@@ -28148,7 +28283,17 @@ ${forbiddenNote}
     const pointerHandlers = widgetHtml.match(/onpointerdown\s*=/gi) || []
     const dragHandlers = widgetHtml.match(/ondragstart\s*=/gi) || []
     const clickHandlers = widgetHtml.match(/onclick\s*=/gi) || []
-    const draggableElementCount = draggableMatches.length + pointerHandlers.length + dragHandlers.length
+    // ★ <script>内の addEventListener('pointerdown',...) も「ドラッグ要素」としてカウント
+    // querySelectorAll(...).forEach の数 + 個別 .addEventListener の数を見積もる
+    const addEventListenerPointer = (widgetHtml.match(/addEventListener\s*\(\s*['"]pointerdown['"]/gi) || []).length
+    // querySelectorAll('.drag-card') 等で複数要素を一括バインドするパターン: クラス指定数で件数を推定
+    const dragCardClassCount = (widgetHtml.match(/class\s*=\s*["'][^"']*\b(drag-card|draggable|daimyo|piece|token)\b[^"']*["']/gi) || []).length
+    // 万能ドラッグスクリプト注入により、実質的なドラッグ可能要素数は class 指定 or onpointerdown の和とみなす
+    const draggableElementCount = Math.max(
+      draggableMatches.length + pointerHandlers.length + dragHandlers.length,
+      addEventListenerPointer > 0 ? dragCardClassCount : 0,
+      dragCardClassCount  // 万能注入により drag-card クラス指定だけでも実質ドラッグ可能
+    )
     const interactiveElements = draggableElementCount + clickHandlers.length
     const stateElements = (widgetHtml.match(/<circle\b|<rect\b|<button\b|<input\b|<li\b|<div\b/gi) || []).length
     const hasReset = /もう一度|最初に戻す|リセット|やり直/i.test(widgetHtml)
