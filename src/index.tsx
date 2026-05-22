@@ -16720,7 +16720,7 @@ ${candidateBlock}
             signal: controller.signal,
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.8, maxOutputTokens: 2048, responseMimeType: 'application/json' }
+              generationConfig: { temperature: 0.8, maxOutputTokens: 8192, responseMimeType: 'application/json' }
             })
           }
         )
@@ -16826,18 +16826,31 @@ ${candidateBlock}
     }
     
     // 例題の問題文が本題とほぼ同じでないかチェック
+    // ★ N-gram (3-gram)による真の類似度判定に変更 — 文字単位の偶然一致を排除
     const resultProblem = (result.example_problem || '').trim()
     const originalProblem = (card.problem_text || card.problem_description || '').trim()
     if (resultProblem && originalProblem && resultProblem.length >= 10 && originalProblem.length >= 10) {
       const rpL = resultProblem.toLowerCase(), opL = originalProblem.toLowerCase()
       let tooSimilarResult = false
+      // (1) 完全包含チェック
       if (rpL.includes(opL) || opL.includes(rpL)) tooSimilarResult = true
+      // (2) 3-gram Jaccard 係数で真の類似度を測定（0.5以上で類似と判定）
       if (!tooSimilarResult) {
-        const sh = rpL.length < opL.length ? rpL : opL
-        const lo = rpL.length >= opL.length ? rpL : opL
-        let cc = 0
-        for (let i = 0; i < sh.length; i++) { if (lo.includes(sh[i])) cc++ }
-        if (cc / sh.length > 0.7) tooSimilarResult = true
+        const makeNgrams = (s: string, n: number): Set<string> => {
+          const set = new Set<string>()
+          for (let i = 0; i <= s.length - n; i++) set.add(s.slice(i, i + n))
+          return set
+        }
+        const rpNgrams = makeNgrams(rpL, 3)
+        const opNgrams = makeNgrams(opL, 3)
+        let inter = 0
+        rpNgrams.forEach(g => { if (opNgrams.has(g)) inter++ })
+        const union = rpNgrams.size + opNgrams.size - inter
+        const jaccard = union > 0 ? inter / union : 0
+        if (jaccard >= 0.5) {
+          tooSimilarResult = true
+          console.warn(`🔧 類似度 Jaccard=${jaccard.toFixed(2)} (inter=${inter}, union=${union})`)
+        }
       }
       if (tooSimilarResult) {
         console.warn(`🔧 例題修正失敗[similar-problem]: AIが本題と類似した問題文を返した / 例題=「${resultProblem.slice(0,100)}」 vs 本題=「${originalProblem.slice(0,100)}」`)

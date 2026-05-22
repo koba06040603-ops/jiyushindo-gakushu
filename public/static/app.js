@@ -1573,6 +1573,88 @@ function initializeApp() {
   window._appBootstrapped = true
   console.log('🚀 app.js 初期化開始')
   
+  // ★★★ document レベルの委譲ドラッグ — NB2ウィジェット内のあらゆる「カード状の要素」を最終手段としてドラッグ可能化
+  // applyUniversalDrag が見逃しても、これが拾う最後の砦
+  try {
+    document.addEventListener('pointerdown', function(e) {
+      // ボタン・リンクは除外
+      if (e.target.closest('button, a, input, textarea, select, label')) return
+      // NB2 ウィジェット内のみ対象
+      const widgetEl = e.target.closest('[id^="nb2-visual-content-"]')
+      if (!widgetEl) return
+      // 既に bind 済みなら applyUniversalDrag に任せる
+      let el = e.target
+      // 最大3階層上って「カード状の要素」を探す
+      for (let depth = 0; depth < 4 && el && el !== widgetEl; depth++, el = el.parentElement) {
+        if (!el || el === widgetEl) break
+        if (el.dataset && el.dataset.udBound === '1') return  // 既存リスナーに任せる
+        const cls = (el.className && typeof el.className === 'string') ? el.className : ''
+        const text = (el.textContent || '').trim()
+        // 「カード状」と判定: data-name/data-drag、または text が15文字以下で子要素2個以下、サイズ200px以下
+        const isCardLike = (
+          (el.dataset && (el.dataset.name || el.dataset.drag)) ||
+          /drag|card|piece|token|chip|tile|daimyo/i.test(cls) ||
+          (text.length > 0 && text.length <= 20 && el.children.length <= 2)
+        )
+        if (!isCardLike) continue
+        // ドロップゾーンは除外
+        if (/drop-zone|^zone$|-zone|container|wrapper|panel|board/i.test(cls)) continue
+        const r = el.getBoundingClientRect()
+        if (r.width > 400 || r.height > 200) continue  // 大きすぎる要素は対象外
+        if (r.width < 20 || r.height < 20) continue  // 小さすぎる要素も対象外
+        // ドラッグ開始
+        console.warn('[UD-delegated] ドラッグ開始:', el.dataset.name || text.slice(0,15) || cls)
+        e.preventDefault()
+        e.stopPropagation()
+        try { el.setPointerCapture(e.pointerId) } catch(_){}
+        const startX = e.clientX, startY = e.clientY
+        const prevTransform = el.style.transform || ''
+        const tm = prevTransform.match(/translate\(\s*(-?[0-9.]+)px\s*,\s*(-?[0-9.]+)px\s*\)/)
+        const startTx = tm ? parseFloat(tm[1]) : 0
+        const startTy = tm ? parseFloat(tm[2]) : 0
+        const otherTransform = prevTransform.replace(/translate\([^)]*\)/g, '').trim()
+        const prevZ = el.style.zIndex
+        const prevCursor = el.style.cursor
+        el.style.cursor = 'grabbing'
+        el.style.zIndex = '9999'
+        el.style.transition = 'none'
+        el.style.touchAction = 'none'
+        const move = (ev) => {
+          const dx = ev.clientX - startX
+          const dy = ev.clientY - startY
+          el.style.transform = 'translate(' + (startTx + dx) + 'px, ' + (startTy + dy) + 'px) ' + otherTransform
+        }
+        const up = (ev) => {
+          el.removeEventListener('pointermove', move)
+          el.removeEventListener('pointerup', up)
+          el.removeEventListener('pointercancel', up)
+          try { el.releasePointerCapture(e.pointerId) } catch(_){}
+          el.style.cursor = prevCursor || 'grab'
+          el.style.zIndex = prevZ || ''
+          // ドロップ判定
+          const r2 = el.getBoundingClientRect()
+          const cx = r2.left + r2.width / 2
+          const cy = r2.top + r2.height / 2
+          const zones = widgetEl.querySelectorAll('.drop-zone, .zone, [data-zone]')
+          let hit = null
+          zones.forEach(z => {
+            const zr = z.getBoundingClientRect()
+            if (cx >= zr.left && cx <= zr.right && cy >= zr.top && cy <= zr.bottom) hit = z
+          })
+          if (hit) {
+            try { hit.style.background = '#FFF8DC' } catch(_){}
+            try { el.dataset.placedZone = hit.dataset.zone || hit.id || '' } catch(_){}
+          }
+        }
+        el.addEventListener('pointermove', move)
+        el.addEventListener('pointerup', up)
+        el.addEventListener('pointercancel', up)
+        return
+      }
+    }, true)  // capture phase で確実に拾う
+    console.log('🎯 delegated drag handler 登録完了')
+  } catch (e) { console.warn('delegated drag init error:', e) }
+  
   // bfcache対策: ページが戻る/進むボタンで復元された場合にリロード
   window.addEventListener('pageshow', (event) => {
     if (event.persisted) {
@@ -7949,7 +8031,7 @@ async function loadCardPage(cardId) {
       console.log('🔧 例題自動修正を開始: card_id=' + fixCardId)
       
       async function tryFixExample(retryNum) {
-        const maxRetries = 5
+        const maxRetries = 10  // ★ 増やした: AIが similar-problem や JSON 解析失敗を出すケースに対応
         try {
           // ★ force: true — SSR が _needsExampleFix=true と判定した時点で再生成必須なので、
           //    サーバ側の重複判定（同期されない可能性あり）をスキップして必ず再生成させる
@@ -12833,14 +12915,14 @@ function initVisualWidgets() {
       const applyUniversalDrag = (targetCardId) => {
         try {
           const container = document.getElementById('nb2-visual-content-' + targetCardId)
-          if (!container) { console.warn('[UD] container見つからず'); return }
-          // セレクタ
+          if (!container) { console.warn('[UD] container見つからず cardId=', targetCardId); return }
+          // セレクタ — 大幅拡張版
           const SELECTORS = [
             '[draggable="true"]', '[data-draggable="true"]',
-            '[class*="drag-card"]', '[class*="draggable"]',
+            '[class*="drag"]', '[class*="card"]',
             '[class*="daimyo"]', '[class*="piece"]', '[class*="token"]',
-            '[class*="chip"]', '[class*="tile"]',
-            '[data-drag]', '[data-name]'
+            '[class*="chip"]', '[class*="tile"]', '[class*="item"]',
+            '[data-drag]', '[data-name]', '[data-id]'
           ]
           const set = new Set()
           SELECTORS.forEach(sel => {
@@ -12848,21 +12930,38 @@ function initVisualWidgets() {
           })
           // cursor:grab/move/pointer のついた要素も追加（buttonとa以外）
           try {
-            container.querySelectorAll('[style*="cursor"]').forEach(el => {
-              if (el.tagName === 'BUTTON' || el.tagName === 'A') return
-              const cs = getComputedStyle(el)
-              if (cs.cursor === 'grab' || cs.cursor === 'move') set.add(el)
+            container.querySelectorAll('*').forEach(el => {
+              if (el.tagName === 'BUTTON' || el.tagName === 'A' || el.tagName === 'SVG') return
+              try {
+                const cs = getComputedStyle(el)
+                if (cs.cursor === 'grab' || cs.cursor === 'move') set.add(el)
+              } catch(_){}
             })
           } catch(_){}
-          // 除外: drop-zone系
+          // 除外: drop-zone系 + コンテナ系 + 大きすぎる要素（widget全体など）
+          const containerRect = container.getBoundingClientRect()
           const targets = Array.from(set).filter(el => {
             const cls = (el.className && typeof el.className === 'string') ? el.className : ''
-            if (/drop-zone|^zone$|\\bzone-|container|wrapper|panel|board/i.test(cls)) {
+            // ドロップゾーン or 明らかにコンテナの要素は除外
+            if (/drop-zone|^zone$|-zone|container|wrapper|panel|board|map-area|^area$/i.test(cls)) {
               if (!el.dataset.name && !el.dataset.drag) return false
             }
+            // コンテナ自体は除外
+            if (el === container) return false
+            // 子要素を多数含む要素（コンテナ系）は除外: 子のtagがdiv/section/articleで5個以上ある場合
+            try {
+              const childCount = el.children.length
+              if (childCount >= 5) return false
+            } catch(_){}
+            // サイズチェック: コンテナの50%以上を占める要素は親コンテナと判定
+            try {
+              const r = el.getBoundingClientRect()
+              if (r.width > containerRect.width * 0.5 || r.height > containerRect.height * 0.5) return false
+            } catch(_){}
             return true
           })
-          console.warn('[UD] 対象数=', targets.length, '/', set.size, 'cardId=', targetCardId)
+          console.warn('[UD] 対象数=', targets.length, '/', set.size, 'cardId=', targetCardId,
+            '/ 例:', targets.slice(0, 3).map(t => (t.dataset.name || t.textContent.slice(0, 10) || t.className)).join(','))
           targets.forEach(el => {
             if (el.dataset.udBound === '1') return
             el.dataset.udBound = '1'
