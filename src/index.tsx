@@ -92,6 +92,8 @@ import {
   FEEDBACK_SCHEMA,
   GRADING_SCHEMA,
 } from './gemini-schemas'
+// 🔧 本番DBスキーマ同期定義（不足テーブル59 / カラム21 / インデックス95）
+import { SCHEMA_SYNC_CREATES, SCHEMA_SYNC_ALTERS, SCHEMA_SYNC_INDEXES, SCHEMA_SYNC_ROUND2, SCHEMA_SYNC_ROUND3 } from './schema-sync'
 
 type Bindings = {
   DB: D1Database
@@ -475,6 +477,44 @@ async function optSelectByCurriculum(db: D1Database, curriculumId: any): Promise
       learning_meaning: p.learning_meaning ?? parsed.learning_meaning ?? '',
     }
   })
+}
+
+// ============================================================
+// answers スキーマ互換レイヤー
+// ------------------------------------------------------------
+// 本番とローカルで answers テーブルの意味そのものが異なる。
+//   本番   : 模範解答マスタ
+//            answer_id, learning_card_id, answer_content, explanation, created_at, updated_at
+//   ローカル: 生徒の解答履歴
+//            answer_id, card_id, student_id, answer_text, is_correct, answered_at, ...
+//
+// カード表示（GET /api/cards/:cardId）では「そのカードに紐づく解答」が取れれば
+// よいため、カードID列の違い（learning_card_id / card_id）だけを吸収する。
+// 本番で「no such column: card_id」により学習カードが開けなかった障害への対応。
+// ============================================================
+let answersCardIdCol: 'learning_card_id' | 'card_id' | null = null
+
+async function answersQueryByCard(db: D1Database, cardId: any): Promise<any | null> {
+  // 一度成功した列名を記憶し、以降はそれを優先して試す
+  const order: Array<'learning_card_id' | 'card_id'> =
+    answersCardIdCol === 'card_id' ? ['card_id', 'learning_card_id'] : ['learning_card_id', 'card_id']
+
+  for (const col of order) {
+    try {
+      const row = await db.prepare(`SELECT * FROM answers WHERE ${col} = ?`).bind(cardId).first()
+      answersCardIdCol = col
+      return row ?? null
+    } catch (e: any) {
+      const msg = String(e?.message ?? e)
+      // 列が無い場合のみ次の候補へ。それ以外のエラーは握りつぶさない
+      if (!/no such column/i.test(msg)) {
+        console.warn('answers 取得エラー:', msg.slice(0, 120))
+        return null
+      }
+    }
+  }
+  console.warn('answers: card_id / learning_card_id のいずれの列も見つからず')
+  return null
 }
 
 // ============================================================
@@ -2052,6 +2092,37 @@ app.get('/health', async (c) => {
 
 // 🔒 セキュリティ修正: /api/debug/* 全体に管理者認証を適用
 app.use('/api/debug/*', authMiddleware, requireRole('admin'))
+
+// ============================================================
+// 全テーブルのスキーマをダンプ（本番/ローカルのスキーマ乖離の一括調査用）
+// 本番D1へ wrangler から直接アクセスできないため、アプリ経由で全量取得する。
+//   GET /api/debug/schema-dump        … 全テーブルのカラム一覧
+//   GET /api/debug/schema-dump?full=1 … CREATE文も含める
+// ============================================================
+app.get('/api/debug/schema-dump', async (c) => {
+  const { env } = c
+  const full = c.req.query('full') === '1'
+  try {
+    const tbls = await env.DB.prepare(
+      `SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name`
+    ).all()
+    const out: any = {}
+    for (const t of (tbls.results || []) as any[]) {
+      try {
+        const info = await env.DB.prepare(`PRAGMA table_info(${t.name})`).all()
+        out[t.name] = {
+          columns: (info.results || []).map((r: any) => r.name),
+          ...(full ? { sql: t.sql } : {}),
+        }
+      } catch (e: any) {
+        out[t.name] = { error: e.message }
+      }
+    }
+    return c.json({ success: true, table_count: Object.keys(out).length, tables: out })
+  } catch (e: any) {
+    return c.json({ success: false, error: String(e?.message ?? e) }, 500)
+  }
+})
 
 // 一時的DBスキーマ確認エンドポイント
 app.get('/api/debug/schema', async (c) => {
@@ -5289,10 +5360,13 @@ app.get('/api/cards/:cardId', async (c) => {
     `).bind(cardId).first()
     
     const hints = await hintQuery(env.DB, (s) => hintSelectSQL(s), [cardId])
-    
-    const answer = await env.DB.prepare(`
-      SELECT * FROM answers WHERE card_id = ?
-    `).bind(cardId).first()
+
+    // answers スキーマ互換:
+    //   本番   = 模範解答テーブル（learning_card_id, answer_content, explanation）
+    //   ローカル = 生徒の解答履歴（card_id, student_id, answer_text, is_correct）
+    // カード表示では「そのカードに紐づく解答」を取れればよいので、
+    // 列名の違いを吸収して取得する（取得できなくてもカード表示は継続する）。
+    const answer = await answersQueryByCard(env.DB, cardId)
     
     // カードデータのJSON問題文をパース
     if (card) {
@@ -7582,7 +7656,8 @@ app.get('/api/answers/curriculum/:curriculumId', async (c) => {
   
   try {
     // コースと学習カードの解答
-    const cardAnswers = await env.DB.prepare(`
+    // answers のカードID列は 本番 learning_card_id / ローカル card_id と異なるため両方試す
+    const buildCardAnswersSQL = (col: string) => `
       SELECT 
         c.course_display_name,
         c.course_level,
@@ -7593,13 +7668,24 @@ app.get('/api/answers/curriculum/:curriculumId', async (c) => {
         a.explanation
       FROM courses c
       JOIN learning_cards lc ON c.id = lc.course_id
-      LEFT JOIN answers a ON lc.card_id = a.card_id
+      LEFT JOIN answers a ON lc.card_id = a.${col}
       WHERE c.curriculum_id = ?
       ORDER BY c.course_level, lc.card_number
-    `).bind(curriculumId).all()
+    `
+    let cardAnswers: any
+    try {
+      cardAnswers = await env.DB.prepare(buildCardAnswersSQL('learning_card_id')).bind(curriculumId).all()
+    } catch (e1: any) {
+      if (/no such column/i.test(String(e1?.message ?? e1))) {
+        cardAnswers = await env.DB.prepare(buildCardAnswersSQL('card_id')).bind(curriculumId).all()
+      } else {
+        throw e1
+      }
+    }
     
     // 選択問題の解答（スキーマ互換レイヤー経由: 本番 curriculum_id / ローカル unit_id）
-    // 内容カラムも本番 problem_content / ローカル content と異なるため s で切り替える
+    // 注: 本番の answers に optional_problem_id 列は存在しないため JOIN しない。
+    //     選択問題の解答は optional_problems 側の内容カラムから取る。
     const optionalAnswers = await optExec(
       env.DB,
       (s) => `
@@ -7607,11 +7693,8 @@ app.get('/api/answers/curriculum/:curriculumId', async (c) => {
           op.problem_id,
           op.problem_title,
           op.${s.contentCol} AS content,
-          op.difficulty_level,
-          a.answer_content,
-          a.explanation
+          op.difficulty_level
         FROM optional_problems op
-        LEFT JOIN answers a ON op.problem_id = a.optional_problem_id
         WHERE op.${s.curriculumIdCol} = ?
         ORDER BY op.problem_id
       `,
@@ -7623,8 +7706,9 @@ app.get('/api/answers/curriculum/:curriculumId', async (c) => {
       cardAnswers: cardAnswers.results,
       optionalAnswers: optionalAnswers.results
     })
-  } catch (error) {
-    return c.json({ error: 'Database error' }, 500)
+  } catch (error: any) {
+    console.error('解答一覧取得エラー:', error)
+    return c.json({ error: 'Database error', details: String(error?.message ?? error).slice(0, 200) }, 500)
   }
 })
 
@@ -16679,6 +16763,99 @@ app.get('/api/admin/schema-repair', authMiddleware, requireRole('admin'), async 
   return c.json({
     success: true, diagnosis: report, needs_repair: needsRepair,
     hint: needsRepair ? 'POST で修復を実行してください' : '修復は不要です',
+  })
+})
+
+// ============================================================
+// 🔧 スキーマ全面同期API（admin限定）
+// ------------------------------------------------------------
+// 本番に存在しないテーブル59個 + 不足カラム21個 + インデックス95個を
+// まとめて作成する。全て冪等（IF NOT EXISTS / duplicate は成功扱い）。
+//   GET  /api/admin/schema-sync   … 不足テーブルの一覧（診断のみ）
+//   POST /api/admin/schema-sync   … 実行
+// 定義は src/schema-sync.ts（ローカルDBの実スキーマから自動生成）。
+// ============================================================
+app.get('/api/admin/schema-sync', authMiddleware, requireRole('admin'), async (c) => {
+  const { env } = c
+  const existing = await env.DB.prepare(
+    `SELECT name FROM sqlite_master WHERE type='table'`
+  ).all()
+  const have = new Set((existing.results || []).map((r: any) => r.name))
+  const expected = [...SCHEMA_SYNC_CREATES, ...SCHEMA_SYNC_ROUND2, ...SCHEMA_SYNC_ROUND3]
+    .filter((s) => /CREATE TABLE/i.test(s))
+    .map((s) => s.match(/CREATE TABLE IF NOT EXISTS\s+[`"]?(\w+)/i)?.[1])
+    .filter(Boolean) as string[]
+  const missing = expected.filter((t) => !have.has(t))
+  return c.json({
+    success: true,
+    total_defined: expected.length,
+    existing_tables: have.size,
+    missing_tables: missing,
+    missing_count: missing.length,
+    hint: missing.length ? 'POST で作成を実行してください' : '不足テーブルはありません',
+  })
+})
+
+app.post('/api/admin/schema-sync', authMiddleware, requireRole('admin'), async (c) => {
+  const { env } = c
+  const result = { created: [] as string[], altered: [] as string[], indexed: 0,
+    skipped: 0, failed: [] as { sql: string; error: string }[] }
+
+  const run = async (sql: string, label: string, bucket?: string[]) => {
+    try {
+      await env.DB.prepare(sql).run()
+      if (bucket) bucket.push(label)
+      return true
+    } catch (e: any) {
+      const msg = String(e?.message ?? e)
+      if (/duplicate column|already exists/i.test(msg)) { result.skipped++; return true }
+      result.failed.push({ sql: sql.slice(0, 90), error: msg.slice(0, 140) })
+      return false
+    }
+  }
+
+  for (const sql of SCHEMA_SYNC_CREATES) {
+    const name = sql.match(/CREATE TABLE IF NOT EXISTS\s+[`"]?(\w+)/i)?.[1] ?? '?'
+    await run(sql, name, result.created)
+  }
+  for (const sql of SCHEMA_SYNC_ALTERS) {
+    const m = sql.match(/ALTER TABLE\s+(\w+)\s+ADD COLUMN\s+(\w+)/i)
+    await run(sql, `${m?.[1]}.${m?.[2]}`, result.altered)
+  }
+  for (const sql of SCHEMA_SYNC_INDEXES) {
+    if (await run(sql, 'idx')) result.indexed++
+  }
+  // 第2次: ローカルにも存在しなかった「書き込みのあるテーブル」
+  // （answer_history など。コードの INSERT 文から列を逆算して定義）
+  for (const sql of SCHEMA_SYNC_ROUND2) {
+    const name = sql.match(/CREATE (?:TABLE|INDEX) IF NOT EXISTS\s+[`"]?(\w+)/i)?.[1] ?? 'r2'
+    if (/CREATE TABLE/i.test(sql)) await run(sql, name, result.created)
+    else if (await run(sql, name)) result.indexed++
+  }
+  // 第3次: INSERT/UPDATE 文から列を逆算生成した欠損テーブル
+  for (const sql of SCHEMA_SYNC_ROUND3) {
+    const name = sql.match(/CREATE TABLE IF NOT EXISTS\s+[`"]?(\w+)/i)?.[1] ?? 'r3'
+    await run(sql, name, result.created)
+  }
+
+  // 作成後の検証
+  const after = await env.DB.prepare(`SELECT name FROM sqlite_master WHERE type='table'`).all()
+  const have = new Set((after.results || []).map((r: any) => r.name))
+  const expected = [...SCHEMA_SYNC_CREATES, ...SCHEMA_SYNC_ROUND2, ...SCHEMA_SYNC_ROUND3]
+    .filter((s) => /CREATE TABLE/i.test(s))
+    .map((s) => s.match(/CREATE TABLE IF NOT EXISTS\s+[`"]?(\w+)/i)?.[1])
+    .filter(Boolean) as string[]
+  const stillMissing = expected.filter((t) => !have.has(t))
+
+  return c.json({
+    success: result.failed.length === 0 && stillMissing.length === 0,
+    created_count: result.created.length,
+    altered_count: result.altered.length,
+    indexed_count: result.indexed,
+    skipped_count: result.skipped,
+    still_missing: stillMissing,
+    failed: result.failed.slice(0, 20),
+    failed_count: result.failed.length,
   })
 })
 

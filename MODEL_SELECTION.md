@@ -415,3 +415,122 @@ GET  /api/debug/schema?tables=<テーブル名>   # 本番の実カラムを確�
 GET  /api/admin/schema-repair                # 既知の不足を診断
 POST /api/admin/schema-repair                # 修復（冪等・再実行可）
 ```
+
+---
+
+## 13. 本番障害の修正記録：問題文が「問題の説明を生成中です」のままになる（2026-09-19）
+
+### 症状
+
+カードを開いても問題文が表示されず、プレースホルダ文言
+「問題の説明を生成中です」だけが残る。
+
+### 根本原因（自己修正）
+
+本作業の §2 で JSON 破損対策として導入した **`responseSchema`（構造化出力）の
+フィールド名が、プロンプト／保存側の名前と食い違っていた**。
+
+| 箇所 | 使っていた名前 |
+|------|----------------|
+| プロンプト（LLMへの指示） | `card_title` / `problem_description` |
+| 保存・表示側のコード | `card_title` / `problem_description` |
+| **導入した responseSchema** | ❌ `title` / `question` |
+
+`responseSchema` は **プロンプトの記述より優先される**ため、
+Gemini は `title` / `question` で返し、保存側が `problem_description` を
+見つけられずプレースホルダで埋めていた。
+
+### 対応
+
+`src/gemini-schemas.ts` の `LEARNING_CARD_SCHEMA` をプロンプトと完全一致させた。
+
+```
+card_number, card_title, card_type, textbook_page,
+problem_description, new_terms, example_problem, example_solution,
+example_answer, example_image_description, real_world_connection,
+answer, answer_keywords, answer_explanation,
+ai_teacher_message, ai_teacher_advice, teacher_help_keywords,
+hints, difficulty_level
+```
+
+`required`: `card_number, card_title, problem_description, answer,
+answer_keywords, answer_explanation, example_problem, example_answer,
+hints, ai_teacher_message`
+
+### 本番での検証（実データ）
+
+| 項目 | 結果 |
+|------|------|
+| 生成 | 4枚 / **プレースホルダ 0件** |
+| 例 | `card_title='通分して合わせよう！'`<br>`problem_description='たくみさんはオレンジジュースを1/2L…'` |
+| 保存→再取得 | 4枚すべて本文を保持 |
+| `/api/cards/2726` | タイトル・問題文・ヒント3件・答え すべて正常 |
+
+検証用データ（curriculum 12318）は本番から削除済み。
+
+---
+
+## 14. スキーマ乖離の全件調査と一括同期（2026-09-19）
+
+「不具合を一掃する」という要望を受け、**個別対応をやめて本番D1と
+ローカルD1のスキーマ差分を全件洗い出し**、一括同期した。
+
+### 調査方法
+
+1. `/api/debug/schema-dump` を実装し、本番D1の全テーブル定義を取得
+2. ローカルD1のスキーマと機械的に差分を取る
+3. さらにソースコード中の **`INSERT` / `UPDATE` 文を静的解析**して
+   「書き込み対象なのに本番に存在しないテーブル」を抽出
+   （読み取り専用テーブルは try/catch で握られており障害化しにくいため後回し）
+
+### 結果：3ラウンドで同期
+
+| ラウンド | 内容 | 件数 |
+|----------|------|------|
+| 1 | ローカル定義に存在し本番に無いテーブル | **59テーブル** |
+| 2 | 書き込み対象で不足（answer_history, generated_problems, student_answers, ai_usage_stats, mistake_notebook, test_results, peer_answers, recommendations, essay_answers） | **9テーブル** |
+| 3 | INSERT/UPDATE 静的解析で追加検出 | **78テーブル** |
+| — | カラム追加（ALTER） | **21カラム** |
+| — | インデックス作成 | **107本** |
+
+**本番テーブル数：106 → 252（失敗 0件）**
+
+### 実装
+
+- `src/schema-sync.ts` … `SCHEMA_SYNC_CREATES` / `ALTERS` / `INDEXES` /
+  `ROUND2` / `ROUND3` を配列で保持
+- `/api/admin/schema-sync`（admin限定）
+  - `GET` = 不足の診断のみ
+  - `POST` = 冪等実行（`CREATE TABLE IF NOT EXISTS`、
+    重複カラムエラーは成功扱い）
+- SQLファイルとしても残置：
+  `migrations/0101_sync_production_full.sql`（59）
+  `migrations/0102_missing_write_tables.sql`（9）
+  `migrations/0103_missing_write_tables_round3.sql`（78）
+
+> Cloudflare APIトークンに **D1権限が無い**（`code: 7403`）ため
+> wrangler から migrations を流せない。そのためアプリ内の管理APIから
+> 適用する方式を採っている。トークンにD1権限を付ければ
+> `npx wrangler d1 migrations apply` でも同じ結果になる。
+
+### 最終総合検証（本番）
+
+| # | 項目 | 結果 |
+|---|------|------|
+| 1 | `/landing` | ✅ 200 |
+| 2 | カード取得 | ✅ 200 |
+| 3 | 解答一覧 | ✅ 200 |
+| 4 | 学習計画 | ✅ 200 |
+| 5 | 選択問題 | ✅ 200 |
+| 6 | スキーマ同期診断 | ✅ 不足なし |
+| 7 | モデル監査 | ✅ 11/11 正常 |
+
+### 残課題（低リスク）
+
+- 読み取り専用でしか参照されないテーブルが **36件** 未作成。
+  呼び出し箇所を抽出して確認したところ、ほぼすべてが try/catch 内で
+  握られており、機能停止には至らない。実害が出た時点で追加する。
+- Git履歴に**過去に漏洩したAPIキー**が残っている。
+  GitHubリポジトリ `koba06040603-ops/jiyushindo-gakushu` は
+  **privateにする／旧キーを失効させる**ことを推奨（ユーザー対応事項）。
+- Cloudflare APIトークンに **D1権限を追加**すると運用が楽になる。

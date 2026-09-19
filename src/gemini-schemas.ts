@@ -33,6 +33,7 @@ export const HINT_SCHEMA: GeminiSchema = {
   properties: {
     hint_level: { type: 'integer', description: '1=気づきを促す, 2=方針を示す, 3=手順を示す（答えは書かない）' },
     hint_text: { type: 'string', description: '答えそのものを含めないヒント文' },
+    thinking_tool_suggestion: { type: 'string', description: '使える思考ツール' },
   },
   required: ['hint_level', 'hint_text'],
 }
@@ -46,30 +47,47 @@ export const MULTIMEDIA_SCHEMA: GeminiSchema = {
   required: ['type', 'description'],
 }
 
+/**
+ * 学習カードスキーマ
+ *
+ * ⚠️ 重要: フィールド名は必ず「プロンプトが指示する名前」と一致させること。
+ * responseSchema はプロンプトより優先されるため、ここで別名を定義すると
+ * プロンプト通りの名前で返ってこず、保存側が値を見つけられなくなる。
+ * （2026-09: title/question で定義した結果、保存側が探す card_title /
+ *   problem_description が生成されず「問題の説明を生成中です」という
+ *   プレースホルダーのまま保存される障害が発生した）
+ *
+ * 保存側が参照する必須フィールド（src/index.tsx requiredFields）:
+ *   card_number, card_title, problem_description, answer
+ */
 export const LEARNING_CARD_SCHEMA: GeminiSchema = {
   type: 'object',
   properties: {
     card_number: { type: 'integer' },
-    title: { type: 'string' },
-    learning_goal: { type: 'string' },
-    question: { type: 'string' },
-    answer: { type: 'string' },
-    answer_keywords: { type: 'array', items: { type: 'string' }, description: '自動採点用キーワード3つ以上' },
-    answer_explanation: { type: 'string', description: '途中式・計算過程を含む100字以上の解説' },
-    example_question: { type: 'string' },
+    card_title: { type: 'string', description: '魅力的なタイトル（20字以内）' },
+    card_type: { type: 'string' },
+    textbook_page: { type: 'string' },
+    problem_description: { type: 'string', description: '具体的な問題文（100-200字）' },
+    new_terms: { type: 'string', description: '新出用語（カンマ区切り）。答えを含めない' },
+    example_problem: { type: 'string', description: '本問題とは別の答えになる例題' },
+    example_solution: { type: 'string', description: '例題の解き方' },
     example_answer: { type: 'string', description: 'answer とは必ず異なる値' },
+    example_image_description: { type: 'string', nullable: true },
+    real_world_connection: { type: 'string' },
+    answer: { type: 'string', description: '自動採点可能な明確な答え' },
+    answer_keywords: { type: 'array', items: { type: 'string' }, description: '採点用キーワード3つ' },
+    answer_explanation: { type: 'string', description: '途中式・計算過程を含む100字以上の解説' },
+    ai_teacher_message: { type: 'string', description: '励ましメッセージ。答えを含めない' },
+    ai_teacher_advice: { type: 'string', description: '学び方アドバイス。答えを含めない' },
+    teacher_help_keywords: { type: 'string', description: '質問用キーワード。答えを含めない' },
     hints: { type: 'array', items: HINT_SCHEMA },
-    new_terms: { type: 'array', items: { type: 'string' } },
-    ai_teacher_message: { type: 'string' },
-    ai_teacher_advice: { type: 'string' },
-    teacher_help_keywords: { type: 'array', items: { type: 'string' } },
-    difficulty: { type: 'string', enum: ['basic', 'standard', 'advanced'] },
-    multimedia_ai_content: MULTIMEDIA_SCHEMA,
+    difficulty_level: { type: 'string' },
   },
   required: [
-    'card_number', 'title', 'question', 'answer', 'answer_keywords',
-    'answer_explanation', 'example_question', 'example_answer',
-    'hints', 'ai_teacher_message', 'difficulty',
+    'card_number', 'card_title', 'problem_description', 'answer',
+    'answer_keywords', 'answer_explanation',
+    'example_problem', 'example_answer',
+    'hints', 'ai_teacher_message',
   ],
 }
 
@@ -81,13 +99,16 @@ export const CARDS_RESPONSE_SCHEMA: GeminiSchema = {
 
 // ============================================================
 // 2. コース生成スキーマ（カード群 + コースメタ情報）
+// ⚠️ トップレベルのキーも /api/ai/generate-course のプロンプトに合わせること
 // ============================================================
 export const COURSE_RESPONSE_SCHEMA: GeminiSchema = {
   type: 'object',
   properties: {
     course_name: { type: 'string' },
-    course_description: { type: 'string' },
-    learning_objectives: { type: 'array', items: { type: 'string' } },
+    name: { type: 'string' },
+    label: { type: 'string' },
+    description: { type: 'string' },
+    color_code: { type: 'string' },
     cards: { type: 'array', items: LEARNING_CARD_SCHEMA },
   },
   required: ['cards'],
