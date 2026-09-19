@@ -1618,6 +1618,7 @@ const PUBLIC_API_PATHS = [
   '/health',
   '/api/notifications/send',  // WebSocket通知（内部通信）
   '/api/realtime/connect',    // WebSocket接続
+  '/api/diag',                // 運用診断（エンドポイント側で DIAG_KEY を検証する）
 ]
 
 app.use('/api/*', async (c, next) => {
@@ -2121,6 +2122,174 @@ app.get('/api/debug/schema-dump', async (c) => {
     return c.json({ success: true, table_count: Object.keys(out).length, tables: out })
   } catch (e: any) {
     return c.json({ success: false, error: String(e?.message ?? e) }, 500)
+  }
+})
+
+// ============================================================
+// 🔍 プレースホルダ残存カードの診断・修復
+//   「問題の説明を生成中です」が残っているカードを検出する。
+//   ?fix=1 で、example_problem 等から本文を復元できるものを自動修復。
+// ============================================================
+const CARD_PLACEHOLDERS = ['問題の説明を生成中です', '解答を生成中です', '学習カード']
+
+app.get('/api/diag/placeholder-cards', async (c) => {
+  const { env } = c
+  // 認証の代わりに DIAG_KEY（Cloudflare Secret）で保護する。
+  // 未設定の環境（ローカル）では検証をスキップする。
+  const diagKey = (env as any).DIAG_KEY
+  if (diagKey && c.req.query('key') !== diagKey) {
+    return c.json({ success: false, error: 'invalid diag key' }, 403)
+  }
+  const fix = c.req.query('fix') === '1'
+  const cardId = c.req.query('card_id')
+  try {
+    let sql = `SELECT card_id, course_id, card_number, card_title,
+                      problem_text, problem_description, problem_content,
+                      example_problem, example_solution, answer, answer_explanation
+               FROM learning_cards
+               WHERE (COALESCE(NULLIF(TRIM(problem_text),''),
+                               NULLIF(TRIM(problem_description),''),
+                               NULLIF(TRIM(problem_content),'')) IS NULL
+                  OR problem_text LIKE '%生成中%'
+                  OR problem_description LIKE '%生成中%'
+                  OR problem_content LIKE '%生成中%')`
+    const binds: any[] = []
+    if (cardId) { sql += ' AND card_id = ?'; binds.push(cardId) }
+    sql += ' ORDER BY card_id DESC LIMIT 200'
+
+    const rows = await env.DB.prepare(sql).bind(...binds).all()
+    const list = (rows.results || []) as any[]
+
+    let fixed = 0
+    let purged = 0
+    const fixes: any[] = []
+    const purge = c.req.query('purge') === '1'
+    if (fix || purge) {
+      for (const r of list) {
+        // ① 例題本文から問題文を復元できるケースは修復する
+        const candidate = String(r.example_problem || '').trim()
+        if (candidate.length >= 10) {
+          try {
+            await env.DB.prepare(
+              'UPDATE learning_cards SET problem_text = ?, problem_description = ?, problem_content = ? WHERE card_id = ?'
+            ).bind(candidate, candidate, candidate, r.card_id).run()
+            fixed++
+            fixes.push({ id: r.card_id, action: 'restored', preview: candidate.slice(0, 60) })
+          } catch (e: any) {
+            fixes.push({ id: r.card_id, error: e.message })
+          }
+          continue
+        }
+        // ② 例題も無い＝完全な空カード。復元不能なので削除する（?purge=1 のときのみ）
+        if (purge) {
+          try {
+            await env.DB.prepare('DELETE FROM hints WHERE card_id = ?').bind(r.card_id).run().catch(() => {})
+            await env.DB.prepare('DELETE FROM learning_cards WHERE card_id = ?').bind(r.card_id).run()
+            purged++
+            fixes.push({ id: r.card_id, action: 'purged' })
+          } catch (e: any) {
+            fixes.push({ id: r.card_id, error: e.message })
+          }
+        }
+      }
+    }
+
+    return c.json({
+      success: true,
+      placeholder_count: list.length,
+      fixed,
+      purged,
+      fixes,
+      cards: list.map((r: any) => ({
+        id: r.card_id,
+        course_id: r.course_id,
+        card_number: r.card_number,
+        card_title: r.card_title,
+        problem_text: r.problem_text,
+        problem_description: r.problem_description,
+        problem_content: r.problem_content,
+        has_example: !!String(r.example_problem || '').trim(),
+        has_answer: !!String(r.answer || '').trim(),
+      })),
+    })
+  } catch (e: any) {
+    return c.json({ success: false, error: String(e?.message ?? e) }, 500)
+  }
+})
+
+// ============================================================
+// 🔍 カード生成のスモークテスト（DIAG_KEY で保護）
+//   本番の実モデルで生成だけ行い、空カード/プレースホルダの
+//   発生有無を確認する。DBには一切書き込まない。
+// ============================================================
+app.post('/api/diag/gen-smoke', async (c) => {
+  const { env } = c
+  const diagKey = (env as any).DIAG_KEY
+  if (diagKey && c.req.query('key') !== diagKey) {
+    return c.json({ success: false, error: 'invalid diag key' }, 403)
+  }
+  const apiKey = (env as any).GEMINI_API_KEY
+  if (!apiKey) return c.json({ success: false, error: 'no api key' }, 500)
+
+  const body = await c.req.json().catch(() => ({} as any))
+  const numCards = body.cards_count || 10
+  const prompt = `あなたは小学校の教科指導に精通した優秀な教師です。
+${body.grade || '小学5年'} ${body.subject || '算数'}「${body.unitName || '分数のたし算とひき算'}」の
+学習カードを${numCards}枚生成してください。
+各カードは card_number, card_title, problem_description（100-200字の具体的な問題文）,
+example_problem, example_answer, answer, answer_keywords, answer_explanation,
+ai_teacher_message, hints（3件: hint_level, hint_text）を必ず埋めること。`
+
+  const maxTok = Math.min(65536, Math.max(16384, numCards * 3000 + 4096))
+  const t0 = Date.now()
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_QUALITY}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: buildGeminiConfig(COURSE_RESPONSE_SCHEMA, {
+            temperature: 0.2,
+            maxOutputTokens: maxTok,
+          }),
+        }),
+      }
+    )
+    const data: any = await res.json()
+    const cand = data?.candidates?.[0]
+    const text = cand?.content?.parts?.[0]?.text || ''
+    let parsed: any = null
+    try {
+      const r = parseGeminiJSON(text)
+      parsed = r.ok ? r.data : { _parse_error: r.error }
+    } catch (e: any) { parsed = { _parse_error: e.message } }
+    const cards = parsed?.cards || []
+    const rawKeys = parsed && typeof parsed === 'object' ? Object.keys(parsed) : []
+    const empty = cards.filter((x: any) =>
+      String(x?.problem_description || '').trim().length < 10).length
+    return c.json({
+      success: true,
+      model: GEMINI_MODEL_QUALITY,
+      maxOutputTokens: maxTok,
+      finishReason: cand?.finishReason,
+      elapsed_ms: Date.now() - t0,
+      usage: data?.usageMetadata,
+      requested: numCards,
+      returned: cards.length,
+      empty_cards: empty,
+      raw_top_keys: rawKeys,
+      raw_head: text.slice(0, 400),
+      samples: cards.slice(0, 12).map((x: any) => ({
+        n: x?.card_number,
+        title: String(x?.card_title || '').slice(0, 24),
+        problem: String(x?.problem_description || '').slice(0, 50),
+        hints: Array.isArray(x?.hints) ? x.hints.length : 0,
+      })),
+    })
+  } catch (e: any) {
+    return c.json({ success: false, error: String(e?.message ?? e), elapsed_ms: Date.now() - t0 }, 500)
   }
 })
 
@@ -18502,9 +18671,12 @@ ${customInfo}${mikataSection}
         signal: controller.signal,
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
+          // 🔧 2026-09 修正: 16384 では10枚生成時に MAX_TOKENS で途中打ち切りになり、
+          // 「部分JSON修復」が中身の空なカードを量産していた（プレースホルダ大量発生の原因）。
+          // カード1枚あたり実測 ~1,100 tokens。枚数に応じて動的に確保する。
           generationConfig: buildGeminiConfig(COURSE_RESPONSE_SCHEMA, {
             temperature: 0.2,
-            maxOutputTokens: 16384
+            maxOutputTokens: Math.min(65536, Math.max(16384, (numCards || 6) * 3000 + 4096))
           })
       })
     })
@@ -18579,9 +18751,25 @@ ${customInfo}${mikataSection}
           if (lastQuoteIdx > 0 && !afterLastQuote.match(/["\]},:]/)) {
             partialText += '"'
           }
-          // 閉じ括弧を追加
-          for (let i = 0; i < bracketCount; i++) partialText += ']'
-          for (let i = 0; i < braceCount; i++) partialText += '}'
+          // 🔧 2026-09 修正: 途中で切れた「最後の1枚」は必ず中身が欠けている。
+          // そのまま閉じると空カードになるため、未完成の要素を切り捨ててから閉じる。
+          const lastComplete = partialText.lastIndexOf('},')
+          if (lastComplete > 0) {
+            const truncated = partialText.slice(0, lastComplete + 1)
+            let bc = 0, kc = 0
+            for (const ch of truncated) {
+              if (ch === '{') bc++
+              if (ch === '}') bc--
+              if (ch === '[') kc++
+              if (ch === ']') kc--
+            }
+            partialText = truncated + ']'.repeat(Math.max(0, kc)) + '}'.repeat(Math.max(0, bc))
+            console.log('🔧 未完成カードを切り捨てて修復しました')
+          } else {
+            // 不完全なJSON文字列値を閉じる
+            for (let i = 0; i < bracketCount; i++) partialText += ']'
+            for (let i = 0; i < braceCount; i++) partialText += '}'
+          }
           console.log('🔧 修復後のJSON末尾:', partialText.slice(-200))
           // 修復したレスポンスでaiResponseに代入（次のパース処理へ）
           candidate.content.parts[0].text = partialText
@@ -18709,6 +18897,28 @@ ${customInfo}${mikataSection}
       }
     }
     
+    // ============================================================
+    // 🔧 2026-09 修正: 中身が空のカードは「補完」せず「破棄」する
+    //   MAX_TOKENS の部分修復で生まれる空カードをそのまま補完すると
+    //   「問題の説明を生成中です」が本番DBに保存されてしまう。
+    //   問題文を持たないカードは無効としてドロップし、
+    //   1枚も残らなければ例外を投げて再試行に回す。
+    // ============================================================
+    const beforeDrop = courseData.cards.length
+    courseData.cards = courseData.cards.filter((card: any) => {
+      const body = String(card?.problem_description || card?.problem_text || card?.problem_content || '').trim()
+      return body.length >= 10
+    })
+    const dropped = beforeDrop - courseData.cards.length
+    if (dropped > 0) {
+      console.warn(`🗑️ 中身の無いカードを ${dropped} 枚破棄しました（${beforeDrop} → ${courseData.cards.length}）`)
+      // 連番を振り直す
+      courseData.cards.forEach((card: any, idx: number) => { card.card_number = idx + 1 })
+    }
+    if (courseData.cards.length === 0) {
+      throw new Error('有効なカードが1枚も生成されませんでした（全カードの問題文が空）')
+    }
+
     // 【新規】各カードの必須フィールドチェック
     const requiredFields = ['card_number', 'card_title', 'problem_description', 'answer']
     for (let i = 0; i < courseData.cards.length; i++) {
