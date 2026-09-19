@@ -229,3 +229,64 @@ N=5 node scripts/bench/bench-stability.mjs gemini-3.7-flash      # 安定性
   「ヒント3で通分結果を直接与えてしまう」傾向はモデル横断で共通しており、
   プロンプト側の改善余地が残っている（品質ゲートは漏洩の伏字化までしか対応しない）。
 - 画像・音声系モデル（`gemini-3.1-flash-image` 等）は本ベンチの対象外。
+
+---
+
+## 10. 本番デプロイ記録（2026-09-19）
+
+### デプロイ先
+既存の本番環境をそのまま更新（URL・D1の児童データ・R2の教材はすべて維持）。
+
+| 項目 | 値 |
+|------|-----|
+| 本番URL | https://jiyushindo-gakushu.pages.dev |
+| Cloudflare プロジェクト | `jiyushindo-gakushu`（ユーザー所有アカウント / BYOK） |
+| ブランチ | main |
+| D1 / KV / R2 | 既存バインディングを継続利用（スキーマ変更なし・マイグレーション不要） |
+
+### デプロイで発覚した重大障害：本番APIキーの失効
+
+デプロイ後に新設の監査API（`?live=1`）を実行したところ、**本番の全11モデルが 403** を返した。
+
+```
+Your API key was reported as leaked. Please use another API key.
+```
+
+本番の `GEMINI_API_KEY` が Google に漏洩キーとして無効化されており、
+**AI機能（カード生成・チャット・画像生成など）が全面停止していた**。
+デプロイ前から停止していた可能性が高いが、誰も気づいていなかった。
+
+→ 有効な鍵で `wrangler pages secret put GEMINI_API_KEY` を実行し再デプロイ。全11モデル復旧。
+
+**この障害は、まさに監査APIを作った目的どおりの検知だった。**
+定期的に `?live=1` を実行する運用を推奨する。
+
+### 漏洩の原因（未対応の課題）
+
+git 履歴に `.dev.vars` が含まれていた形跡があり、GitHub リモートが設定されている。
+
+```
+origin  https://github.com/koba06040603-ops/jiyushindo-gakushu.git
+7e428c0 Remove tracked .wrangler, .dev.vars, dist from git
+```
+
+- **現状**: `.dev.vars` は `.gitignore` 済み・git非追跡・`dist` にも鍵は焼き込まれていない（確認済み）
+- **ただし**: 過去コミット `7e428c0^` に旧鍵（`...bnPo`）が残存。GitHub が公開リポジトリなら
+  クローラが検出し Google に通報された可能性が高い
+- **現行鍵（`...fVvc`）は履歴中の鍵とは別物**のため即座の危険はない
+
+**推奨対応（要判断）**
+1. GitHub リポジトリが public なら private に変更する
+2. 履歴から鍵を除去する（`git filter-repo` 等）。ただし履歴改変は影響が大きいため要検討
+3. 旧鍵 `...bnPo` を Google AI Studio で明示的に失効させる
+4. 今後は本番鍵を `.dev.vars` に置かず、`wrangler pages secret` のみで管理する
+
+### デプロイ後の検証結果
+
+| 項目 | 結果 |
+|------|------|
+| トップページ / ログイン | ✅ 200・既存本番DBで認証成功 |
+| モデル監査 `?live=1` | ✅ 11/11 alive |
+| カード生成（6枚） | ✅ 18秒・答え漏洩0・例題重複0・解説不足0 |
+| 復旧した機能 | ✅ 漢字変換・なぜ探究・マインドマップ |
+| 静的アセット | ✅ `/static/app.js`・`/manifest.json` とも 200 |
