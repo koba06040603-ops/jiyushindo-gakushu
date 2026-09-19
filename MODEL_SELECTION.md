@@ -290,3 +290,69 @@ origin  https://github.com/koba06040603-ops/jiyushindo-gakushu.git
 | カード生成（6枚） | ✅ 18秒・答え漏洩0・例題重複0・解説不足0 |
 | 復旧した機能 | ✅ 漢字変換・なぜ探究・マインドマップ |
 | 静的アセット | ✅ `/static/app.js`・`/manifest.json` とも 200 |
+
+---
+
+## 11. 本番障害の修正記録：単元保存エラー（2026-09-19）
+
+### 症状
+本番で「この単元を保存して使用する」を押すと保存に失敗していた。
+
+```
+D1_ERROR: no such column: unit_id at offset 36: SQLITE_ERROR
+```
+
+### 原因：本番とローカルで optional_problems のスキーマが乖離
+
+| | カラム |
+|---|---|
+| **本番** | problem_id, **curriculum_id**, problem_number, problem_title, problem_description, **problem_content**, difficulty_level, learning_meaning, created_at, updated_at |
+| **ローカル** | problem_id, **unit_id**, problem_title, problem_type, difficulty_level, **content**, created_at, school_id |
+| 共通 | problem_id, problem_title, difficulty_level, created_at |
+
+コードはローカルスキーマ（`unit_id` / `content`）前提で書かれており、本番では列が存在せず失敗していた。
+
+### 対応：スキーマ互換レイヤー（既存の hint_cards と同方式）
+
+`src/index.tsx` に以下を実装。失敗したら反対スキーマで自動再試行し、成功した方を記憶する。
+
+| 関数 | 役割 |
+|------|------|
+| `optExec()` | スキーマ切替つき実行（run / all 両対応） |
+| `optInsert()` | 本番は正規化カラム、ローカルは content にJSON集約して保存 |
+| `optSelectByCurriculum()` | 読み出し時にローカルの content(JSON) を展開し本番形式へ正規化 |
+| `optDeleteByCurriculum()` | 単元IDでの削除 |
+
+初期値は**本番スキーマ優先**（本番での失敗を最小化するため）。
+
+### 併せて修正した潜在バグ
+
+- 選択問題の**削除・更新が存在しない主キー `id` を参照**していた（正しくは `problem_id`）
+- 選択課題取得のフォールバックが try / catch 両方とも `unit_id` で、**多段化が無意味**だった
+- 解答一覧JOIN・統計クエリ・単元複製も本番非対応カラムを直接参照していた
+
+### 検証方法
+
+ローカルDBの `optional_problems` を**本番と同一スキーマに一時入替**して両系統を実測した
+（検証後、トリガー11件を含め完全復元済み）。
+
+| スキーマ | 保存 | 読み出し |
+|---------|------|---------|
+| ローカル（unit_id） | ✅ 2件 | ✅ 2件（JSON展開が正常） |
+| 本番（curriculum_id） | ✅ 2件 | ✅ 2件（正規化カラムへ正しく格納） |
+
+### 本番デプロイ後の確認
+
+| 項目 | 結果 |
+|------|------|
+| 単元保存 | ✅ 成功（選択問題2件とも保存） |
+| 選択問題の読み出し | ✅ desc / content / meaning すべて復元 |
+| 単元削除 | ✅ 正常（テストデータは削除済み） |
+| カード生成 | ✅ 6枚14秒・漏洩0・重複0 |
+| モデル監査 | ✅ 11/11 正常 |
+
+### 教訓
+
+**ローカルDBと本番DBのスキーマが乖離していると、ローカルでどれだけテストしても本番で落ちる。**
+今回のように本番のみ存在するカラム構成がある場合は、
+`/api/debug/schema` で本番の実スキーマを確認してから実装すること。
