@@ -82,6 +82,16 @@ import { v4Api } from './v4-api'
 import { v4CardApi, fetchStudentRawData, buildProfilesFromD1, buildBehaviorFromD1, computeAdaptiveNext, buildV4PromptSection, determineCardTemplate } from './v4-card-integration'
 import { computeIntegratedControls, computeFundamentalAxes, understandCurrentPresence, ARCHETYPES } from './lib/v4-engine'
 import { evidenceApi } from './evidence-api'
+// 🔧 2026-09 AIモデル最適化: 構造化出力スキーマ + 堅牢JSONパーサ
+import {
+  buildGeminiConfig,
+  parseGeminiJSON,
+  CARDS_RESPONSE_SCHEMA,
+  COURSE_RESPONSE_SCHEMA,
+  LEARNING_STATE_SCHEMA,
+  FEEDBACK_SCHEMA,
+  GRADING_SCHEMA,
+} from './gemini-schemas'
 
 type Bindings = {
   DB: D1Database
@@ -116,24 +126,66 @@ export { ProgressWebSocket } from './websocket'
 // ローカルDB: card_id, hint_level, hint_text
 // 本番DB:     learning_card_id, hint_number, hint_content, thinking_tool_suggestion
 // ============================================================
-// Gemini モデル定数（2026年5月 Google I/O 2026 リリース反映）
-// カード生成・問題生成など品質重要タスク用（Gemini 3.5 Flash GA - 最高性能・4倍速）
-// 2026/5/19 GA: gemini-3.1 Pro を全ベンチで上回り、コーディング・エージェントに最強
-const GEMINI_MODEL_QUALITY = 'gemini-3.5-flash'
-// チャット・フィードバック・分析など軽量タスク用（Gemini 3.1 Flash Lite - 高速・低コスト・無料枠あり）
-// 注: 3.5 Flash Lite は未リリースのため 3.1 Lite を継続使用
-const GEMINI_MODEL_LITE = 'gemini-3.1-flash-lite-preview'
-// フォールバック1（Gemini 3 Flash Preview - 旧プライマリ）
-const GEMINI_MODEL_FALLBACK_PRIMARY = 'gemini-3-flash-preview'
-// フォールバック2（Gemini 2.5 Flash - 安定・無料枠あり）
-const GEMINI_MODEL_FALLBACK = 'gemini-2.5-flash'
-// 旧フォールバック（Gemini 2.0 Flash）
-const GEMINI_MODEL_LEGACY = 'gemini-2.0-flash'
-// マルチモーダル動画・画像生成用（Gemini Omni Flash - 2026/5 リリース）
-// 動画生成・編集・マルチモーダル創作に特化。Google AI+/Pro/Ultra で提供
-const GEMINI_MODEL_OMNI = 'gemini-omni-flash'
-// 画像生成フォールバック（Nano Banana 2 - 旧画像生成）
+// Gemini モデル定数 — 2026-09 実測ベンチマークに基づく最適化
+// ============================================================
+// 【選定根拠】scripts/bench/ の実測結果（MODEL_SELECTION.md 参照）
+//
+// ■ カード/問題生成（10枚・responseSchema適用・各5回試行 × 2ラウンド）
+//   モデル                  成功率   平均時間   品質(/60)   機械エラー
+//   gemini-3.7-flash        10/10    17.2s     54.9      0.4   ← 採用（最速×最高品質）
+//   gemini-3.8-flash        10/10    21.0s     52.2      0.2
+//   gemini-3.5-flash        10/10    49.3s     54.6      0.8   ← 旧設定（2.9倍遅い）
+//   gemini-3-flash-preview   5/5     34.9s     55.0      2.2
+//
+// ■ 重要: responseSchema（構造化出力）なしでは JSON 破損が多発
+//   3.8-flash: 成功 2/6 → 6/6、3.7-flash: 3/6 → 6/6 に改善。
+//   カード生成は必ず buildGeminiConfig() 経由でスキーマを付与すること。
+//
+// ■ 軽量タスク（学習状態分析・フィードバック）
+//   gemini-3.5-flash-lite / 3.1-flash-lite ともに品質100点・約0.9-1.2秒。
+//   3.5 Lite が GA 済みのため採用（thinking 0トークンで最小コスト）。
+//
+// ■ 旧設定の不具合（本改修で修正）
+//   gemini-2.0-flash / gemini-2.0-flash-lite / gemini-omni-flash / gemini-2.5-flash-lite
+//   は現在 404（提供終了）。フォールバック連鎖の末端が死んでいた。
+// ------------------------------------------------------------
+
+// 【品質重視】カード生成・問題生成・コース生成など、教育品質が直結するタスク
+// gemini-3.7-flash: 17秒・品質54.9/60。3.5-flash比で 2.9倍高速かつ同等以上の品質
+const GEMINI_MODEL_QUALITY = 'gemini-3.7-flash'
+
+// 【バランス】採点・要約・レポートなど中量タスク（品質最上位・やや低速）
+const GEMINI_MODEL_BALANCED = 'gemini-3.8-flash'
+
+// 【軽量・高頻度】チャット・状態分析・短文フィードバック（約1秒・thinking無し）
+const GEMINI_MODEL_LITE = 'gemini-3.5-flash-lite'
+
+// 【フォールバック連鎖】いずれも 2026-09 時点で 200 応答を実測確認済み
+const GEMINI_MODEL_FALLBACK_PRIMARY = 'gemini-3.8-flash'   // 1段目: 最高品質
+const GEMINI_MODEL_FALLBACK = 'gemini-3.5-flash'           // 2段目: 安定・実績
+const GEMINI_MODEL_LEGACY = 'gemini-3-flash-preview'       // 3段目: 旧プライマリ（2.0系は404のため置換）
+const GEMINI_MODEL_LITE_FALLBACK = 'gemini-3.1-flash-lite' // 軽量系フォールバック
+
+// 【マルチモーダル】
+const GEMINI_MODEL_OMNI = 'gemini-omni-flash-preview'      // 旧 'gemini-omni-flash' は404のため修正
+const GEMINI_MODEL_IMAGE = 'gemini-3.1-flash-image'        // 画像生成プライマリ（GA版）
 const GEMINI_MODEL_IMAGE_FALLBACK = 'gemini-3.1-flash-image-preview'
+const GEMINI_MODEL_IMAGE_PRO = 'gemini-3-pro-image'        // 高品質図版（GA版）
+
+// 【タスク別モデル解決ヘルパー】
+// 用途に応じた [プライマリ, フォールバック...] の配列を返す
+type GeminiTaskTier = 'quality' | 'balanced' | 'lite'
+function getModelChain(tier: GeminiTaskTier = 'quality'): string[] {
+  switch (tier) {
+    case 'lite':
+      return [GEMINI_MODEL_LITE, GEMINI_MODEL_LITE_FALLBACK, GEMINI_MODEL_FALLBACK]
+    case 'balanced':
+      return [GEMINI_MODEL_BALANCED, GEMINI_MODEL_QUALITY, GEMINI_MODEL_FALLBACK]
+    case 'quality':
+    default:
+      return [GEMINI_MODEL_QUALITY, GEMINI_MODEL_FALLBACK_PRIMARY, GEMINI_MODEL_FALLBACK, GEMINI_MODEL_LEGACY]
+  }
+}
 // ============================================================
 
 // ============================================================
@@ -266,6 +318,107 @@ function hintDeleteSQL(schema: HintSchema): string {
 
 function hintUpdateSQL(schema: HintSchema): string {
   return `UPDATE hint_cards SET ${schema.textCol} = ? WHERE hint_id = ?`
+}
+
+// ============================================================
+// 🔧 2026-09 AIモデル最適化: 学習カード 教育品質ゲート
+// ------------------------------------------------------------
+// responseSchema は構造（型・必須項目）は強制できるが、
+// 「ヒントに答えを書かない」「例題の答えを本題と変える」といった
+// 意味的な制約は強制できない。実測ベンチでもモデル横断で
+// scaffolding(足場) と leak_safety(漏洩) のスコアが落ちる主因だった。
+// そこで生成後にサーバー側で検出し、可能なものは自動是正する。
+// ============================================================
+interface CardQualityReport {
+  issues: string[]
+  fixed: number
+}
+
+function enforceCardQuality(cards: any[]): CardQualityReport {
+  const issues: string[] = []
+  let fixed = 0
+  if (!Array.isArray(cards)) return { issues: ['cards が配列でない'], fixed: 0 }
+
+  for (let i = 0; i < cards.length; i++) {
+    const card = cards[i]
+    const no = card?.card_number ?? i + 1
+    const answer = String(card?.answer ?? '').trim()
+    if (!answer) continue
+
+    // --- 1. 答えの漏洩検出（児童が問題を解く前に見えるフィールド） ---
+    // ヒント・新出用語・教師ヘルプ・AIメッセージに正解そのものが入ると学習効果がゼロになる
+    if (answer.length >= 2) {
+      const leakTargets: Array<{ label: string; get: () => string; set: (v: string) => void }> = []
+
+      if (Array.isArray(card.hints)) {
+        card.hints.forEach((h: any, hi: number) => {
+          leakTargets.push({
+            label: `hints[${hi}]`,
+            get: () => String(h?.hint_text ?? ''),
+            set: (v) => { h.hint_text = v },
+          })
+        })
+      }
+      for (const f of ['ai_teacher_message', 'ai_teacher_advice'] as const) {
+        leakTargets.push({
+          label: f,
+          get: () => String(card?.[f] ?? ''),
+          set: (v) => { card[f] = v },
+        })
+      }
+
+      for (const t of leakTargets) {
+        const text = t.get()
+        if (text && text.includes(answer)) {
+          // 正解文字列を伏字化して漏洩を断つ（文意は保ったまま答えだけ隠す）
+          t.set(text.split(answer).join('●●'))
+          issues.push(`カード${no}: ${t.label} に答え「${answer}」が漏洩 → 伏字化`)
+          fixed++
+        }
+      }
+
+      // 配列系フィールドは答えを含む要素ごと除去
+      for (const f of ['new_terms', 'teacher_help_keywords'] as const) {
+        if (Array.isArray(card[f])) {
+          const before = card[f].length
+          card[f] = card[f].filter((t: any) => !String(t ?? '').includes(answer))
+          if (card[f].length !== before) {
+            issues.push(`カード${no}: ${f} から答えを含む語を除去`)
+            fixed++
+          }
+        }
+      }
+    }
+
+    // --- 2. 例題の答えが本題と重複していないか ---
+    // 重複していると例題を見るだけで本題が解けてしまう
+    const exAnswer = String(card?.example_answer ?? '').trim()
+    if (exAnswer && exAnswer === answer) {
+      // 空にしてフロント側の例題再生成フローに委ねる（誤った例題を出すより安全）
+      card.example_answer = ''
+      card.example_question = ''
+      issues.push(`カード${no}: 例題の答えが本題と重複（${answer}）→ 例題をクリア`)
+      fixed++
+    }
+
+    // --- 3. 解説の実質性（途中式・過程が書かれているか） ---
+    const expl = String(card?.answer_explanation ?? '')
+    if (expl && expl.length < 100) {
+      issues.push(`カード${no}: 解説が${expl.length}字（推奨100字以上）`)
+    }
+
+    // --- 4. 自動採点用キーワードの担保 ---
+    if (!Array.isArray(card.answer_keywords) || card.answer_keywords.length < 3) {
+      const kw: string[] = Array.isArray(card.answer_keywords) ? [...card.answer_keywords] : []
+      if (answer && !kw.includes(answer)) kw.push(answer)
+      while (kw.length < 3) kw.push(answer)
+      card.answer_keywords = kw.slice(0, 5)
+      issues.push(`カード${no}: 採点キーワード不足 → 補完`)
+      fixed++
+    }
+  }
+
+  return { issues, fixed }
 }
 
 // JSON抽出ヘルパー（バッククォート対応）
@@ -17071,7 +17224,7 @@ app.post('/api/fix-all-examples', async (c) => {
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), 20000)
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_FALLBACK}:generateContent?key=${geminiApiKey}`,
           { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.8, maxOutputTokens: 500 } }) }
         )
@@ -17749,8 +17902,9 @@ ${customInfo}${mikataSection}
 12. 【★★★答え漏洩禁止★★★】new_terms, teacher_help_keywords, hints の hint_text, ai_teacher_message, ai_teacher_advice には、answer（正解）そのものを絶対に含めないこと。これらのフィールドは問題を解く前に児童に見える。答えがバレると学習効果がゼロになる。背景知識・考え方・アプローチ方法のみを書くこと
 13. 【★★★例題と本題の答え重複禁止★★★】example_answer と answer は絶対に同じ文字列にしてはいけない。同じ単語・同じフレーズも禁止。例題は本題の関連トピックだが、答えは必ず別の値にすること。違反例: answer=「ゲルマン系」, example_answer=「ゲルマン系」は禁止。正しい例: answer=「ゲルマン系」, example_answer=「ラテン系」`
 
-    // gemini-3.5-flash をプライマリ（Gemini 3.5 Flash GA・2026/5/19・4倍速・最高性能）
-    // フォールバック: gemini-3-flash-preview, gemini-2.5-flash（安定）, gemini-2.0-flash（レガシー）
+    // 🔧 2026-09 最適化: gemini-3.7-flash をプライマリ（実測17秒・品質54.9/60）
+    // 旧 gemini-3.5-flash は49秒と2.9倍遅く同等品質のため降格。
+    // フォールバック連鎖は全て 200 応答を実測確認済み（旧2.0系は404のため除去）
     const models = [GEMINI_MODEL_QUALITY, GEMINI_MODEL_FALLBACK_PRIMARY, GEMINI_MODEL_FALLBACK, GEMINI_MODEL_LEGACY]
     
     console.log(`📋 コース情報:`, {
@@ -17777,18 +17931,18 @@ ${customInfo}${mikataSection}
       let response: Response
       try {
         // thinking有効（ベンチマーク:thinking有効28秒 vs 無効51秒 — 有効の方が速い）
-        // responseMimeType: 'application/json' でJSONパース安定化
+        // 🔧 2026-09 最適化: responseSchema（構造化出力）を付与
+        //    実測: schema なし 成功2/6 → schema あり 6/6（JSON構造破損を解消）
         response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
+          generationConfig: buildGeminiConfig(COURSE_RESPONSE_SCHEMA, {
             temperature: 0.2,
-            maxOutputTokens: 16384,
-            responseMimeType: 'application/json'
-          }
+            maxOutputTokens: 16384
+          })
       })
     })
       } catch (fetchError: any) {
@@ -17938,8 +18092,16 @@ ${customInfo}${mikataSection}
           courseData = JSON.parse(fixedJson)
           console.log('✅ 手動修正JSON.parse成功（3回目）')
         } catch (parseError3) {
-          console.error('❌ すべてのパース方法が失敗しました')
-          throw new Error(`JSONパースエラー: ${parseError1.message}`)
+          // 4回目: 共通サルベージ層（末尾の余分な閉じ括弧などを段階的に修復）
+          // 実測で観測された破損パターン（...}]}] 等）に対応
+          const salvaged = parseGeminiJSON(aiResponse)
+          if (salvaged.ok) {
+            courseData = salvaged.data
+            console.log('✅ parseGeminiJSON サルベージ成功（4回目）')
+          } else {
+            console.error('❌ すべてのパース方法が失敗しました:', salvaged.error)
+            throw new Error(`JSONパースエラー: ${parseError1.message}`)
+          }
         }
       }
     }
@@ -18003,11 +18165,26 @@ ${customInfo}${mikataSection}
       }
     }
     
+    // ============================================================
+    // 🔧 2026-09 AI最適化: 教育品質ゲート（LLM が構造上守れない意味的制約を機械で担保）
+    // responseSchema は「型」は強制できるが「答えの漏洩」「例題の重複」といった
+    // 意味的制約は強制できない。実測でも 6枚中2枚に例題重複が発生したため、
+    // サーバー側で検出し自動是正する。
+    // ============================================================
+    const qualityReport = enforceCardQuality(courseData.cards)
+    if (qualityReport.issues.length > 0) {
+      console.warn('⚠️ 品質ゲート検出:', qualityReport.issues)
+      console.log(`🔧 自動是正: ${qualityReport.fixed}件`)
+    } else {
+      console.log('✅ 品質ゲート: 問題なし')
+    }
+
     console.log('✅ バリデーション成功:', {
       コース名: courseData.course_name || courseData.name,
       カード枚数: courseData.cards.length,
       使用モデル: modelName,
-      試行回数: attempt
+      試行回数: attempt,
+      品質是正: qualityReport.fixed
     })
     
     // 【新規】成功したのでループを抜ける
@@ -20944,7 +21121,9 @@ ${courses.results.map((c: any, i: number) => `${i + 1}. ${c.course_name}: ${c.de
 必ず完全なJSONのみを出力してください。説明文は不要です。`
 
     const response = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_QUALITY}:generateContent?key=' + apiKey,
+      // 🔧 2026-09 修正: シングルクォート内で ${} が展開されず、モデル名がリテラル
+      // 文字列としてURLに入り常に404になっていたバグを修正（追加問題生成が機能不全）
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_QUALITY}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -48497,7 +48676,7 @@ app.post('/api/ai/why-exploration', async (c) => {
 JSONのみ出力。`
 
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_LITE}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -48688,7 +48867,7 @@ app.post('/api/ai/generate-mindmap', async (c) => {
     ].join('\n')
 
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_LITE}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -48734,9 +48913,9 @@ app.post('/api/ai/recognize-handwriting', async (c) => {
 数式の場合は、算数の記号（＋、−、×、÷、＝）を使ってください。
 何も認識できない場合は空文字を返してください。`
 
-    // gemini-2.0-flash を使用（画像入力対応。flash-liteは非対応）
+    // 画像入力対応モデルを使用（lite系は画像非対応）。旧 gemini-2.0-flash は404のため置換
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_FALLBACK}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -48778,7 +48957,7 @@ app.post('/api/ai/kanji-convert', async (c) => {
   
   try {
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_FALLBACK}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -48896,7 +49075,7 @@ ${cleanedContent}
 - ★最重要: 答えの単語を絶対に発音しないこと★${forbiddenRule}`
 
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_LITE}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

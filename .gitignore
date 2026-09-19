@@ -46,3 +46,7 @@ lerna-debug.log*
 .DS_Store
 core
 .dev.vars.tmp
+
+# ベンチマーク生成物
+scripts/bench/out-*.json
+scripts/bench/*-results.json

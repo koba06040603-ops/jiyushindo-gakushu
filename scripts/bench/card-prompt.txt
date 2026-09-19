@@ -1,0 +1,17 @@
+あなたは小学校の自由進度学習を支援するAI教師です。
+小学5年生・算数・単元「分数のたし算とひき算（異分母）」の学習カードを10枚、JSONで生成してください。
+対象児童プロファイル: 視覚優位(visual)、ZPD位置30%（やや易しめ）、直近の正答率55%、フラストレーション傾向あり（足場を厚めに）
+
+出力形式(JSON):
+{"cards":[{"card_number":1,"title":"","learning_goal":"","question":"","answer":"","answer_keywords":["","",""],"answer_explanation":"途中式を含む100字以上","example_question":"","example_answer":"","hints":[{"hint_level":1,"hint_text":""},{"hint_level":2,"hint_text":""},{"hint_level":3,"hint_text":""}],"new_terms":[""],"ai_teacher_message":"","ai_teacher_advice":"","teacher_help_keywords":[""],"difficulty":"basic|standard|advanced","multimedia_ai_content":{"type":"illustration|diagram|animation","description":""}}]}
+
+厳守事項:
+1. JSONのみ出力
+2. answer_explanation には必ず途中式・計算過程を含め100字以上
+3. hints/new_terms/teacher_help_keywords/ai_teacher_message/ai_teacher_advice に answer(正解)そのものを絶対含めない
+4. example_answer と answer は絶対に同じ値・同じ単語にしない
+5. カード4枚目以降は応用的・発展的内容を含める
+6. 学習指導要領の目標水準に合わせる
+7. answerは自動採点できる明確な答えにし、answer_keywordsに判定用キーワード3つを設定
+8. 視覚優位の児童向けに multimedia_ai_content を全カードに設定
+9. 難易度は基礎→標準→発展へ段階的に配列すること

@@ -1,0 +1,216 @@
+/**
+ * Gemini 構造化出力（responseSchema）定義
+ * ============================================================
+ * 【背景】2026-09 実測ベンチマーク（scripts/bench/test-schema.mjs）にて、
+ * responseMimeType: 'application/json' のみでは 10枚カード生成時に
+ * JSON 構造破損（余分な括弧・未終端文字列）が高頻度で発生することを確認。
+ *
+ *   gemini-3.8-flash  schema なし: 成功 2/6  → schema あり: 6/6
+ *   gemini-3.7-flash  schema なし: 成功 3/6  → schema あり: 6/6
+ *
+ * finishReason は STOP（トークン切れではない）ため、maxOutputTokens 増加では
+ * 解決しない。responseSchema による構造強制が唯一の有効な対策。
+ *
+ * 本モジュールのスキーマを generationConfig.responseSchema に渡すこと。
+ */
+
+/** Gemini OpenAPI サブセット スキーマ型 */
+export interface GeminiSchema {
+  type: 'object' | 'array' | 'string' | 'integer' | 'number' | 'boolean'
+  properties?: Record<string, GeminiSchema>
+  items?: GeminiSchema
+  required?: string[]
+  enum?: string[]
+  description?: string
+  nullable?: boolean
+}
+
+// ============================================================
+// 1. 学習カード生成スキーマ（最重要 — 自由進度学習の中核）
+// ============================================================
+export const HINT_SCHEMA: GeminiSchema = {
+  type: 'object',
+  properties: {
+    hint_level: { type: 'integer', description: '1=気づきを促す, 2=方針を示す, 3=手順を示す（答えは書かない）' },
+    hint_text: { type: 'string', description: '答えそのものを含めないヒント文' },
+  },
+  required: ['hint_level', 'hint_text'],
+}
+
+export const MULTIMEDIA_SCHEMA: GeminiSchema = {
+  type: 'object',
+  properties: {
+    type: { type: 'string', description: 'illustration / diagram / animation / chart など' },
+    description: { type: 'string', description: '生成すべき視覚教材の具体的な説明' },
+  },
+  required: ['type', 'description'],
+}
+
+export const LEARNING_CARD_SCHEMA: GeminiSchema = {
+  type: 'object',
+  properties: {
+    card_number: { type: 'integer' },
+    title: { type: 'string' },
+    learning_goal: { type: 'string' },
+    question: { type: 'string' },
+    answer: { type: 'string' },
+    answer_keywords: { type: 'array', items: { type: 'string' }, description: '自動採点用キーワード3つ以上' },
+    answer_explanation: { type: 'string', description: '途中式・計算過程を含む100字以上の解説' },
+    example_question: { type: 'string' },
+    example_answer: { type: 'string', description: 'answer とは必ず異なる値' },
+    hints: { type: 'array', items: HINT_SCHEMA },
+    new_terms: { type: 'array', items: { type: 'string' } },
+    ai_teacher_message: { type: 'string' },
+    ai_teacher_advice: { type: 'string' },
+    teacher_help_keywords: { type: 'array', items: { type: 'string' } },
+    difficulty: { type: 'string', enum: ['basic', 'standard', 'advanced'] },
+    multimedia_ai_content: MULTIMEDIA_SCHEMA,
+  },
+  required: [
+    'card_number', 'title', 'question', 'answer', 'answer_keywords',
+    'answer_explanation', 'example_question', 'example_answer',
+    'hints', 'ai_teacher_message', 'difficulty',
+  ],
+}
+
+export const CARDS_RESPONSE_SCHEMA: GeminiSchema = {
+  type: 'object',
+  properties: { cards: { type: 'array', items: LEARNING_CARD_SCHEMA } },
+  required: ['cards'],
+}
+
+// ============================================================
+// 2. コース生成スキーマ（カード群 + コースメタ情報）
+// ============================================================
+export const COURSE_RESPONSE_SCHEMA: GeminiSchema = {
+  type: 'object',
+  properties: {
+    course_name: { type: 'string' },
+    course_description: { type: 'string' },
+    learning_objectives: { type: 'array', items: { type: 'string' } },
+    cards: { type: 'array', items: LEARNING_CARD_SCHEMA },
+  },
+  required: ['cards'],
+}
+
+// ============================================================
+// 3. 学習状態分析スキーマ（軽量・高頻度タスク）
+// ============================================================
+export const LEARNING_STATE_SCHEMA: GeminiSchema = {
+  type: 'object',
+  properties: {
+    state: { type: 'string', enum: ['stagnant', 'growing', 'mastered'] },
+    cause: { type: 'string' },
+    next_action: { type: 'string' },
+    difficulty_adjust: { type: 'integer', description: '-1=易しく, 0=維持, 1=難しく' },
+    encouragement: { type: 'string', description: '児童向けの励まし' },
+  },
+  required: ['state', 'next_action', 'difficulty_adjust', 'encouragement'],
+}
+
+// ============================================================
+// 4. 形成的フィードバックスキーマ
+// ============================================================
+export const FEEDBACK_SCHEMA: GeminiSchema = {
+  type: 'object',
+  properties: {
+    is_correct: { type: 'boolean' },
+    misconception: { type: 'string', description: '誤概念の特定' },
+    feedback: { type: 'string', description: '答えを教えず気づきを促す言葉がけ' },
+    next_hint: { type: 'string' },
+  },
+  required: ['is_correct', 'feedback'],
+}
+
+// ============================================================
+// 5. 記述式採点スキーマ
+// ============================================================
+export const GRADING_SCHEMA: GeminiSchema = {
+  type: 'object',
+  properties: {
+    score: { type: 'integer' },
+    max_score: { type: 'integer' },
+    is_correct: { type: 'boolean' },
+    matched_keywords: { type: 'array', items: { type: 'string' } },
+    missing_points: { type: 'array', items: { type: 'string' } },
+    feedback: { type: 'string' },
+  },
+  required: ['score', 'is_correct', 'feedback'],
+}
+
+// ============================================================
+// 生成設定ビルダー
+// ============================================================
+export interface GeminiGenConfig {
+  temperature: number
+  maxOutputTokens: number
+  responseMimeType?: string
+  responseSchema?: GeminiSchema
+  topP?: number
+}
+
+/**
+ * タスクに応じた generationConfig を生成する。
+ * schema を渡した場合、JSON 構造破損を防ぐ構造化出力モードになる。
+ *
+ * @param schema   responseSchema（省略時は mimeType のみの緩い JSON モード）
+ * @param opts     temperature / maxOutputTokens の上書き
+ */
+export function buildGeminiConfig(
+  schema?: GeminiSchema,
+  opts: Partial<Pick<GeminiGenConfig, 'temperature' | 'maxOutputTokens' | 'topP'>> = {}
+): GeminiGenConfig {
+  const cfg: GeminiGenConfig = {
+    temperature: opts.temperature ?? 0.2,
+    maxOutputTokens: opts.maxOutputTokens ?? 16384,
+    responseMimeType: 'application/json',
+  }
+  if (opts.topP !== undefined) cfg.topP = opts.topP
+  if (schema) cfg.responseSchema = schema
+  return cfg
+}
+
+/**
+ * Gemini 応答テキストを堅牢に JSON パースする。
+ * responseSchema 使用時でもまれに発生する破損に対するサルベージ層。
+ *
+ * 1. そのままパース
+ * 2. ```json フェンス除去
+ * 3. 最初の { 〜 最後の } を抽出
+ * 4. 末尾の余分な閉じ括弧を削除して再試行
+ */
+export function parseGeminiJSON<T = any>(raw: string): { ok: true; data: T } | { ok: false; error: string } {
+  if (!raw || !raw.trim()) return { ok: false, error: 'empty response' }
+
+  const attempts: string[] = []
+  const cleaned = raw.trim()
+  attempts.push(cleaned)
+
+  // フェンス除去
+  const defenced = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+  if (defenced !== cleaned) attempts.push(defenced)
+
+  // 最初の { 〜 最後の }
+  const first = defenced.indexOf('{')
+  const last = defenced.lastIndexOf('}')
+  if (first >= 0 && last > first) attempts.push(defenced.slice(first, last + 1))
+
+  for (const a of attempts) {
+    try {
+      return { ok: true, data: JSON.parse(a) as T }
+    } catch { /* 次の候補へ */ }
+  }
+
+  // 末尾の余分な閉じ括弧を1つずつ削って再試行（観測された破損パターン: ...}]}]）
+  let salvage = attempts[attempts.length - 1] ?? defenced
+  for (let i = 0; i < 5; i++) {
+    salvage = salvage.replace(/[\]\}]\s*$/, '').trimEnd()
+    for (const suffix of ['}', ']}', '"}]}', '"}]}]']) {
+      try {
+        return { ok: true, data: JSON.parse(salvage + suffix) as T }
+      } catch { /* 次へ */ }
+    }
+  }
+
+  return { ok: false, error: `JSON parse failed (len=${raw.length}, tail=${raw.slice(-60)})` }
+}
