@@ -356,3 +356,62 @@ D1_ERROR: no such column: unit_id at offset 36: SQLITE_ERROR
 **ローカルDBと本番DBのスキーマが乖離していると、ローカルでどれだけテストしても本番で落ちる。**
 今回のように本番のみ存在するカラム構成がある場合は、
 `/api/debug/schema` で本番の実スキーマを確認してから実装すること。
+
+---
+
+## 12. 本番障害の修正記録：学習のてびき読み込みエラー（2026-09-19）
+
+### 症状
+`/landing` で「データの読み込みに失敗しました」。
+`GET /api/learning-plan/:studentId/:curriculumId` が **500**（`Database error`）。
+
+### 原因：learning_plans / unit_reflections のスキーマ不足
+
+| テーブル | 本番の実態 | コードが要求 |
+|---------|-----------|-------------|
+| `learning_plans` | plan_id, student_id, **plan_date**, target_subject, target_unit, target_cards_count, target_time_minutes, motivation_level, strategy_choice, created_at | **curriculum_id, hour_number, subject, planned_date, learning_content, reflection_good/bad/learned, ai_feedback** |
+| `unit_reflections` | **テーブルごと存在しない**（migration 0088 未適用） | student_id, curriculum_id, reflection_good/bad/learned |
+
+「1日の学習計画」用の旧テーブルに、「単元の学習のてびき」機能を後から載せたが、
+本番へマイグレーションが適用されていなかった。
+
+### 対応
+
+1. **`migrations/0100_fix_learning_plans_schema.sql`** を追加
+   （既存の1日計画機能を壊さないよう、カラム追加＋テーブル新設の非破壊方式）
+2. **本番D1へAPIトークンの権限が無い**（`code: 7403`）ため wrangler から適用できず、
+   アプリ経由で冪等に修復する **`/api/admin/schema-repair`（admin限定）** を実装
+   - `GET` = 診断のみ / `POST` = 実行
+3. `plan_date` は旧スキーマで NOT NULL のため、未入力時は当日日付で補完
+4. `unit_reflections.plan_id` の NOT NULL は SQLite では後から外せないため、
+   制約エラーを検知したら `plan_id=0` で再試行するフォールバックをコード側に実装
+
+### 併せて修正
+
+- `/api/debug/schema` を `?tables=a,b,c` で任意テーブルを検査できるよう拡張
+  （本番/ローカルのスキーマ乖離調査を高速化）
+- `/favicon.svg` が 404（`dist/public/` にしかコピーされずルート直下に無かった）
+  → build スクリプトにルートへのコピーを追加
+
+### 本番デプロイ後の確認
+
+| 項目 | 結果 |
+|------|------|
+| `/landing` のJSエラー | ✅ **0件**（修正前は404が1件） |
+| 学習計画 GET | ✅ 200（修正前は500） |
+| 学習計画 保存→再取得 | ✅ 2件が正しく往復 |
+| 単元振り返りの保存 | ✅ 成功 |
+| スキーマ診断 | ✅ 修復不要 |
+| 単元保存 | ✅ 選択問題1件とも保存 |
+| カード生成 | ✅ 6枚16秒・漏洩0・重複0 |
+| モデル監査 | ✅ 11/11 正常 |
+
+### 運用メモ
+
+本番でスキーマ起因のエラーが出たら、まず以下で切り分けられる。
+
+```
+GET  /api/debug/schema?tables=<テーブル名>   # 本番の実カラムを確認
+GET  /api/admin/schema-repair                # 既知の不足を診断
+POST /api/admin/schema-repair                # 修復（冪等・再実行可）
+```

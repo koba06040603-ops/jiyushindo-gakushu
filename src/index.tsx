@@ -2056,12 +2056,18 @@ app.use('/api/debug/*', authMiddleware, requireRole('admin'))
 // 一時的DBスキーマ確認エンドポイント
 app.get('/api/debug/schema', async (c) => {
   const { env } = c
-  const tables = ['curriculum', 'courses', 'learning_cards', 'hint_cards', 'optional_problems', 'curriculum_metadata', 'retrieval_practice_content']
+  // ?tables=a,b,c で任意テーブルを検査可能（本番/ローカルのスキーマ乖離調査用）
+  const q = c.req.query('tables')
+  const tables = q
+    ? q.split(',').map((t) => t.trim()).filter((t) => /^[A-Za-z0-9_]+$/.test(t)).slice(0, 30)
+    : ['curriculum', 'courses', 'learning_cards', 'hint_cards', 'optional_problems',
+       'curriculum_metadata', 'retrieval_practice_content', 'learning_plans', 'unit_reflections']
   const result: any = {}
   for (const table of tables) {
     try {
       const info = await env.DB.prepare(`PRAGMA table_info(${table})`).all()
-      result[table] = (info.results || []).map((col: any) => ({ name: col.name, type: col.type, pk: col.pk }))
+      const cols = (info.results || []).map((col: any) => ({ name: col.name, type: col.type, pk: col.pk }))
+      result[table] = cols.length ? cols : { error: 'table not found' }
     } catch (e: any) {
       result[table] = { error: e.message }
     }
@@ -7762,24 +7768,29 @@ app.post('/api/learning-plan/save', async (c) => {
     
     // 新しい計画を保存
     for (const plan of plans) {
+      // 旧スキーマ由来の plan_date は NOT NULL 制約があるため必ず値を入れる
+      // （単元の学習のてびきでは planned_date を使うが、未入力のこともあるため今日の日付で代替）
+      const planDateValue = plan.planned_date || new Date().toISOString().slice(0, 10)
       await env.DB.prepare(`
         INSERT INTO learning_plans (
           student_id, 
           curriculum_id,
           hour_number,
           subject,
+          plan_date,
           planned_date,
           learning_content,
           reflection_good, 
           reflection_bad, 
           reflection_learned,
           ai_feedback
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         student_id,
         curriculum_id,
         plan.hour_number,
         plan.subject,
+        planDateValue,
         plan.planned_date || null,
         plan.learning_content || '',
         plan.reflection_good || '',
@@ -7791,21 +7802,34 @@ app.post('/api/learning-plan/save', async (c) => {
     
     // 単元全体の振り返りを保存
     if (unit_reflection && (unit_reflection.good || unit_reflection.bad || unit_reflection.learned)) {
-      await env.DB.prepare(`
-        INSERT INTO unit_reflections (
-          student_id, 
-          curriculum_id,
-          reflection_good, 
-          reflection_bad, 
-          reflection_learned
-        ) VALUES (?, ?, ?, ?, ?)
-      `).bind(
+      // 旧スキーマ（migration 0088 版）では plan_id が NOT NULL のため、
+      // まず plan_id 無しで試み、制約エラーなら 0 を入れて再試行する。
+      // SQLite は列の NOT NULL 制約を後から外せないため、コード側で吸収する。
+      const reflectionBinds = [
         student_id,
         curriculum_id,
         unit_reflection.good || '',
         unit_reflection.bad || '',
-        unit_reflection.learned || ''
-      ).run()
+        unit_reflection.learned || '',
+      ]
+      try {
+        await env.DB.prepare(`
+          INSERT INTO unit_reflections (
+            student_id, curriculum_id, reflection_good, reflection_bad, reflection_learned
+          ) VALUES (?, ?, ?, ?, ?)
+        `).bind(...reflectionBinds).run()
+      } catch (refErr: any) {
+        if (/NOT NULL constraint failed: unit_reflections\.plan_id/i.test(String(refErr?.message ?? refErr))) {
+          await env.DB.prepare(`
+            INSERT INTO unit_reflections (
+              plan_id, student_id, curriculum_id, reflection_good, reflection_bad, reflection_learned
+            ) VALUES (0, ?, ?, ?, ?, ?)
+          `).bind(...reflectionBinds).run()
+          console.log('📋 unit_reflections: 旧スキーマ検出 → plan_id=0 で保存')
+        } else {
+          throw refErr
+        }
+      }
     }
     
     return c.json({ success: true })
@@ -16566,6 +16590,125 @@ app.get('/api/admin/model-audit', authMiddleware, requireRole('admin'), async (c
     alert: dead.length > 0
       ? `⚠️ ${dead.length}件のモデルが利用できません。該当機能が停止している可能性があります: ${dead.map((d) => d.model).join(', ')}`
       : '✅ 全モデル正常',
+  })
+})
+
+// ============================================================
+// 🔧 スキーマ修復API（admin限定）
+// ------------------------------------------------------------
+// 本番D1にAPIトークンの権限が無く wrangler から直接マイグレーションを
+// 適用できないため、アプリ経由で不足カラム／テーブルを補う。
+// migrations/0100_fix_learning_plans_schema.sql と同じ内容を冪等に実行する。
+//   GET  /api/admin/schema-repair        … 現状診断のみ（変更しない）
+//   POST /api/admin/schema-repair        … 実行
+// ============================================================
+const SCHEMA_REPAIR_STATEMENTS: { label: string; sql: string }[] = [
+  // learning_plans: 単元の学習のてびき用カラム
+  { label: 'learning_plans.curriculum_id', sql: `ALTER TABLE learning_plans ADD COLUMN curriculum_id INTEGER` },
+  { label: 'learning_plans.hour_number', sql: `ALTER TABLE learning_plans ADD COLUMN hour_number INTEGER` },
+  { label: 'learning_plans.subject', sql: `ALTER TABLE learning_plans ADD COLUMN subject TEXT` },
+  { label: 'learning_plans.planned_date', sql: `ALTER TABLE learning_plans ADD COLUMN planned_date DATE` },
+  { label: 'learning_plans.learning_content', sql: `ALTER TABLE learning_plans ADD COLUMN learning_content TEXT` },
+  { label: 'learning_plans.reflection_good', sql: `ALTER TABLE learning_plans ADD COLUMN reflection_good TEXT` },
+  { label: 'learning_plans.reflection_bad', sql: `ALTER TABLE learning_plans ADD COLUMN reflection_bad TEXT` },
+  { label: 'learning_plans.reflection_learned', sql: `ALTER TABLE learning_plans ADD COLUMN reflection_learned TEXT` },
+  { label: 'learning_plans.ai_feedback', sql: `ALTER TABLE learning_plans ADD COLUMN ai_feedback TEXT` },
+  { label: 'idx_learning_plans_curriculum', sql: `CREATE INDEX IF NOT EXISTS idx_learning_plans_curriculum ON learning_plans(student_id, curriculum_id)` },
+  // unit_reflections: 単元全体の振り返り（plan_id は NULL 許容で作成）
+  { label: 'unit_reflections (create)', sql: `CREATE TABLE IF NOT EXISTS unit_reflections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      plan_id INTEGER,
+      student_id INTEGER NOT NULL,
+      curriculum_id INTEGER,
+      reflection_good TEXT,
+      reflection_bad TEXT,
+      reflection_learned TEXT,
+      goal_achievement TEXT,
+      most_important_learning TEXT,
+      effective_methods TEXT,
+      planning_reflection TEXT,
+      friend_learning TEXT,
+      next_unit_application TEXT,
+      ai_overall_evaluation TEXT,
+      metacognition_score REAL,
+      planning_score REAL,
+      method_score REAL,
+      collaboration_score REAL,
+      persistence_score REAL,
+      autonomy_score REAL,
+      growth_data TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )` },
+  // 旧 0088 版が既に存在する環境向けの追補
+  { label: 'unit_reflections.curriculum_id', sql: `ALTER TABLE unit_reflections ADD COLUMN curriculum_id INTEGER` },
+  { label: 'unit_reflections.reflection_good', sql: `ALTER TABLE unit_reflections ADD COLUMN reflection_good TEXT` },
+  { label: 'unit_reflections.reflection_bad', sql: `ALTER TABLE unit_reflections ADD COLUMN reflection_bad TEXT` },
+  { label: 'unit_reflections.reflection_learned', sql: `ALTER TABLE unit_reflections ADD COLUMN reflection_learned TEXT` },
+  { label: 'idx_unit_reflections_student', sql: `CREATE INDEX IF NOT EXISTS idx_unit_reflections_student ON unit_reflections(student_id, curriculum_id)` },
+]
+
+/** 期待カラムが揃っているかを診断する */
+async function diagnoseSchema(db: D1Database) {
+  const expect: Record<string, string[]> = {
+    learning_plans: ['curriculum_id', 'hour_number', 'subject', 'planned_date', 'learning_content',
+      'reflection_good', 'reflection_bad', 'reflection_learned', 'ai_feedback'],
+    unit_reflections: ['curriculum_id', 'reflection_good', 'reflection_bad', 'reflection_learned'],
+  }
+  const report: any = {}
+  for (const [table, cols] of Object.entries(expect)) {
+    try {
+      const info = await db.prepare(`PRAGMA table_info(${table})`).all()
+      const existing = (info.results || []).map((r: any) => r.name)
+      if (existing.length === 0) { report[table] = { exists: false, missing: cols }; continue }
+      const planIdRow = (info.results || []).find((r: any) => r.name === 'plan_id')
+      report[table] = {
+        exists: true,
+        missing: cols.filter((c2) => !existing.includes(c2)),
+        ...(table === 'unit_reflections' ? { plan_id_not_null: planIdRow ? !!planIdRow.notnull : null } : {}),
+      }
+    } catch (e: any) {
+      report[table] = { exists: false, error: e.message }
+    }
+  }
+  return report
+}
+
+app.get('/api/admin/schema-repair', authMiddleware, requireRole('admin'), async (c) => {
+  const report = await diagnoseSchema(c.env.DB)
+  const needsRepair = Object.values(report).some((r: any) => !r.exists || (r.missing && r.missing.length > 0))
+  return c.json({
+    success: true, diagnosis: report, needs_repair: needsRepair,
+    hint: needsRepair ? 'POST で修復を実行してください' : '修復は不要です',
+  })
+})
+
+app.post('/api/admin/schema-repair', authMiddleware, requireRole('admin'), async (c) => {
+  const { env } = c
+  const before = await diagnoseSchema(env.DB)
+  const applied: string[] = []
+  const skipped: string[] = []
+  const failed: { label: string; error: string }[] = []
+
+  for (const st of SCHEMA_REPAIR_STATEMENTS) {
+    try {
+      await env.DB.prepare(st.sql).run()
+      applied.push(st.label)
+    } catch (e: any) {
+      const msg = String(e?.message ?? e)
+      // 冪等性: 既に存在する場合は成功扱い
+      if (/duplicate column|already exists/i.test(msg)) skipped.push(st.label)
+      else failed.push({ label: st.label, error: msg.slice(0, 160) })
+    }
+  }
+
+  const after = await diagnoseSchema(env.DB)
+  const resolved = Object.values(after).every((r: any) => r.exists && (!r.missing || r.missing.length === 0))
+  return c.json({
+    success: failed.length === 0,
+    before, after, resolved,
+    applied, skipped, failed,
+    note: 'unit_reflections.plan_id の NOT NULL 制約は SQLite の仕様上その場で外せない。'
+      + ' plan_id_not_null が true の場合、単元単位の振り返り保存のみ失敗する（学習計画の保存は可能）。',
   })
 })
 
