@@ -352,6 +352,132 @@ function hintUpdateSQL(schema: HintSchema): string {
 }
 
 // ============================================================
+// optional_problems スキーマ互換レイヤー
+// ------------------------------------------------------------
+// 本番DBとローカルDBでカラム構成が異なるため、両対応させる。
+//   本番:     curriculum_id, problem_number, problem_description,
+//             problem_content, learning_meaning, updated_at
+//   ローカル: unit_id, problem_type, content, school_id
+// 共通:       problem_id, problem_title, difficulty_level, created_at
+//
+// 本番で「no such column: unit_id」により単元保存が失敗していたため追加。
+// hint_cards と同じく、失敗したら反対スキーマで自動再試行する方式。
+// ============================================================
+type OptionalProblemSchema = {
+  curriculumIdCol: string   // curriculum_id (本番) or unit_id (ローカル)
+  contentCol: string        // problem_content (本番) or content (ローカル)
+  isProd: boolean
+}
+
+const OPT_SCHEMA_PROD: OptionalProblemSchema = {
+  curriculumIdCol: 'curriculum_id', contentCol: 'problem_content', isProd: true,
+}
+const OPT_SCHEMA_LOCAL: OptionalProblemSchema = {
+  curriculumIdCol: 'unit_id', contentCol: 'content', isProd: false,
+}
+
+let optSchemaDetected: OptionalProblemSchema | null = null
+
+// 初期値は本番スキーマを優先（本番での失敗を最小化）
+function getOptSchema(): OptionalProblemSchema {
+  return optSchemaDetected || OPT_SCHEMA_PROD
+}
+
+/** スキーマ不一致時に反対スキーマで再試行する実行ヘルパー */
+async function optExec(
+  db: D1Database,
+  sqlFn: (s: OptionalProblemSchema) => string,
+  bindsFn: (s: OptionalProblemSchema) => any[],
+  mode: 'run' | 'all' = 'run'
+): Promise<any> {
+  const schema = getOptSchema()
+  const exec = async (s: OptionalProblemSchema) => {
+    const stmt = db.prepare(sqlFn(s)).bind(...bindsFn(s))
+    return mode === 'all' ? await stmt.all() : await stmt.run()
+  }
+  try {
+    const r = await exec(schema)
+    if (!optSchemaDetected) optSchemaDetected = schema
+    return r
+  } catch (e: any) {
+    const alt = schema === OPT_SCHEMA_PROD ? OPT_SCHEMA_LOCAL : OPT_SCHEMA_PROD
+    try {
+      const r = await exec(alt)
+      optSchemaDetected = alt
+      console.log(`📋 optional_problems スキーマを ${alt.curriculumIdCol} に自動補正`)
+      return r
+    } catch {
+      throw e // 両方失敗なら元のエラー
+    }
+  }
+}
+
+/** 選択問題を1件INSERT（両スキーマ対応） */
+async function optInsert(db: D1Database, curriculumId: any, problem: any, index: number): Promise<any> {
+  const title = problem.problem_title || problem.title || '選択問題'
+  const difficulty = problem.difficulty_level || 'standard'
+  const number = problem.problem_number || index + 1
+  // 本番は正規化カラム、ローカルはJSON一括。両方に同じ情報を保存する
+  const contentJson = JSON.stringify({
+    problem_number: number,
+    problem_description: problem.problem_description || problem.description || '',
+    problem_content: problem.problem_content || problem.content || '',
+    learning_meaning: problem.learning_meaning || '',
+    problem_type: problem.problem_type || 'optional',
+  })
+
+  return optExec(
+    db,
+    (s) => s.isProd
+      ? `INSERT INTO optional_problems (curriculum_id, problem_number, problem_title, problem_description, problem_content, difficulty_level, learning_meaning)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      : `INSERT INTO optional_problems (unit_id, problem_title, problem_type, difficulty_level, content)
+         VALUES (?, ?, ?, ?, ?)`,
+    (s) => s.isProd
+      ? [curriculumId, number, title,
+         problem.problem_description || problem.description || '',
+         problem.problem_content || problem.content || '',
+         difficulty, problem.learning_meaning || '']
+      : [curriculumId, title, problem.problem_type || 'optional', difficulty, contentJson]
+  )
+}
+
+/** 選択問題を単元IDで削除（両スキーマ対応） */
+async function optDeleteByCurriculum(db: D1Database, curriculumId: any): Promise<any> {
+  return optExec(
+    db,
+    (s) => `DELETE FROM optional_problems WHERE ${s.curriculumIdCol} = ?`,
+    () => [curriculumId]
+  )
+}
+
+/** 選択問題を単元IDで取得（両スキーマ対応・戻り値のカラム名を正規化） */
+async function optSelectByCurriculum(db: D1Database, curriculumId: any): Promise<any[]> {
+  const r = await optExec(
+    db,
+    (s) => `SELECT * FROM optional_problems WHERE ${s.curriculumIdCol} = ? ORDER BY problem_id`,
+    () => [curriculumId],
+    'all'
+  )
+  const rows = (r?.results || []) as any[]
+  // ローカルの content(JSON) を展開して本番形式に揃える
+  return rows.map((p, idx) => {
+    let parsed: any = {}
+    if (p.content) {
+      try { parsed = typeof p.content === 'string' ? JSON.parse(p.content) : p.content } catch { /* noop */ }
+    }
+    return {
+      ...parsed,
+      ...p,
+      problem_number: p.problem_number ?? parsed.problem_number ?? idx + 1,
+      problem_description: p.problem_description ?? parsed.problem_description ?? '',
+      problem_content: p.problem_content ?? parsed.problem_content ?? '',
+      learning_meaning: p.learning_meaning ?? parsed.learning_meaning ?? '',
+    }
+  })
+}
+
+// ============================================================
 // 🔧 2026-09 AIモデル最適化: 学習カード 教育品質ゲート
 // ------------------------------------------------------------
 // responseSchema は構造（型・必須項目）は強制できるが、
@@ -2151,7 +2277,7 @@ app.post('/api/debug/cleanup-duplicates', async (c) => {
             await env.DB.prepare(`DELETE FROM learning_cards WHERE course_id = ?`).bind(course.id).run()
           }
           await env.DB.prepare(`DELETE FROM courses WHERE curriculum_id = ?`).bind(delId).run()
-          await env.DB.prepare(`DELETE FROM optional_problems WHERE unit_id = ?`).bind(delId).run()
+          await optDeleteByCurriculum(env.DB, delId)
           await env.DB.prepare(`DELETE FROM curriculum_metadata WHERE curriculum_id = ?`).bind(delId).run()
           await env.DB.prepare(`DELETE FROM curriculum WHERE id = ?`).bind(delId).run()
         }
@@ -4955,13 +5081,7 @@ app.get('/api/curriculum/:id', async (c) => {
     let optionalWithNumber: any[] = []
     try {
       // 本番スキーマ: problem_id(PK), curriculum_id, problem_number, problem_title, problem_description, problem_content, difficulty_level, learning_meaning
-      const optionalProblems = await env.DB.prepare(`
-        SELECT problem_id, unit_id, problem_title, problem_type,
-               difficulty_level, content, created_at
-        FROM optional_problems 
-        WHERE unit_id = ?
-        ORDER BY problem_id
-      `).bind(id).all()
+      const optionalProblems = { results: await optSelectByCurriculum(env.DB, id) }
       optionalWithNumber = (optionalProblems.results || []).map((p: any, idx: number) => {
         let parsed = {}
         try { parsed = typeof p.content === 'string' ? JSON.parse(p.content) : (p.content || {}) } catch(e) {}
@@ -7472,20 +7592,26 @@ app.get('/api/answers/curriculum/:curriculumId', async (c) => {
       ORDER BY c.course_level, lc.card_number
     `).bind(curriculumId).all()
     
-    // 選択問題の解答
-    const optionalAnswers = await env.DB.prepare(`
-      SELECT 
-        op.problem_id,
-        op.problem_title,
-        op.content,
-        op.difficulty_level,
-        a.answer_content,
-        a.explanation
-      FROM optional_problems op
-      LEFT JOIN answers a ON op.problem_id = a.optional_problem_id
-      WHERE op.unit_id = ?
-      ORDER BY op.problem_id
-    `).bind(curriculumId).all()
+    // 選択問題の解答（スキーマ互換レイヤー経由: 本番 curriculum_id / ローカル unit_id）
+    // 内容カラムも本番 problem_content / ローカル content と異なるため s で切り替える
+    const optionalAnswers = await optExec(
+      env.DB,
+      (s) => `
+        SELECT
+          op.problem_id,
+          op.problem_title,
+          op.${s.contentCol} AS content,
+          op.difficulty_level,
+          a.answer_content,
+          a.explanation
+        FROM optional_problems op
+        LEFT JOIN answers a ON op.problem_id = a.optional_problem_id
+        WHERE op.${s.curriculumIdCol} = ?
+        ORDER BY op.problem_id
+      `,
+      () => [curriculumId],
+      'all'
+    )
     
     return c.json({
       cardAnswers: cardAnswers.results,
@@ -9511,8 +9637,7 @@ app.get('/guide/:curriculumId', async (c) => {
     }
     
     // 選択問題を取得
-    const optResult = await env.DB.prepare('SELECT * FROM optional_problems WHERE unit_id = ? ORDER BY problem_id').bind(curriculumId).all()
-    optionalProblems = (optResult.results || []) as any[]
+    optionalProblems = await optSelectByCurriculum(env.DB, curriculumId)
     
     // 個別コースの場合：個別用がなければカードベースの確認テスト・課題を自動生成
     if (isPersonalized) {
@@ -18678,7 +18803,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
         await env.DB.prepare(`DELETE FROM learning_cards WHERE course_id = ?`).bind(course.id).run()
       }
       await env.DB.prepare(`DELETE FROM courses WHERE curriculum_id = ?`).bind(curriculumId).run()
-      await env.DB.prepare(`DELETE FROM optional_problems WHERE unit_id = ?`).bind(curriculumId).run()
+      await optDeleteByCurriculum(env.DB, curriculumId)
       await env.DB.prepare(`DELETE FROM curriculum_metadata WHERE curriculum_id = ?`).bind(curriculumId).run()
       
       // メタデータ更新
@@ -18997,22 +19122,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
     // ============================================================
     for (let pi = 0; pi < (optionalProblems || []).length; pi++) {
       const problem = optionalProblems[pi]
-      await env.DB.prepare(`
-        INSERT INTO optional_problems (
-          unit_id, problem_title, problem_type, difficulty_level, content
-        ) VALUES (?, ?, ?, ?, ?)
-      `).bind(
-        curriculumId,
-        problem.problem_title || problem.title || '選択問題',
-        problem.problem_type || 'optional',
-        problem.difficulty_level || 'standard',
-        JSON.stringify({
-          problem_number: problem.problem_number || (pi + 1),
-          problem_description: problem.problem_description || problem.content || problem.problem_content || '',
-          problem_content: problem.problem_content || problem.content || problem.problem_description || '',
-          learning_meaning: problem.learning_meaning || ''
-        })
-      ).run()
+      await optInsert(env.DB, curriculumId, problem, pi)
     }
     
     // ============================================================
@@ -20713,22 +20823,7 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
         const problem = problems.optional_problems[oi]
         console.log(`  - 問題${problem.problem_number || oi+1}: ${problem.problem_title}`)
         // 本番スキーマ: problem_id, curriculum_id, problem_number, problem_title, problem_description, problem_content, difficulty_level, learning_meaning
-        await env.DB.prepare(`
-          INSERT INTO optional_problems (
-            unit_id, problem_title, problem_type, difficulty_level, content
-          ) VALUES (?, ?, ?, ?, ?)
-        `).bind(
-          curriculumId,
-          problem.problem_title || '問題',
-          problem.problem_type || 'optional',
-          problem.difficulty_level || 'standard',
-          JSON.stringify({
-            problem_number: problem.problem_number || (oi + 1),
-            problem_description: problem.problem_description || problem.problem_content || problem.content || '',
-            problem_content: problem.problem_content || problem.problem_description || problem.content || '',
-            learning_meaning: problem.learning_meaning || ''
-          })
-        ).run()
+        await optInsert(env.DB, curriculumId, problem, oi)
       }
     } else {
       console.warn('optional_problemsが見つかりません')
@@ -20953,17 +21048,11 @@ app.get('/api/curriculum/:curriculumId/optional-problems', async (c) => {
   const curriculumId = c.req.param('curriculumId')
   
   try {
-    // 実スキーマ: problem_id, unit_id, problem_title, problem_type, difficulty_level, content, created_at
-    const problems = await env.DB.prepare(`
-      SELECT problem_id, unit_id, problem_title, problem_type,
-             difficulty_level, content, created_at
-      FROM optional_problems 
-      WHERE unit_id = ? 
-      ORDER BY problem_id
-    `).bind(curriculumId).all()
-    
+    // スキーマ互換レイヤー経由（本番 curriculum_id / ローカル unit_id 両対応）
+    const problems = await optSelectByCurriculum(env.DB, curriculumId)
+
     // problem_number を付与
-    const problemsWithNumber = (problems.results || []).map((p: any, idx: number) => ({
+    const problemsWithNumber = problems.map((p: any, idx: number) => ({
       ...p,
       problem_number: p.problem_number || idx + 1
     }))
@@ -21304,22 +21393,7 @@ ${courses.results.map((c: any, i: number) => `${i + 1}. ${c.course_name}: ${c.de
     // 選択問題
     if (additionalProblems.optional_problems) {
       for (const problem of additionalProblems.optional_problems) {
-        await env.DB.prepare(`
-          INSERT INTO optional_problems (
-            unit_id, problem_title, problem_type, difficulty_level, content
-          ) VALUES (?, ?, ?, ?, ?)
-        `).bind(
-          curriculumId,
-          problem.problem_title || '問題',
-          problem.problem_type || 'optional',
-          problem.difficulty_level || 'medium',
-          JSON.stringify({
-            problem_number: problem.problem_number,
-            problem_content: problem.problem_content || problem.problem_description || '問題内容',
-            problem_description: problem.problem_description || problem.problem_content || '問題の説明',
-            learning_meaning: problem.learning_meaning || ''
-          })
-        ).run()
+        await optInsert(env.DB, curriculumId, problem, (problem.problem_number ? problem.problem_number - 1 : 0))
       }
     }
     
@@ -21519,9 +21593,7 @@ app.delete('/api/curriculum/:id', async (c) => {
     console.log(`  - メタデータ削除完了`)
     
     // 5. 選択問題を削除
-    await env.DB.prepare(`
-      DELETE FROM optional_problems WHERE unit_id = ?
-    `).bind(id).run()
+    await optDeleteByCurriculum(env.DB, id)
     console.log(`  - 選択問題削除完了`)
     
     // 6. カリキュラム本体を削除
@@ -21652,22 +21724,10 @@ app.post('/api/curriculum/:id/duplicate', async (c) => {
     }
     
     // 選択問題をコピー
-    const optionalProblems = await env.DB.prepare(`
-      SELECT * FROM optional_problems WHERE unit_id = ?
-    `).bind(sourceId).all()
-    
-    for (const problem of optionalProblems.results) {
-      await env.DB.prepare(`
-        INSERT INTO optional_problems (
-          unit_id, problem_title, problem_type, difficulty_level, content
-        ) VALUES (?, ?, ?, ?, ?)
-      `).bind(
-        newCurriculumId,
-        (problem as any).problem_title,
-        (problem as any).problem_type || 'optional',
-        (problem as any).difficulty_level,
-        (problem as any).content || '{}'
-      ).run()
+    const optionalProblems = await optSelectByCurriculum(env.DB, sourceId)
+
+    for (let opi = 0; opi < optionalProblems.length; opi++) {
+      await optInsert(env.DB, newCurriculumId, optionalProblems[opi], opi)
     }
     
     console.log(`✅ 単元複製完了: newId=${newCurriculumId}`)
@@ -21729,7 +21789,7 @@ app.delete('/api/optional-problem/:id', async (c) => {
   
   try {
     await env.DB.prepare(`
-      DELETE FROM optional_problems WHERE id = ?
+      DELETE FROM optional_problems WHERE problem_id = ?
     `).bind(problemId).run()
     
     return c.json({
@@ -21775,19 +21835,29 @@ app.put('/api/optional-problem/:id', async (c) => {
       }, 400)
     }
     
-    await env.DB.prepare(`
-      UPDATE optional_problems
-      SET problem_title = ?, problem_description = ?, 
-          problem_content = ?, difficulty_level = ?, learning_meaning = ?
-      WHERE id = ?
-    `).bind(
-      problem_title.trim(),
-      problem_description.trim(),
-      problem_content || '',
-      difficulty_level,
-      learning_meaning || '',
-      problemId
-    ).run()
+    // スキーマ互換レイヤー経由（本番は正規化カラム / ローカルは content にJSON集約）
+    // 主キーは problem_id（旧コードは存在しない id を参照していた）
+    await optExec(
+      env.DB,
+      (s) => s.isProd
+        ? `UPDATE optional_problems
+           SET problem_title = ?, problem_description = ?,
+               problem_content = ?, difficulty_level = ?, learning_meaning = ?
+           WHERE problem_id = ?`
+        : `UPDATE optional_problems
+           SET problem_title = ?, difficulty_level = ?, content = ?
+           WHERE problem_id = ?`,
+      (s) => s.isProd
+        ? [problem_title.trim(), problem_description.trim(), problem_content || '',
+           difficulty_level, learning_meaning || '', problemId]
+        : [problem_title.trim(), difficulty_level,
+           JSON.stringify({
+             problem_description: problem_description.trim(),
+             problem_content: problem_content || '',
+             learning_meaning: learning_meaning || '',
+           }),
+           problemId]
+    )
     
     return c.json({
       success: true,
@@ -21813,31 +21883,13 @@ app.post('/api/curriculum/:id/optional-problem', async (c) => {
   console.log('📝 選択問題追加リクエスト:', { curriculumId, body })
   
   try {
-    // 既存の問題数を取得して次の番号を決定
-    const countResult: any = await env.DB.prepare(`
-      SELECT COUNT(*) as count FROM optional_problems WHERE unit_id = ?
-    `).bind(curriculumId).first()
-    
-    const nextProblemNumber = (countResult?.count || 0) + 1
+    // 既存の問題数を取得して次の番号を決定（スキーマ互換レイヤー経由）
+    const existingOptional = await optSelectByCurriculum(env.DB, curriculumId)
+    const nextProblemNumber = existingOptional.length + 1
     
     console.log('📝 次の問題番号:', nextProblemNumber)
     
-    const result = await env.DB.prepare(`
-      INSERT INTO optional_problems (
-        unit_id, problem_title, problem_type, difficulty_level, content
-      ) VALUES (?, ?, ?, ?, ?)
-    `).bind(
-      curriculumId,
-      problem_title || '問題',
-      problem_category || 'optional',
-      'standard',
-      JSON.stringify({
-        problem_number: nextProblemNumber,
-        problem_description: problem_description || '問題の説明',
-        problem_content: problem_content || problem_description || '問題内容',
-        learning_meaning: learning_meaning || ''
-      })
-    ).run()
+    const result = await optInsert(env.DB, curriculumId, problem, (problem.problem_number ? problem.problem_number - 1 : 0))
     
     console.log('✅ 選択問題追加成功:', result.meta.last_row_id)
     
@@ -22815,13 +22867,19 @@ app.get('/api/system/stats', async (c) => {
       FROM learning_cards
     `).first()
     
-    // 選択問題統計
-    const optionalProblemStats = await env.DB.prepare(`
-      SELECT 
+    // 選択問題統計（スキーマ互換レイヤー経由: 本番 curriculum_id / ローカル unit_id）
+    const optionalStatsRes = await optExec(
+      env.DB,
+      (s) => `SELECT
         COUNT(*) as total_optional_problems,
-        COUNT(DISTINCT curriculum_id) as curriculums_with_optional_problems
-      FROM optional_problems
-    `).first()
+        COUNT(DISTINCT ${s.curriculumIdCol}) as curriculums_with_optional_problems
+      FROM optional_problems`,
+      () => [],
+      'all'
+    )
+    const optionalProblemStats = (optionalStatsRes?.results || [])[0] || {
+      total_optional_problems: 0, curriculums_with_optional_problems: 0,
+    }
     
     return c.json({
       success: true,
@@ -47243,24 +47301,11 @@ app.get('/api/student-learning/tebiki', async (c) => {
     // 4. 選択課題取得
     let optionalProblems: any[] = []
     try {
-      // optional_problems: problem_id, unit_id, problem_title, content, difficulty_level, problem_type
-      const optRes = await env.DB.prepare(`
-        SELECT problem_id, unit_id, problem_title, 
-               content AS problem_content,
-               difficulty_level, problem_type,
-               ROW_NUMBER() OVER (ORDER BY problem_id) AS problem_number
-        FROM optional_problems WHERE unit_id = ?
-      `).bind(curriculum.id).all()
-      optionalProblems = optRes.results || []
-    } catch {
-      try {
-        // curriculum_id で再試行（別スキーマ対応）
-        const optRes2 = await env.DB.prepare(`
-          SELECT *, ROW_NUMBER() OVER (ORDER BY problem_id) AS problem_number 
-          FROM optional_problems WHERE unit_id = ?
-        `).bind(curriculum.id).all()
-        optionalProblems = optRes2.results || []
-      } catch {}
+      // スキーマ互換レイヤー経由（本番 curriculum_id / ローカル unit_id 両対応）
+      const rows = await optSelectByCurriculum(env.DB, curriculum.id)
+      optionalProblems = rows.map((r: any, i: number) => ({ ...r, problem_number: r.problem_number ?? i + 1 }))
+    } catch (e: any) {
+      console.warn('選択課題の取得に失敗:', e?.message)
     }
 
     // 5. メタデータ取得（コース選択問題・共通チェックテスト）
