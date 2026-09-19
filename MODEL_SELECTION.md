@@ -139,7 +139,61 @@ run 3: ✅ 8枚 17秒 | 答え漏洩=0 例題重複=0 解説不足=1
 
 ---
 
-## 7. 実装ファイル
+## 7. 使用状況の確認方法（運用）
+
+モデルは提供終了が予告なく起こる（実際に 2026-09 に gemini-2.0 系が一斉終了し
+6機能が無言で壊れていた）。以下2つの手段で定期的に確認すること。
+
+### 7-1. 監査API（admin限定・本番で使える）
+
+```
+GET /api/admin/model-audit          # 構成一覧のみ（即時）
+GET /api/admin/model-audit?live=1   # 実APIを叩いて生死確認（約15秒）
+```
+
+`live=1` は全モデルへ実際にリクエストを送り、`alive` 判定を返す。
+画像は `responseModalities:['IMAGE']`、TTS は読み上げ指示文＋`['AUDIO']` と
+**用途別の正しいパラメータで検査**する（単語だけ渡すとTTSが誤検知するため）。
+
+```json
+{ "summary": { "total": 11, "alive": 11, "dead": 0 }, "alert": "✅ 全モデル正常" }
+```
+
+### 7-2. 静的監査スクリプト（開発時）
+
+```bash
+node scripts/bench/audit-models.mjs --live
+```
+
+エンドポイント別の使用モデル一覧、ハードコード箇所、未使用定数、
+**シングルクォート内 `${}` の展開バグ**を検出する。
+
+### 現在の状態（2026-09 時点）
+
+| 項目 | 状態 |
+|------|------|
+| Gemini API 呼び出し総数 | 85箇所 |
+| 定数管理 | 71箇所 |
+| **ハードコード** | **0箇所** ✅ |
+| テンプレート展開バグ | 0箇所 ✅ |
+| モデル生存 | **11/11** ✅ |
+
+### モデル割り当て一覧
+
+| 区分 | 定数 | モデル | 主な適用先 |
+|------|------|--------|-----------|
+| テキスト品質 | `GEMINI_MODEL_QUALITY` | gemini-3.7-flash | カード/問題/コース生成、単元分析、記述採点 |
+| テキスト軽量 | `GEMINI_MODEL_LITE` | gemini-3.5-flash-lite | AIチャット、誤答分析、励まし、振り返り分析 |
+| 画像 | `GEMINI_MODEL_IMAGE` | gemini-3.1-flash-image | ヒント画像、絵本、触覚ウィジェット、教材図版 |
+| 画像(高品質) | `GEMINI_MODEL_IMAGE_PRO` | gemini-3-pro-image | `/api/ai/generate-image` の第1段 |
+| 音声 | `GEMINI_MODEL_TTS` | gemini-2.5-flash-preview-tts | `/api/ai/tts` 読み上げ |
+
+> 注: `gemini-omni-flash` 系は `generateContent` 非対応（"This model only supports
+> Interactions API"）のため定数ごと廃止した。
+
+---
+
+## 8. 実装ファイル
 
 | ファイル | 内容 |
 |---------|------|
@@ -150,6 +204,8 @@ run 3: ✅ 8枚 17秒 | 答え漏洩=0 例題重複=0 解説不足=1
 | `scripts/bench/bench-quality.mjs` | 10枚生成 + LLM-as-Judge 品質評価 |
 | `scripts/bench/bench-stability.mjs` | N回並列実行による安定性・分散計測 |
 | `scripts/bench/test-schema.mjs` | responseSchema 有無の A/B 検証 |
+| `scripts/bench/audit-models.mjs` | モデル使用状況の静的監査＋生死確認 |
+| `src/index.tsx` `GET /api/admin/model-audit` | 運用時のモデル監査API（admin限定） |
 
 ### 再検証の方法
 
@@ -165,7 +221,7 @@ N=5 node scripts/bench/bench-stability.mjs gemini-3.7-flash      # 安定性
 
 ---
 
-## 8. 既知の限界
+## 9. 既知の限界
 
 - **LLM-as-Judge のスコアには分散がある**（同一モデルで 46〜59 のばらつき）。
   単発の結果でモデルを決めず、最低5回試行の平均で判断すること。

@@ -167,10 +167,14 @@ const GEMINI_MODEL_LEGACY = 'gemini-3-flash-preview'       // 3段目: 旧プラ
 const GEMINI_MODEL_LITE_FALLBACK = 'gemini-3.1-flash-lite' // 軽量系フォールバック
 
 // 【マルチモーダル】
-const GEMINI_MODEL_OMNI = 'gemini-omni-flash-preview'      // 旧 'gemini-omni-flash' は404のため修正
-const GEMINI_MODEL_IMAGE = 'gemini-3.1-flash-image'        // 画像生成プライマリ（GA版）
-const GEMINI_MODEL_IMAGE_FALLBACK = 'gemini-3.1-flash-image-preview'
-const GEMINI_MODEL_IMAGE_PRO = 'gemini-3-pro-image'        // 高品質図版（GA版）
+// 注: gemini-omni-flash 系は generateContent 非対応（"This model only supports
+//     Interactions API"）。本システムは generateContent のみを使うため定数を廃止した。
+const GEMINI_MODEL_IMAGE = 'gemini-3.1-flash-image'              // 画像生成プライマリ（GA版）
+const GEMINI_MODEL_IMAGE_FALLBACK = 'gemini-3.1-flash-image-preview' // 画像生成フォールバック（preview）
+const GEMINI_MODEL_IMAGE_PRO = 'gemini-3-pro-image'              // 高品質図版（GA版）
+const GEMINI_MODEL_IMAGE_LEGACY = 'gemini-2.5-flash-image'       // 画像生成 最終フォールバック（旧世代・200確認済み）
+// TTS（音声合成）: responseModalities:['AUDIO'] が必須。TEXT では 400 になる
+const GEMINI_MODEL_TTS = 'gemini-2.5-flash-preview-tts'
 
 // 【タスク別モデル解決ヘルパー】
 // 用途に応じた [プライマリ, フォールバック...] の配列を返す
@@ -186,6 +190,33 @@ function getModelChain(tier: GeminiTaskTier = 'quality'): string[] {
       return [GEMINI_MODEL_QUALITY, GEMINI_MODEL_FALLBACK_PRIMARY, GEMINI_MODEL_FALLBACK, GEMINI_MODEL_LEGACY]
   }
 }
+
+// 【モデル構成の一覧】監査API・運用確認用
+const GEMINI_MODEL_REGISTRY = {
+  text: {
+    quality: GEMINI_MODEL_QUALITY,
+    balanced: GEMINI_MODEL_BALANCED,
+    lite: GEMINI_MODEL_LITE,
+  },
+  fallback: {
+    primary: GEMINI_MODEL_FALLBACK_PRIMARY,
+    secondary: GEMINI_MODEL_FALLBACK,
+    legacy: GEMINI_MODEL_LEGACY,
+    lite: GEMINI_MODEL_LITE_FALLBACK,
+  },
+  image: {
+    primary: GEMINI_MODEL_IMAGE,
+    fallback: GEMINI_MODEL_IMAGE_FALLBACK,
+    pro: GEMINI_MODEL_IMAGE_PRO,
+    legacy: GEMINI_MODEL_IMAGE_LEGACY,
+  },
+  audio: { tts: GEMINI_MODEL_TTS },
+  chains: {
+    quality: getModelChain('quality'),
+    balanced: getModelChain('balanced'),
+    lite: getModelChain('lite'),
+  },
+} as const
 // ============================================================
 
 // ============================================================
@@ -16326,6 +16357,93 @@ ${specificInstructions}
   }
 })
 
+// ============================================================
+// 🔍 AIモデル使用状況 監査API（admin限定）
+// 現在どのモデルが、どのティアに割り当てられているかを一覧化し、
+// 各モデルが実際に API 上で生きているか（提供終了していないか）を確認する。
+// 2026-09 に gemini-2.0 系が一斉に提供終了し、6機能が無言で壊れていた事故を
+// 二度と起こさないための運用ツール。
+//   GET /api/admin/model-audit        … 構成一覧のみ（即時）
+//   GET /api/admin/model-audit?live=1 … 実 API を叩いて生死確認（数秒）
+// ============================================================
+app.get('/api/admin/model-audit', authMiddleware, requireRole('admin'), async (c) => {
+  const { env } = c
+  const live = c.req.query('live') === '1'
+  const apiKey = env.GEMINI_API_KEY
+
+  const registry = GEMINI_MODEL_REGISTRY
+  const result: any = {
+    success: true,
+    checked_at: new Date().toISOString(),
+    registry,
+    note: 'ベンチマーク根拠は MODEL_SELECTION.md を参照',
+  }
+
+  if (!live) {
+    result.hint = 'live=1 を付けると各モデルの生死を実APIで確認します'
+    return c.json(result)
+  }
+
+  if (!apiKey || apiKey === 'your-gemini-api-key-here') {
+    return c.json({ ...result, success: false, error: 'GEMINI_API_KEY が未設定のため生死確認できません' }, 500)
+  }
+
+  // 重複を除いた全モデルを並列でヘルスチェック
+  const all = Array.from(new Set([
+    ...Object.values(registry.text),
+    ...Object.values(registry.fallback),
+    ...Object.values(registry.image),
+    ...Object.values(registry.audio),
+  ]))
+
+  const checks = await Promise.all(all.map(async (model) => {
+    const post = async (body: any) => {
+      const ctrl = new AbortController()
+      const timer = setTimeout(() => ctrl.abort(), 20000)
+      try {
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctrl.signal }
+        )
+        clearTimeout(timer)
+        let message = ''
+        if (!r.ok) { try { message = ((await r.json()) as any)?.error?.message ?? '' } catch { /* noop */ } }
+        return { status: r.status, message }
+      } catch (e: any) {
+        clearTimeout(timer)
+        return { status: 0, message: e?.message ?? 'network error' }
+      }
+    }
+
+    // 画像/音声モデルは専用の responseModalities が必須なので用途別に検査する
+    let res
+    if (model.includes('image')) {
+      res = await post({ contents: [{ parts: [{ text: 'a simple red circle' }] }], generationConfig: { responseModalities: ['IMAGE'] } })
+    } else if (model.includes('tts')) {
+      // TTS は「読み上げさせる文」を渡さないとモデルがテキスト応答を試みて 400 になる。
+      // 単語だけだと誤検知するため、明確な読み上げ指示付きの文を渡す。
+      res = await post({
+        contents: [{ parts: [{ text: '次の文を読み上げてください: こんにちは、テストです。' }] }],
+        generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } } },
+      })
+    } else {
+      res = await post({ contents: [{ parts: [{ text: 'ping' }] }], generationConfig: { maxOutputTokens: 10 } })
+    }
+
+    return { model, alive: res.status === 200, status: res.status, message: res.message.slice(0, 160) }
+  }))
+
+  const dead = checks.filter((x) => !x.alive)
+  return c.json({
+    ...result,
+    health: checks.sort((a, b) => Number(a.alive) - Number(b.alive)),
+    summary: { total: checks.length, alive: checks.length - dead.length, dead: dead.length },
+    alert: dead.length > 0
+      ? `⚠️ ${dead.length}件のモデルが利用できません。該当機能が停止している可能性があります: ${dead.map((d) => d.model).join(', ')}`
+      : '✅ 全モデル正常',
+  })
+})
+
 // デバッグ用: Gemini API接続テスト
 app.get('/api/ai/test-gemini', async (c) => {
   const { env } = c
@@ -17356,7 +17474,7 @@ ${truncatedText}`
       const ttsTimeout = setTimeout(() => ttsAbort.abort(), 25000)
       
       const ttsResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_TTS}:generateContent`,
         {
           method: 'POST',
           headers: {
@@ -18976,7 +19094,7 @@ ${cardAns ? `※再確認: 「${cardAns}」を図に含めないこと。` : ''}
           
           try {
             const resp = await fetch(
-              'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent',
+              `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_IMAGE}:generateContent`,
               {
                 method: 'POST',
                 headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
@@ -27630,7 +27748,7 @@ ${cardAnswer ? `5. ★★★「${cardAnswer}」を図の中に絶対に書かな
   // Nano Banana 2 (gemini-3.1-flash-image-preview)
   try {
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_IMAGE}:generateContent`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
@@ -27718,7 +27836,7 @@ Style requirements:
   try {
     console.log('🎨 導入ストーリーブック画像生成開始...')
     const resp = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent',
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_IMAGE}:generateContent`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
@@ -27849,7 +27967,7 @@ Requirements:
 - About 30 seconds long`
 
       const audioResp = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent',
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_IMAGE}:generateContent`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
@@ -28283,7 +28401,7 @@ ${forbiddenNote}
 
     // Nano Banana 2 でウィジェットHTML + 説明画像を生成
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_IMAGE}:generateContent`,
       {
         method: 'POST',
         headers: { 'x-goog-api-key': geminiApiKey, 'Content-Type': 'application/json' },
@@ -28746,7 +28864,7 @@ ${context}
 
       try {
         const resp = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_IMAGE}:generateContent`,
           {
             method: 'POST',
             headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
@@ -29389,10 +29507,10 @@ ${student_answer ? `【児童の入力した答え】${student_answer}` : ''}
       return c.json({ success: true, analysis: result })
     }
 
-    // フォールバック: gemini-3-flash-preview
-    console.log('⚠️ 3.1失敗、gemini-3-flash-previewにフォールバック...')
+    // フォールバック（定数管理: MODEL_SELECTION.md 参照）
+    console.log(`⚠️ プライマリ失敗、${GEMINI_MODEL_LEGACY} にフォールバック...`)
     const resp2 = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_LEGACY}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -34310,7 +34428,7 @@ HTMLコードだけを出力（コードブロック不要）:`
 ★問題文の内容全体を正確に反映した図を描くこと。タイトルだけでなく問題文を読むこと★`
         
         const nb2Resp = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_IMAGE_FALLBACK}:generateContent`,
           {
             method: 'POST',
             headers: { 'x-goog-api-key': geminiApiKey, 'Content-Type': 'application/json' },
@@ -34447,7 +34565,7 @@ JSON形式で出力してください:`
       try {
         console.log('🎨 Nano Banana Pro (gemini-3-pro-image-preview) で高精度画像生成...')
         const proResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_IMAGE_PRO}:generateContent`,
           {
             method: 'POST',
             headers: {
@@ -34518,7 +34636,7 @@ JSON形式で出力してください:`
     try {
       console.log('🎨 Nano Banana 2 (gemini-3.1-flash-image-preview) で画像生成...')
       const geminiImageResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_IMAGE_FALLBACK}:generateContent`,
         {
           method: 'POST',
           headers: {
@@ -34582,11 +34700,11 @@ JSON形式で出力してください:`
       console.warn('⚠️ Nano Banana 2画像生成エラー:', imgErr.message)
     }
     
-    // フォールバック: 旧 Nano Banana (gemini-2.5-flash-image)
+    // フォールバック: 旧 Nano Banana（最終フォールバック。前段と別モデルにすること）
     try {
-      console.log('💡 フォールバック: Nano Banana (gemini-2.5-flash-image)...')
+      console.log(`💡 フォールバック: ${GEMINI_MODEL_IMAGE_LEGACY}...`)
       const nbResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_IMAGE_LEGACY}:generateContent`,
         {
           method: 'POST',
           headers: {
@@ -43749,7 +43867,7 @@ ${context}
 
           try {
             const resp = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent`,
+              `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_IMAGE}:generateContent`,
               {
                 method: 'POST',
                 headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
@@ -48740,7 +48858,7 @@ JSONで出力:
 JSONのみ出力。`
 
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_FALLBACK}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
