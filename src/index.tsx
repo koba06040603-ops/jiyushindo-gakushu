@@ -13858,13 +13858,47 @@ app.get('/guide/:curriculumId', async (c) => {
     var ns = norm(studentAnswer);
     var nc = norm(correctAnswer);
     
-    // 多段階判定
-    var exact = ns === nc || nc.includes(ns) || ns.includes(nc);
-    // 数値抽出
+    // ============================================================
+    // 🔧 2026-09 修正: 数値問題の誤判定を防ぐ
+    //   旧実装は nc.includes(ns) による部分一致だったため、
+    //   正解「2」に対し「12」「20」「21こ」まで○になっていた。
+    //   → 答えが数値のみの場合は「数の完全一致」で判定する。
+    // ============================================================
     var extractNums = function(s) { return (s.match(/\\d+\\.?\\d*/g)||[]).map(Number); };
+    // 漢数字・ひらがな数詞も数値として認識する（「にこ」「二こ」→ 2）
+    var JP_NUM = {'ぜろ':0,'れい':0,'いち':1,'ひとつ':1,'に':2,'ふたつ':2,'さん':3,'みっつ':3,'し':4,'よん':4,'よっつ':4,'ご':5,'いつつ':5,'ろく':6,'むっつ':6,'なな':7,'しち':7,'ななつ':7,'はち':8,'やっつ':8,'きゅう':9,'く':9,'ここのつ':9,'じゅう':10,'とお':10,'零':0,'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10};
+    var jpToNum = function(s) {
+      // まず「ひとつ/ふたつ…」のような数詞そのものを優先して照合する
+      if (JP_NUM.hasOwnProperty(s)) return JP_NUM[s];
+      // 次に単位（こ/個/人/本/枚/円 等）を外した本体を見る
+      var body = s.replace(/(こ|個|人|本|まい|枚|円|さつ|冊|だい|台|ひき|匹|わ|羽)$/, '');
+      if (JP_NUM.hasOwnProperty(body)) return JP_NUM[body];
+      // 最後に「つ」も外して再照合（「みっつ」→「みっ」は辞書に無いので影響しない）
+      var body2 = body.replace(/つ$/, '');
+      if (JP_NUM.hasOwnProperty(body2)) return JP_NUM[body2];
+      return null;
+    };
     var cNums = extractNums(nc);
     var sNums = extractNums(ns);
-    var numMatch = cNums.length > 0 && cNums.every(function(n) { return sNums.indexOf(n) >= 0; });
+    if (sNums.length === 0) { var j = jpToNum(ns); if (j !== null) sNums = [j]; }
+    if (cNums.length === 0) { var j2 = jpToNum(nc); if (j2 !== null) cNums = [j2]; }
+
+    // 正解が「数値ひとつ（＋単位）」だけかどうか
+    var cIsPureNumber = cNums.length === 1 &&
+      /^[0-9.]+(こ|個|つ|人|本|まい|枚|円|さつ|冊|だい|台|ひき|匹|わ|羽|cm|mm|m|km|g|kg|ml|l|度|°|%)?$/.test(nc);
+
+    var exact, numMatch;
+    if (cIsPureNumber) {
+      // ★数値問題: 児童の答えから取り出した数が、正解の数と完全一致することを要求
+      //   「2」「2こ」「２個」「にこ」→ ○ ／ 「1」「12」「20」→ ×
+      numMatch = sNums.length > 0 && sNums.indexOf(cNums[0]) >= 0 &&
+                 sNums.every(function(n) { return n === cNums[0]; });
+      exact = ns === nc;
+    } else {
+      // 記述・語句の答え: 従来どおり包含も許容する
+      exact = ns === nc || nc.includes(ns) || ns.includes(nc);
+      numMatch = cNums.length > 0 && cNums.every(function(n) { return sNums.indexOf(n) >= 0; });
+    }
     // 分数判定
     var fracMatch = false;
     var cFracs = nc.match(/\\d+\\/\\d+|\\d+分の\\d+/g) || [];
@@ -13899,7 +13933,10 @@ app.get('/guide/:curriculumId', async (c) => {
       if (typeof rawKw === 'string' && rawKw.startsWith('[')) answerKeywords = JSON.parse(rawKw);
       else if (Array.isArray(rawKw)) answerKeywords = rawKw;
     } catch(e) {}
-    if (answerKeywords.length >= 2) {
+    // 🔧 数値問題ではキーワード判定を使わない。
+    //   answer_keywords に ["2","こ","あまり"] のような語が入っていると、
+    //   間違った数を書いても「こ」「あまり」だけで正解になってしまうため。
+    if (answerKeywords.length >= 2 && !cIsPureNumber) {
       kwResult.total = answerKeywords.length;
       kwResult.required = Math.max(2, Math.ceil(answerKeywords.length * 0.67));
       for (var ki = 0; ki < answerKeywords.length; ki++) {
@@ -34937,6 +34974,42 @@ app.post('/api/ai/generate-image', async (c) => {
     if (custom_prompt && custom_prompt.length > 1) {
       contextParts.push(`\n【ユーザー追加指示】\n${custom_prompt.substring(0, 500)}`)
     }
+    // ============================================================
+    // 🔢 2026-09 追加: 個数の取り違えを防ぐ「数量マニフェスト」
+    //   画像生成モデルは「りんご5こ」と書いても7こ描くことがある。
+    //   問題文から《数＋助数詞＋（直前の修飾語）》を抽出し、
+    //   「何を何個描くか」を箇条書きで明示して数え違いを抑止する。
+    // ============================================================
+    const quantitySource = `${safeProblemText} ${safePrompt}`
+    const COUNTER = 'こ|個|つ|人|にん|本|ほん|枚|まい|冊|さつ|台|だい|匹|ひき|羽|わ|輪|りん|束|たば|皿|さら|箱|はこ'
+    const qtyRe = new RegExp('([\\u3040-\\u30FF\\u4E00-\\u9FFF A-Za-z]{0,12}?)\\s*([0-9０-９]{1,3})\\s*(' + COUNTER + ')', 'g')
+    const qtyItems: string[] = []
+    const seenQty = new Set<string>()
+    let qm: RegExpExecArray | null
+    while ((qm = qtyRe.exec(quantitySource)) !== null) {
+      const label = (qm[1] || '').replace(/[、。，．,.\s]/g, '').slice(-10)
+      const numRaw = qm[2].replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+      const n = parseInt(numRaw, 10)
+      const counter = qm[3]
+      if (!n || n <= 0 || n > 50) continue          // 極端な数は図にしない
+      // 「1こずつ」「2つずつ」のような分配表現は描画数ではないので除外
+      const after = quantitySource.slice(qm.index + qm[0].length, qm.index + qm[0].length + 3)
+      if (/^(ずつ|づつ)/.test(after)) continue
+      const key = `${label}|${n}|${counter}`
+      if (seenQty.has(key)) continue
+      seenQty.add(key)
+      qtyItems.push(label ? `${label}: ちょうど ${n} ${counter}` : `ちょうど ${n} ${counter}`)
+      if (qtyItems.length >= 6) break
+    }
+    if (qtyItems.length > 0) {
+      contextParts.unshift(
+        '【数量の厳守 — 最重要】図に描く個数は次のとおり。1個でも多い/少ないと教材として誤りになります。\n' +
+        qtyItems.map((t) => '  ・' + t).join('\n') +
+        '\n描き終えたら必ず指さし確認するように数を数え直し、上の数と完全に一致させてください。' +
+        '\n数が合わない場合は描き直すこと。余分な飾りのオブジェクトを増やしてはいけません。'
+      )
+    }
+
     const userContext = contextParts.join('\n')
     
     // ========== 問題内容の分析: 表/グラフ/図形/その他を判定 ==========
