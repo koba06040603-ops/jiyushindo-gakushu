@@ -174,7 +174,14 @@ const GEMINI_MODEL_LITE_FALLBACK = 'gemini-3.1-flash-lite' // 軽量系フォー
 const GEMINI_MODEL_IMAGE = 'gemini-3.1-flash-image'              // 画像生成プライマリ（GA版）
 const GEMINI_MODEL_IMAGE_FALLBACK = 'gemini-3.1-flash-image-preview' // 画像生成フォールバック（preview）
 const GEMINI_MODEL_IMAGE_PRO = 'gemini-3-pro-image'              // 高品質図版（GA版）
-const GEMINI_MODEL_IMAGE_LEGACY = 'gemini-2.5-flash-image'       // 画像生成 最終フォールバック（旧世代・200確認済み）
+const GEMINI_MODEL_IMAGE_LEGACY = 'gemini-2.5-flash-image'       // 画像生成 最終フォールバック（旧世代）
+// ⚠️ 2026-09 実測: gemini-2.5-flash-image は日本語が崩壊する（「おはじき」→「おぼぎき」等）。
+//    教材品質1/5。他が全滅したときのみ使うこと。
+// 【画像モデル個数正確性ベンチ（あかい5こ/きいろい3こ, 各2回）】
+//   gemini-3-pro-image      : 個数正解 1/2, 日本語○, 品質 4/5・2/5  ← 図版はこれが最良
+//   gemini-3.1-flash-image  : 個数正解 0/2, 日本語○, 品質 3/5・2/5  ← 速い(8秒)
+//   gemini-2.5-flash-image  : 個数正解 0/2, 日本語×, 品質 1/5・1/5  ← 使用非推奨
+// 結論: 「数を数える図」は AI に描かせず buildCountingSVG() で決定論的に描画する。
 // TTS（音声合成）: responseModalities:['AUDIO'] が必須。TEXT では 400 になる
 const GEMINI_MODEL_TTS = 'gemini-2.5-flash-preview-tts'
 
@@ -29084,11 +29091,50 @@ ${spec.concrete_examples.map((e: any, i: number) => `  ${i + 1}. ${e.name || e} 
       console.warn(`⚠️ STAGE 1 教育デザイン仕様の抽出スキップ: ${stage1Err.message}`)
     }
 
+    // ============================================================
+    // 🔢 2026-09 追加: 算数の「数」を扱う問題では個数を厳守させる
+    //   [必須1]「固有名詞を最低6個」という指示が、
+    //   「あかい4こ・あおい3こ」のような問題で個数を勝手に増やしていた。
+    //   問題文から数量を抽出し、最優先の制約として差し込む。
+    // ============================================================
+    let quantityNote = ''
+    try {
+      const qsrc = String(problem_text || '')
+      const CNT = 'こ|個|つ|人|にん|本|ほん|枚|まい|冊|さつ|台|だい|匹|ひき|羽|わ'
+      const re = new RegExp('([\\u3040-\\u30FF\\u4E00-\\u9FFF]{0,10}?)\\s*([0-9０-９]{1,2})\\s*(' + CNT + ')', 'g')
+      const items: string[] = []
+      const seen = new Set<string>()
+      let m: RegExpExecArray | null
+      while ((m = re.exec(qsrc)) !== null) {
+        const after = qsrc.slice(m.index + m[0].length, m.index + m[0].length + 3)
+        if (/^(ずつ|づつ)/.test(after)) continue
+        const label = (m[1] || '').replace(/[、。，．,.\s]/g, '').slice(-8)
+        const n = parseInt(m[2].replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)), 10)
+        if (!n || n <= 0 || n > 30) continue
+        const key = `${label}|${n}|${m[3]}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        items.push(`  ・${label || '対象'} … ちょうど ${n} ${m[3]}（${n}個の操作要素を配置）`)
+        if (items.length >= 5) break
+      }
+      if (items.length > 0) {
+        quantityNote = `
+
+【🔢 個数の厳守 — 他のどの指示よりも優先 🔢】
+この問題は「数」を扱います。画面に配置する操作要素の個数は次のとおりです。
+${items.join('\n')}
+・1個でも多い/少ないと教材として誤りになります。必ず数え直して一致させること。
+・**下の[必須1]「固有名詞を最低6個」はこの問題には適用しません。**
+  上の個数がすべてに優先します。数合わせのために要素を増やしてはいけません。`
+      }
+    } catch {}
+
     const prompt = `あなたは「教科の本質を掴ませる」教育教材デザイナーです。
 子どもが画面上で「さわって・考えて・気づく」教材HTMLを1つ生成してください。
 ${designSpec}
 【学習カード情報】
 ${context}
+${quantityNote}
 ${editNote}
 ${forbiddenNote}
 
@@ -29100,6 +29146,7 @@ ${forbiddenNote}
 
 【★★★ 絶対に守る制約 ★★★】
 [必須1] 上記の「具体例リスト」の **固有名詞を最低6個** をドラッグ可能な要素として実際にHTMLに配置すること
+        ※ただし上に【個数の厳守】がある場合は**そちらが最優先**。指定個数ちょうどにすること（6個に満たなくてよい）
 [必須2] その6個以上の要素を **児童が実際に操作（ドラッグ・タップ・並べ替え等）できる** こと
 [必須3] 「あと○個」のカウンタを出すなら、その個数分の要素が画面に **見えて、動かせる状態で存在** すること。カウンタだけ出して肝心の駒が画面にないのは最悪のバグ
 [必須4] 操作した結果が **画面に保持され**、児童が全体パターンを俯瞰できること
@@ -34887,6 +34934,116 @@ app.delete('/api/cards/images/:imageId', async (c) => {
 })
 
 // AI画像生成API（Gemini Imagen使用）- JSXGraph + Nano Banana Pro 統合版
+// ============================================================
+// 🎯 数量図を「コードで」正確に描く（AI画像生成の数え間違い対策）
+//   画像生成モデルは「5こ」と指示しても6〜7こ描くことがある実測結果が出たため、
+//   個数を数える問題だけは SVG を決定論的に生成して 100% 正確にする。
+// ============================================================
+const COUNTER_COLORS: Record<string, { fill: string; stroke: string }> = {
+  あか: { fill: '#EF4444', stroke: '#991B1B' },
+  あかい: { fill: '#EF4444', stroke: '#991B1B' },
+  赤: { fill: '#EF4444', stroke: '#991B1B' },
+  あお: { fill: '#3B82F6', stroke: '#1E3A8A' },
+  あおい: { fill: '#3B82F6', stroke: '#1E3A8A' },
+  青: { fill: '#3B82F6', stroke: '#1E3A8A' },
+  きいろ: { fill: '#FACC15', stroke: '#854D0E' },
+  きいろい: { fill: '#FACC15', stroke: '#854D0E' },
+  黄: { fill: '#FACC15', stroke: '#854D0E' },
+  みどり: { fill: '#22C55E', stroke: '#14532D' },
+  緑: { fill: '#22C55E', stroke: '#14532D' },
+  しろ: { fill: '#F9FAFB', stroke: '#6B7280' },
+  白: { fill: '#F9FAFB', stroke: '#6B7280' },
+}
+
+function pickCounterColor(label: string, idx: number) {
+  for (const key of Object.keys(COUNTER_COLORS)) {
+    if (label.includes(key)) return COUNTER_COLORS[key]
+  }
+  const fallback = [
+    { fill: '#EF4444', stroke: '#991B1B' },
+    { fill: '#3B82F6', stroke: '#1E3A8A' },
+    { fill: '#FACC15', stroke: '#854D0E' },
+    { fill: '#22C55E', stroke: '#14532D' },
+  ]
+  return fallback[idx % fallback.length]
+}
+
+function escXml(t: string) {
+  return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&apos;')
+}
+
+/**
+ * 2グループの一対一対応（くらべる）を SVG で描く。
+ * 個数はコードで制御するので必ず正確になる。
+ */
+function buildCountingSVG(groups: Array<{ label: string; n: number; counter: string }>) {
+  const gs = groups.slice(0, 2)
+  if (gs.length < 1) return null
+  const R = 34
+  const GAP = 26
+  const maxN = Math.max(...gs.map((g) => g.n))
+  const leftPad = 40
+  const topPad = 70
+  const rowH = 190
+  const W = Math.max(560, leftPad * 2 + maxN * (R * 2 + GAP))
+  const H = topPad + rowH * gs.length + 60
+
+  const parts: string[] = []
+  parts.push(`<rect width="${W}" height="${H}" fill="#FFFFFF"/>`)
+
+  const centers: number[][] = []
+  gs.forEach((g, gi) => {
+    const col = pickCounterColor(g.label, gi)
+    const cy = topPad + gi * rowH + R + 20
+    const rowCenters: number[] = []
+    // 見出し
+    parts.push(
+      `<text x="${leftPad}" y="${topPad + gi * rowH - 8}" font-family="sans-serif" font-size="30" font-weight="bold" fill="#111827">${escXml(g.label || 'グループ' + (gi + 1))}</text>`
+    )
+    for (let i = 0; i < g.n; i++) {
+      const cx = leftPad + R + i * (R * 2 + GAP)
+      rowCenters.push(cx)
+      parts.push(
+        `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${col.fill}" stroke="${col.stroke}" stroke-width="4"/>`
+      )
+    }
+    centers.push(rowCenters)
+    // 個数ラベル
+    parts.push(
+      `<text x="${W - leftPad}" y="${topPad + gi * rowH - 8}" text-anchor="end" font-family="sans-serif" font-size="26" fill="#6B7280">${g.n}${escXml(g.counter)}</text>`
+    )
+  })
+
+  // 一対一の対応線（少ない方の数だけ結ぶ）
+  if (centers.length === 2) {
+    const pairs = Math.min(centers[0].length, centers[1].length)
+    const y1 = topPad + R + 20 + R
+    const y2 = topPad + rowH + R + 20 - R
+    for (let i = 0; i < pairs; i++) {
+      parts.push(
+        `<line x1="${centers[0][i]}" y1="${y1}" x2="${centers[1][i]}" y2="${y2}" stroke="#374151" stroke-width="3"/>`
+      )
+    }
+    // あまりに「？」を付ける
+    const longer = centers[0].length >= centers[1].length ? 0 : 1
+    for (let i = pairs; i < centers[longer].length; i++) {
+      const cx = centers[longer][i]
+      const cy = topPad + longer * rowH + R + 20
+      parts.push(
+        `<text x="${cx}" y="${cy + 12}" text-anchor="middle" font-family="sans-serif" font-size="38" font-weight="bold" fill="#111827">?</text>`
+      )
+    }
+    if (centers[longer].length > pairs) {
+      parts.push(
+        `<text x="${W / 2}" y="${H - 18}" text-anchor="middle" font-family="sans-serif" font-size="26" fill="#B45309">? のところが「あまり」だよ</text>`
+      )
+    }
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${parts.join('')}</svg>`
+}
+
 app.post('/api/ai/generate-image', async (c) => {
   const { env } = c
   const { prompt, card_id, teacher_id, negative_prompt, style, aspect_ratio, problem_text, card_title, unit_name, subject, grade, prefer_image, prefer_model, answer_text, answer_explanation, custom_prompt, forbidden_answer } = await c.req.json()
@@ -34984,6 +35141,7 @@ app.post('/api/ai/generate-image', async (c) => {
     const COUNTER = 'こ|個|つ|人|にん|本|ほん|枚|まい|冊|さつ|台|だい|匹|ひき|羽|わ|輪|りん|束|たば|皿|さら|箱|はこ'
     const qtyRe = new RegExp('([\\u3040-\\u30FF\\u4E00-\\u9FFF A-Za-z]{0,12}?)\\s*([0-9０-９]{1,3})\\s*(' + COUNTER + ')', 'g')
     const qtyItems: string[] = []
+    const qtyObjects: Array<{ label: string; n: number; counter: string }> = []
     const seenQty = new Set<string>()
     let qm: RegExpExecArray | null
     while ((qm = qtyRe.exec(quantitySource)) !== null) {
@@ -34999,6 +35157,7 @@ app.post('/api/ai/generate-image', async (c) => {
       if (seenQty.has(key)) continue
       seenQty.add(key)
       qtyItems.push(label ? `${label}: ちょうど ${n} ${counter}` : `ちょうど ${n} ${counter}`)
+      qtyObjects.push({ label, n, counter })
       if (qtyItems.length >= 6) break
     }
     if (qtyItems.length > 0) {
@@ -35028,6 +35187,31 @@ app.post('/api/ai/generate-image', async (c) => {
     
     console.log(`📊 問題分析: table=${isTableType}, graph=${isGraphType}, proportion=${isProportionType}, geometry=${isGeometryType}, numberLine=${isNumberLineType}, jsxgraph=${canUseJSXGraph}`)
     
+    // ========== 第0候補: 数量くらべ図（コードで確実に正確に描く） ==========
+    // 【2026-09 実測】画像生成モデルは「5こ」と指示しても 6〜7こ 描く。
+    //   gemini-3.1-flash-image 0/2、gemini-3-pro-image 1/2、2.5-flash-image は日本語も崩れる。
+    //   「数を数える」問題は AI に描かせず SVG で決定論的に描画する。
+    const isCountingCompare =
+      qtyObjects.length >= 2 &&
+      /くらべ|比べ|おおい|多い|すくない|少ない|あまり|余り|ちがい|違い|どちらが|なんこ|何個|いくつ/.test(allText) &&
+      qtyObjects.every((g) => g.n <= 15)
+
+    if (isCountingCompare) {
+      const svg = buildCountingSVG(qtyObjects)
+      if (svg) {
+        console.log(`🎯 数量SVG生成: ${qtyObjects.map((g) => `${g.label}=${g.n}`).join(', ')}`)
+        const dataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)))
+        return c.json({
+          success: true,
+          image_url: dataUrl,
+          model: 'deterministic-svg (個数保証)',
+          generation_time_ms: 0,
+          diagram_type: '数量くらべ図',
+          note: '個数の正確さを保証するため、AI画像生成ではなくコードで描画しています',
+        })
+      }
+    }
+
     // ========== 第1候補: JSXGraph インタラクティブ作図 ==========
     // グラフ/比例/反比例/コンパス/直線/数直線/図形 → 最優先でJSXGraph
     if (canUseJSXGraph && !prefer_image && prefer_model !== 'nano_banana_pro') {
