@@ -2509,6 +2509,161 @@ app.get('/api/diag/guide-apis/:id', async (c) => {
   return c.json({ success: failed.length === 0, failed, detail: out })
 })
 
+// ============================================================
+// 🔧 保存済みの「数量図」を正確なSVGに作り直す
+//   AI画像生成で個数が合っていない古い図が本番DBに残っているため、
+//   数量が抽出できるカードの problem_image_url / example_image_url を
+//   決定論的SVGに差し替える。
+//   GET  = 対象の診断のみ  /  ?apply=1 = 実際に差し替え
+// ============================================================
+app.get('/api/diag/fix-counting-images', async (c) => {
+  const { env } = c
+  const diagKey = (env as any).DIAG_KEY
+  if (diagKey && c.req.query('key') !== diagKey) {
+    return c.json({ success: false, error: 'invalid diag key' }, 403)
+  }
+  const apply = c.req.query('apply') === '1'
+  const curriculumId = c.req.query('curriculum_id')
+  const cardId = c.req.query('card_id')
+
+  // 問題文から数量を抽出する（generate-image と同じ規則）
+  const BAD_LABEL = /^(ぜんぶで|全部で|あわせて|合わせて|みんなで|いれると|入れると|ぜんぶ|のこり|残り|つぎに|さいしょに|まとまりが)$/
+  const COUNTER = 'こ|個|つ|人|にん|本|ほん|枚|まい|冊|さつ|台|だい|匹|ひき|羽|わ'
+  const extractQty = (src: string) => {
+    const re = new RegExp('([\\u3040-\\u30FF\\u4E00-\\u9FFF]{0,16}?)\\s*([0-9０-９]{1,3})\\s*(' + COUNTER + ')', 'g')
+    const out: Array<{ label: string; n: number; counter: string }> = []
+    const seen = new Set<string>()
+    let m: RegExpExecArray | null
+    while ((m = re.exec(src)) !== null) {
+      const after = src.slice(m.index + m[0].length, m.index + m[0].length + 3)
+      if (/^(ずつ|づつ)/.test(after)) continue
+      const label = (m[1] || '').replace(/[、。，．,.\s]/g, '').slice(-14)
+      const n = parseInt(m[2].replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)), 10)
+      if (!n || n <= 0 || n > 15) continue
+      const key = `${label}|${n}|${m[3]}`
+      if (seen.has(key)) continue
+      if (!label || label.length < 2 || BAD_LABEL.test(label) || DEIXIS.test(label)) continue
+      seen.add(key)
+      out.push({ label, n, counter: m[3] })
+      if (out.length >= 4) break
+    }
+    return out
+  }
+  // 「一対一で対応づけて比べる」問題に限定する。
+  // 「ぜんぶで」「あわせて」のような合併・増加は別の図が要るので対象外。
+  const isCountingText = (t: string) =>
+    /くらべ|比べ|どちらが|おおい|多い|すくない|少ない|あまり|余り|ちがい|違い/.test(t) &&
+    !/ぜんぶで|全部で|あわせて|合わせて|たすと|足すと|いれると|入れると|のこりは|残りは|ずつわけ|分けると/.test(t) &&
+    // 金額・グラフ・表・データなど「おはじき図」が不適切な文脈は除外
+    !/円|グラフ|表に|データ|きろく|記録|時間|分|km|cm|kg|ｇ|リットル|L|%|パーセント/.test(t)
+
+  // ラベルが「この」「次の」のような指示語だけのものは実体ではない
+  const DEIXIS = /^(この|その|あの|どの|つぎの|次の|した|下|うえ|上|みぎ|右|ひだり|左|クラスの|みんなの|ぜんぶ)/
+
+
+  try {
+    let sql = `SELECT lc.card_id, lc.card_title, lc.problem_text, lc.problem_description,
+                      lc.example_problem, lc.problem_image_url, lc.example_image_url, lc.course_id
+                 FROM learning_cards lc`
+    const binds: any[] = []
+    if (curriculumId) {
+      sql += ` JOIN courses co ON co.id = lc.course_id WHERE co.curriculum_id = ?`
+      binds.push(curriculumId)
+    } else if (cardId) {
+      sql += ` WHERE lc.card_id = ?`
+      binds.push(cardId)
+    } else {
+      sql += ` WHERE lc.problem_image_url IS NOT NULL OR lc.example_image_url IS NOT NULL`
+    }
+    sql += ' LIMIT 500'
+
+    const rows = await env.DB.prepare(sql).bind(...binds).all()
+    const targets: any[] = []
+    let fixed = 0
+
+    for (const r of (rows.results || []) as any[]) {
+      // ① 本問題の図
+      const pText = String(r.problem_text || r.problem_description || '')
+      if (pText && isCountingText(pText)) {
+        const q = extractQty(pText)
+        if (q.length === 2) {   // ちょうど2グループの一対一比較だけを対象にする
+          const svg = buildCountingSVG(q, pText)
+          if (svg) {
+            const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)))
+            targets.push({ card_id: r.card_id, field: 'problem_image_url', qty: q.map((x) => `${x.label}=${x.n}`) })
+            if (apply) {
+              await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE card_id = ?')
+                .bind(url, r.card_id).run()
+              fixed++
+            }
+          }
+        }
+      }
+      // ② 例題の図
+      const eText = String(r.example_problem || '')
+      if (eText && isCountingText(eText)) {
+        const q = extractQty(eText)
+        if (q.length === 2) {   // ちょうど2グループの一対一比較だけを対象にする
+          const svg = buildCountingSVG(q, eText)
+          if (svg) {
+            const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)))
+            targets.push({ card_id: r.card_id, field: 'example_image_url', qty: q.map((x) => `${x.label}=${x.n}`) })
+            if (apply) {
+              try {
+                await env.DB.prepare('UPDATE learning_cards SET example_image_url = ? WHERE card_id = ?')
+                  .bind(url, r.card_id).run()
+                fixed++
+              } catch {}
+            }
+          }
+        }
+      }
+    }
+
+    // 検証: 保存済みの画像がSVGになっているか、円の数が合っているかを数える
+    const verify: any[] = []
+    if (cardId) {
+      const v = await env.DB.prepare(
+        'SELECT card_id, problem_image_url, example_image_url FROM learning_cards WHERE card_id = ?'
+      ).bind(cardId).first() as any
+      for (const f of ['problem_image_url', 'example_image_url']) {
+        const u = String(v?.[f] || '')
+        if (!u) { verify.push({ field: f, state: 'なし' }); continue }
+        if (!u.startsWith('data:image/svg+xml;base64,')) {
+          verify.push({ field: f, state: 'AI画像のまま', head: u.slice(0, 40) })
+          continue
+        }
+        try {
+          const svg = decodeURIComponent(escape(atob(u.split(',')[1])))
+          const circles = (svg.match(/<circle/g) || []).length
+          const lines = (svg.match(/<line/g) || []).length
+          const colors: Record<string, number> = {}
+          for (const m of svg.matchAll(/fill="(#[0-9A-Fa-f]{6})"/g)) {
+            const col = m[1]
+            if (col === '#FFFFFF') continue
+            colors[col] = (colors[col] || 0) + 1
+          }
+          verify.push({ field: f, state: 'SVG(個数保証)', circles, lines, colors })
+        } catch (e: any) {
+          verify.push({ field: f, state: 'decode失敗', error: e.message })
+        }
+      }
+    }
+
+    return c.json({
+      success: true,
+      applied: apply,
+      scanned: (rows.results || []).length,
+      target_count: targets.length,
+      fixed,
+      verify,
+      targets: targets.slice(0, 50),
+    })
+  } catch (e: any) {
+    return c.json({ success: false, error: String(e?.message ?? e) }, 500)
+  }
+})
+
 // 一時的DBスキーマ確認エンドポイント
 app.get('/api/debug/schema', async (c) => {
   const { env } = c
@@ -34955,9 +35110,24 @@ const COUNTER_COLORS: Record<string, { fill: string; stroke: string }> = {
   白: { fill: '#F9FAFB', stroke: '#6B7280' },
 }
 
-function pickCounterColor(label: string, idx: number) {
+function pickCounterColor(label: string, idx: number, context?: string) {
+  // ① ラベル自身に色名が含まれていればそれを使う
   for (const key of Object.keys(COUNTER_COLORS)) {
     if (label.includes(key)) return COUNTER_COLORS[key]
+  }
+  // ② ラベルが「おはじきが」のように色名を失っている場合、
+  //    問題文全体から「〇〇い＋そのラベル」の並びを探して色を復元する
+  if (context) {
+    const stem = label.replace(/(が|は|を|に|と|も)$/, '')
+    if (stem.length >= 2) {
+      const order: string[] = []
+      const re = new RegExp('(あかい|あか|赤|あおい|あお|青|きいろい|きいろ|黄|みどり|緑|しろい|しろ|白)\\s*' + stem, 'g')
+      let mm: RegExpExecArray | null
+      while ((mm = re.exec(context)) !== null) {
+        if (!order.includes(mm[1])) order.push(mm[1])
+      }
+      if (order[idx] && COUNTER_COLORS[order[idx]]) return COUNTER_COLORS[order[idx]]
+    }
   }
   const fallback = [
     { fill: '#EF4444', stroke: '#991B1B' },
@@ -34977,7 +35147,7 @@ function escXml(t: string) {
  * 2グループの一対一対応（くらべる）を SVG で描く。
  * 個数はコードで制御するので必ず正確になる。
  */
-function buildCountingSVG(groups: Array<{ label: string; n: number; counter: string }>) {
+function buildCountingSVG(groups: Array<{ label: string; n: number; counter: string }>, ctx?: string) {
   const gs = groups.slice(0, 2)
   if (gs.length < 1) return null
   const R = 34
@@ -34994,7 +35164,7 @@ function buildCountingSVG(groups: Array<{ label: string; n: number; counter: str
 
   const centers: number[][] = []
   gs.forEach((g, gi) => {
-    const col = pickCounterColor(g.label, gi)
+    const col = pickCounterColor(g.label, gi, ctx)
     const cy = topPad + gi * rowH + R + 20
     const rowCenters: number[] = []
     // 見出し
@@ -35139,7 +35309,7 @@ app.post('/api/ai/generate-image', async (c) => {
     // ============================================================
     const quantitySource = `${safeProblemText} ${safePrompt}`
     const COUNTER = 'こ|個|つ|人|にん|本|ほん|枚|まい|冊|さつ|台|だい|匹|ひき|羽|わ|輪|りん|束|たば|皿|さら|箱|はこ'
-    const qtyRe = new RegExp('([\\u3040-\\u30FF\\u4E00-\\u9FFF A-Za-z]{0,12}?)\\s*([0-9０-９]{1,3})\\s*(' + COUNTER + ')', 'g')
+    const qtyRe = new RegExp('([\\u3040-\\u30FF\\u4E00-\\u9FFF A-Za-z]{0,16}?)\\s*([0-9０-９]{1,3})\\s*(' + COUNTER + ')', 'g')
     const qtyItems: string[] = []
     const qtyObjects: Array<{ label: string; n: number; counter: string }> = []
     const seenQty = new Set<string>()
@@ -35191,15 +35361,25 @@ app.post('/api/ai/generate-image', async (c) => {
     // 【2026-09 実測】画像生成モデルは「5こ」と指示しても 6〜7こ 描く。
     //   gemini-3.1-flash-image 0/2、gemini-3-pro-image 1/2、2.5-flash-image は日本語も崩れる。
     //   「数を数える」問題は AI に描かせず SVG で決定論的に描画する。
+    // 「一対一で対応づけて比べる」問題に限定する。
+    // 「ぜんぶで」「あわせて」のような合併・増加は別の図が必要なので対象外。
+    const BAD_QTY_LABEL = /^(ぜんぶで|全部で|あわせて|合わせて|みんなで|いれると|入れると|ぜんぶ|のこり|残り|つぎに|さいしょに|まとまりが)$/
+    const DEIXIS_LABEL = /^(この|その|あの|どの|つぎの|次の|した|下|うえ|上|みぎ|右|ひだり|左|クラスの|みんなの|ぜんぶ)/
+    const compareObjects = qtyObjects.filter(
+      (g) => g.label && g.label.length >= 2 && !BAD_QTY_LABEL.test(g.label) && !DEIXIS_LABEL.test(g.label)
+    )
     const isCountingCompare =
-      qtyObjects.length >= 2 &&
-      /くらべ|比べ|おおい|多い|すくない|少ない|あまり|余り|ちがい|違い|どちらが|なんこ|何個|いくつ/.test(allText) &&
-      qtyObjects.every((g) => g.n <= 15)
+      compareObjects.length === 2 &&
+      /くらべ|比べ|どちらが|おおい|多い|すくない|少ない|あまり|余り|ちがい|違い/.test(allText) &&
+      !/ぜんぶで|全部で|あわせて|合わせて|たすと|足すと|いれると|入れると|のこりは|残りは|分けると/.test(allText) &&
+      // 金額・グラフ・表・単位量など「おはじき図」が不適切な文脈は除外
+      !/円|グラフ|表に|データ|きろく|記録|km|cm|kg|リットル|%|パーセント/.test(allText) &&
+      compareObjects.every((g) => g.n <= 15)
 
     if (isCountingCompare) {
-      const svg = buildCountingSVG(qtyObjects)
+      const svg = buildCountingSVG(compareObjects, quantitySource)
       if (svg) {
-        console.log(`🎯 数量SVG生成: ${qtyObjects.map((g) => `${g.label}=${g.n}`).join(', ')}`)
+        console.log(`🎯 数量SVG生成: ${compareObjects.map((g) => `${g.label}=${g.n}`).join(', ')}`)
         const dataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)))
         return c.json({
           success: true,
