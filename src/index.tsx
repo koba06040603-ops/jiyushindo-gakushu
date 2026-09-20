@@ -2428,6 +2428,80 @@ app.get('/api/diag/dedupe-units', async (c) => {
   }
 })
 
+// ============================================================
+// 🔍 学習のてびき(SPA)が使う4APIの応答を一括検証する
+//    どのAPIが落ちて画面が空になるのかを切り分ける。
+// ============================================================
+app.get('/api/diag/guide-apis/:id', async (c) => {
+  const { env } = c
+  const diagKey = (env as any).DIAG_KEY
+  if (diagKey && c.req.query('key') !== diagKey) {
+    return c.json({ success: false, error: 'invalid diag key' }, 403)
+  }
+  const id = c.req.param('id')
+  const out: any = {}
+
+  // 1) メイン: /api/curriculum/:id 相当
+  try {
+    const cur = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(id).first() as any
+    const courses = await env.DB.prepare('SELECT * FROM courses WHERE curriculum_id = ?').bind(id).all()
+    let cards = 0
+    for (const co of (courses.results || []) as any[]) {
+      const r = await env.DB.prepare('SELECT COUNT(*) AS n FROM learning_cards WHERE course_id = ?').bind(co.id).first() as any
+      cards += Number(r?.n || 0)
+    }
+    out.curriculum = { ok: !!cur, unit_name: cur?.unit_name, courses: (courses.results || []).length, cards }
+  } catch (e: any) { out.curriculum = { ok: false, error: e.message } }
+
+  // 2) metadata
+  try {
+    const r = await env.DB.prepare('SELECT meta_key FROM curriculum_metadata WHERE curriculum_id = ?').bind(id).all()
+    out.metadata = { ok: true, count: (r.results || []).length }
+  } catch (e: any) { out.metadata = { ok: false, error: e.message } }
+
+  // 3) optional-problems
+  try {
+    const r = await optSelectByCurriculum(env.DB, Number(id))
+    out.optional_problems = { ok: true, count: (r || []).length }
+  } catch (e: any) { out.optional_problems = { ok: false, error: e.message } }
+
+  // 4) learning-stats
+  try {
+    const r = await env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM learning_cards lc JOIN courses co ON co.id = lc.course_id WHERE co.curriculum_id = ?'
+    ).bind(id).first() as any
+    out.learning_stats = { ok: true, cards: Number(r?.n || 0) }
+  } catch (e: any) { out.learning_stats = { ok: false, error: e.message } }
+
+  // 5) environment/design
+  try {
+    const r = await env.DB.prepare('SELECT * FROM learning_environment_designs WHERE curriculum_id = ? LIMIT 1').bind(id).first()
+    out.environment_design = { ok: true, exists: !!r }
+  } catch (e: any) { out.environment_design = { ok: false, error: e.message } }
+
+  // 6) SPA が実際に読む形（courses[].cards）になっているか
+  try {
+    const courses = await env.DB.prepare(
+      `SELECT c.*, (SELECT COUNT(*) FROM learning_cards WHERE course_id = c.id) as card_count
+         FROM courses c WHERE c.curriculum_id = ? AND c.course_level != 'personalized'`
+    ).bind(id).all()
+    const shaped: any[] = []
+    for (const co of (courses.results || []) as any[]) {
+      const cards = await env.DB.prepare(
+        'SELECT card_id, card_number, card_title FROM learning_cards WHERE course_id = ? ORDER BY card_number'
+      ).bind(co.id).all()
+      shaped.push({
+        id: co.id, name: co.course_name, level: co.course_level,
+        card_count_col: co.card_count, cards_len: (cards.results || []).length,
+      })
+    }
+    out.spa_shape = { ok: true, courses: shaped }
+  } catch (e: any) { out.spa_shape = { ok: false, error: e.message } }
+
+  const failed = Object.entries(out).filter(([, v]: any) => v && v.ok === false).map(([k]) => k)
+  return c.json({ success: failed.length === 0, failed, detail: out })
+})
+
 // 一時的DBスキーマ確認エンドポイント
 app.get('/api/debug/schema', async (c) => {
   const { env } = c
