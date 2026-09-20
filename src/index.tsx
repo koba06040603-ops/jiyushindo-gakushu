@@ -62,6 +62,7 @@ import {
 import { AdaptiveLearningEngine } from './adaptive-learning'
 import { SchoolManagementSystem } from './school-management'
 import { AIContentGenerator } from './ai-content-generator'
+import { buildQualityRules, buildQualityChecklist, buildReviseCardsPrompt } from './quality-rules'
 import { 
   addToMistakeNotebook, 
   getMistakeNotebook, 
@@ -697,6 +698,74 @@ function enforceSelfLearningQuality(cards: any[], grade: string, unitName: strin
 }
 
 /**
+ * ✍️ 2026-09 追加: 推敲パス（第2パス生成）
+ *   評価ハーネス（scripts/quality）で最も効果が大きかった改善。
+ *   1回の生成では、ルールを全部同時に守りきれず必ずどこかが抜ける。
+ *   そこで「教材検定官」として生成結果を粗探しさせ、欠陥を直した完成版を作らせる。
+ *   実測: 平均 88.0 → 94.7 / 93.3（7観点 LLM-as-Judge）
+ *
+ *   失敗しても元のカードをそのまま使うため、生成フローは止まらない。
+ */
+async function reviseCardsForQuality(
+  cards: any[],
+  apiKey: string,
+  ctx: { grade?: string; subject?: string; unit?: string; goal?: string }
+): Promise<{ revised: boolean; reason: string }> {
+  if (!Array.isArray(cards) || cards.length === 0 || !apiKey) {
+    return { revised: false, reason: 'skip(no-cards-or-key)' }
+  }
+  // 大量カードは1回のリクエストに収まらないため、推敲は先頭20枚までを対象にする
+  if (cards.length > 20) return { revised: false, reason: 'skip(too-many-cards)' }
+
+  try {
+    const prompt = buildReviseCardsPrompt(ctx, cards)
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 120000)
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_QUALITY}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0, maxOutputTokens: 32768, responseMimeType: 'application/json' },
+        }),
+        signal: controller.signal,
+      }
+    )
+    clearTimeout(timer)
+    if (!res.ok) return { revised: false, reason: `http-${res.status}` }
+
+    const data: any = await res.json()
+    const finish = data?.candidates?.[0]?.finishReason
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    if (finish === 'MAX_TOKENS') return { revised: false, reason: 'max-tokens' }
+
+    let parsed: any
+    try { parsed = JSON.parse(text) } catch { return { revised: false, reason: 'parse-error' } }
+
+    const fixed = parsed?.cards
+    // 枚数が変わっていたら信用しない（カードが消える事故を防ぐ）
+    if (!Array.isArray(fixed) || fixed.length !== cards.length) {
+      return { revised: false, reason: `count-mismatch(${fixed?.length}/${cards.length})` }
+    }
+    // 必須フィールドが欠けた推敲結果は採用しない
+    for (const c of fixed) {
+      if (!c?.problem_description || !c?.answer) return { revised: false, reason: 'missing-required-field' }
+    }
+
+    // 元配列を破壊的に置き換える（呼び出し側の参照を保つ）
+    for (let i = 0; i < cards.length; i++) {
+      // 推敲側に無いフィールド（IDなど）は元のものを残す
+      cards[i] = { ...cards[i], ...fixed[i] }
+    }
+    return { revised: true, reason: 'ok' }
+  } catch (e: any) {
+    return { revised: false, reason: `error(${String(e?.message || e).slice(0, 60)})` }
+  }
+}
+
+/**
  * 🧮 2026-09 追加: 答えの検算層
  *   教材で最も許されないのは「答えが間違っている」こと。
  *   生成時とは独立に、別プロンプトで問題を解き直して照合する。
@@ -807,18 +876,33 @@ function attachAutoDiagrams(cards: any[]): { issues: string[]; attached: number 
     // すでに図があるならそのまま
     if (card.problem_image_url) continue
     const text = String(card.problem_description || card.problem_text || '')
-    if (!text) continue
     try {
-      const built = autoBuildProblemSVG(text)
+      // ① LLM が指定した diagram 仕様を最優先で使う（型と数値が明示されているため最も正確）
+      let built = buildSVGFromDiagramSpec(card.diagram)
+      // ② 指定が無い／描けなかった場合は、問題文のパターンから推測する
+      if (!built && text) built = autoBuildProblemSVG(text)
       if (built) {
         card.problem_image_url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(built.svg)))
         card._auto_diagram = built.kind
         issues.push(`カード${no}: ${built.kind}を自動生成`)
         attached++
+      } else if (card.diagram) {
+        issues.push(`カード${no}: diagram指定(${card.diagram?.type})を描画できず`)
       }
     } catch (e: any) {
       issues.push(`カード${no}: 図の自動生成に失敗（${e?.message}）`)
     }
+
+    // 例題の図も同じ仕組みで付ける
+    try {
+      if (!card.example_image_url && card.example_diagram) {
+        const ex = buildSVGFromDiagramSpec(card.example_diagram)
+        if (ex) {
+          card.example_image_url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(ex.svg)))
+          attached++
+        }
+      }
+    } catch { /* 例題の図は必須ではないので握りつぶす */ }
   }
   return { issues, attached }
 }
@@ -19263,61 +19347,10 @@ app.post('/api/ai/generate-course', async (c) => {
     })()
     const isElementaryLow = /小学/.test(String(grade || '')) && gradeNumForRule > 0 && gradeNumForRule <= 2
 
-    const selfLearningRules = `
-════════════════════════════════════════════════
-★★★★★ 最優先ルール：自由進度学習の絶対要件 ★★★★★
-このシステムは「児童が先生に頼らず、ひとりで学び進める」ためのものです。
-以下に1つでも違反したカードは教材として失格です。必ず全て守ってください。
-════════════════════════════════════════════════
-
-【絶対要件1｜問題は文章だけで完結させる】
-★ problem_description は「それを読むだけで解ける」状態にすること。
-✗ 悪い例: 「えにかいてある りんごの かずを かぞえましょう」（絵が無いので解けない）
-✗ 悪い例: 「どんぐりが ならんでいます。なんこ ありますか」（数が書いていないので解けない）
-○ 良い例: 「おさらに りんごが 3こ、みかんが 5こ あります。どちらが なんこ おおいですか」
-→ 「え」「図」「ひょう」「グラフ」を参照する表現を使うなら、
-　 **必要な数・情報を必ず本文中にも文字で書く**こと。
-→ 迷ったら「絵への言及をやめて、数を本文に書く」を選ぶこと。
-
-【絶対要件2｜ヒントは答えを言わない。手の動かし方を教える】
-★ hints は「答えを小出しにするもの」ではなく「自分で解くための足場」です。
-✗ 悪い例: 「さいごの かずが こたえだよ」（考える余地がない）
-✗ 悪い例: 「3こめは『？』」（答えを言っている）
-✗ 悪い例: 「がんばろう！」（何の助けにもならない）
-○ hint_level 1 = **どこに注目するか**（例:「2つの かずを くらべるんだね。まず おおきいほうを さがそう」）
-○ hint_level 2 = **手を動かす具体的な方法**（例:「おはじきを 4こと 3こ ならべて、1こずつ ペアに してみよう」）
-○ hint_level 3 = **答えの直前まで導くが答えは言わない**（例:「ペアに ならずに のこったのは なんこ？ それが こたえだよ」）
-★ answer の値そのもの（数字・語句）を hint_text に絶対に書かないこと。
-
-【絶対要件3｜例題は必ず付ける。本問より易しくする】
-★ example_problem / example_answer / example_solution は **省略禁止**。
-★ 例題は本問と「同じ考え方・より易しい数」にすること。
-★ 例題の答えは本問の答えと **必ず別の値** にすること。
-
-【絶対要件4｜誤字を出さない】
-★ 生成後に自分で読み返し、助数詞・送りがなを確認すること。
-✗ 「4くだい」→ ○「4だい」　✗「なんてすか」→ ○「なんですか」
-★ ${isElementaryLow ? '小学1〜2年なので、漢字はできるだけ使わず、ひらがな中心・わかち書きにすること。' : '学年に応じた漢字を使い、習っていない漢字にはふりがなの配慮をすること。'}
-
-【絶対要件5｜未習の記号・用語を使わない】${isElementaryLow ? `
-★ この学年（小学${gradeNumForRule}年）では以下を **解説・ヒント・例題に一切書かない**:
-　 ✗ 「＋」「−」「×」「÷」「＝」の記号（単元がたし算・ひき算の場合のみ使用可）
-　 ✗ 式の形（例: 「5 + ? = 8」「4 - 3 = 1」）
-○ かわりに ことばで書く: 「8は 5と いくつ？」「4は 3より 1 おおきい」
-★ 文はみじかく。1文は25字以内を目安にすること。` : `
-★ その学年でまだ習っていない用語・記号・公式を使わないこと。
-★ 使う必要がある場合は、その場で意味を説明すること。`}
-
-【絶対要件6｜答えは検算して確定させる】
-★ answer を書く前に、自分で問題文の条件から計算し直すこと。
-★ 問題文の数値と answer が矛盾していないか必ず確認すること。
-★ 選択肢を出す場合、answer は必ず選択肢の中に含めること。
-
-【絶対要件7｜答え合わせまで一人でできるようにする】
-★ answer_explanation は「なぜその答えになるか」を①②③の手順で書くこと。
-★ 単に答えを繰り返すのではなく、**児童が自分の考えと見比べられる**書き方にすること。
-════════════════════════════════════════════════
-`
+    // 🎓 v12 品質ルール（scripts/quality の評価ハーネスで 94.7点を達成）
+    //    ルール本体は src/quality-rules.ts に集約。変更時は必ず回帰テストすること。
+    const qualityCtx = { grade: String(grade || ''), subject: String(subject || ''), unit: String(unitName || ''), goal: String(unitGoal || '') }
+    const selfLearningRules = buildQualityRules(qualityCtx)
 
     const prompt = `あなたは小学校の教科指導に精通した優秀な教師です。以下の単元の学習カード${numCards}枚を生成してください。
 ${selfLearningRules}
@@ -19371,6 +19404,8 @@ ${customInfo}${mikataSection}
   → 児童の回答にキーワード3つ中2つ以上含まれていれば正解とする
   → 例: answer="協力してボールを奪う", answer_keywords=["協力","ボール","奪う"]
 - 「シュートが決まってみんなで喜び合ったとき」のような曖昧な正解は絶対に禁止
+
+${buildQualityChecklist(String(unitName || ''))}
 
 【重要】以下のJSON形式で、必ず完全な${numCards}枚のカードを生成してください：
 
@@ -19762,6 +19797,11 @@ ${customInfo}${mikataSection}
     // 意味的制約は強制できない。実測でも 6枚中2枚に例題重複が発生したため、
     // サーバー側で検出し自動是正する。
     // ============================================================
+    // ✍️ 推敲パス（第2パス）: 生成結果を「教材検定官」として点検・修正させる
+    //    評価ハーネス実測で平均 88.0 → 94.7 と最も効果が大きかった工程。
+    const reviseReport = await reviseCardsForQuality(courseData.cards, apiKey, qualityCtx)
+    console.log(`✍️ 推敲パス: ${reviseReport.revised ? '適用' : 'スキップ'} (${reviseReport.reason})`)
+
     // 🧮 答えの検算（教材の正確性を最優先。誤りがあれば検算結果で上書き）
     const verifyReport = await verifyCardAnswers(
       courseData.cards, apiKey, String(grade || ''), String(subject || '')
@@ -35678,6 +35718,146 @@ function buildCountSVG(n: number, label: string) {
   }
   p.push(`<text x="${W / 2}" y="${H - 12}" text-anchor="middle" font-family="sans-serif" font-size="22" fill="#6B7280">ひとつずつ ゆびで さして かぞえてみよう</text>`)
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${p.join('')}</svg>`
+}
+
+// ④ 数直線（数の位置・大小・たしひきの移動）
+function buildNumberLineSVG(min: number, max: number, mark?: number | null, step = 1) {
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return null
+  const n = Math.round((max - min) / step)
+  if (n <= 0 || n > 40) return null
+  const PAD = 60, W = Math.max(600, PAD * 2 + n * 46), H = 190
+  const y = 110
+  const x = (v: number) => PAD + ((v - min) / (max - min)) * (W - PAD * 2)
+  const p: string[] = [`<rect width="${W}" height="${H}" fill="#FFFFFF"/>`]
+  // 軸
+  p.push(`<line x1="${PAD - 24}" y1="${y}" x2="${W - PAD + 24}" y2="${y}" stroke="#374151" stroke-width="3"/>`)
+  p.push(`<polygon points="${W - PAD + 24},${y - 7} ${W - PAD + 38},${y} ${W - PAD + 24},${y + 7}" fill="#374151"/>`)
+  for (let i = 0; i <= n; i++) {
+    const v = min + i * step
+    const cx = x(v)
+    const isMark = mark !== null && mark !== undefined && Math.abs(v - mark) < 1e-9
+    p.push(`<line x1="${cx}" y1="${y - 14}" x2="${cx}" y2="${y + 14}" stroke="#374151" stroke-width="${isMark ? 4 : 2}"/>`)
+    // 目盛りの数字。ただし「?」の位置には数字を書かない（答えになるため）
+    if (isMark) {
+      p.push(`<circle cx="${cx}" cy="${y}" r="13" fill="#FDE68A" stroke="#D97706" stroke-width="4"/>`)
+      p.push(`<text x="${cx}" y="${y + 56}" text-anchor="middle" font-family="sans-serif" font-size="30" font-weight="bold" fill="#D97706">?</text>`)
+    } else {
+      p.push(`<text x="${cx}" y="${y + 44}" text-anchor="middle" font-family="sans-serif" font-size="22" fill="#111827">${v}</text>`)
+    }
+  }
+  p.push(`<text x="${W / 2}" y="${H - 12}" text-anchor="middle" font-family="sans-serif" font-size="21" fill="#6B7280">めもりを ひとつずつ たどって みよう</text>`)
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${p.join('')}</svg>`
+}
+
+// ⑤ テープ図（長さ・量の比較、倍の関係）
+function buildTapeSVG(bars: Array<{ label: string; len: number }>) {
+  const bs = (bars || []).filter((b) => b && Number.isFinite(Number(b.len)) && Number(b.len) > 0).slice(0, 4)
+  if (bs.length < 1) return null
+  const maxLen = Math.max(...bs.map((b) => Number(b.len)))
+  const LABEL_W = 170, BAR_MAX = 520, BAR_H = 56, GAP = 30, PAD = 30
+  const W = LABEL_W + BAR_MAX + PAD * 2 + 70
+  const H = PAD * 2 + bs.length * (BAR_H + GAP) + 40
+  const palette = [
+    { fill: '#FCA5A5', stroke: '#DC2626' },
+    { fill: '#93C5FD', stroke: '#2563EB' },
+    { fill: '#86EFAC', stroke: '#16A34A' },
+    { fill: '#FDE68A', stroke: '#D97706' },
+  ]
+  const p: string[] = [`<rect width="${W}" height="${H}" fill="#FFFFFF"/>`]
+  bs.forEach((b, i) => {
+    const yy = PAD + i * (BAR_H + GAP)
+    const w = (Number(b.len) / maxLen) * BAR_MAX
+    const c = palette[i % palette.length]
+    p.push(`<text x="${PAD}" y="${yy + BAR_H / 2 + 8}" font-family="sans-serif" font-size="23" fill="#111827">${escXml(String(b.label || '').slice(0, 9))}</text>`)
+    p.push(`<rect x="${LABEL_W}" y="${yy}" width="${w}" height="${BAR_H}" fill="${c.fill}" stroke="${c.stroke}" stroke-width="3" rx="6"/>`)
+    p.push(`<text x="${LABEL_W + w + 14}" y="${yy + BAR_H / 2 + 8}" font-family="sans-serif" font-size="22" fill="#374151">${escXml(String(b.len))}</text>`)
+  })
+  p.push(`<text x="${W / 2}" y="${H - 12}" text-anchor="middle" font-family="sans-serif" font-size="21" fill="#6B7280">ながさを くらべて みよう</text>`)
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${p.join('')}</svg>`
+}
+
+// ⑥ 分数の帯図（大きさ比べ・通分の必要性）
+function buildFractionSVG(fractions: Array<{ num: number; den: number }>) {
+  const fs = (fractions || [])
+    .filter((f) => f && Number.isInteger(Number(f.den)) && Number(f.den) > 0 && Number(f.den) <= 24 &&
+                   Number.isInteger(Number(f.num)) && Number(f.num) >= 0)
+    .slice(0, 4)
+  if (fs.length < 1) return null
+  const LABEL_W = 120, BAR_W = 540, BAR_H = 62, GAP = 34, PAD = 30
+  const W = LABEL_W + BAR_W + PAD * 2
+  const H = PAD * 2 + fs.length * (BAR_H + GAP) + 40
+  const palette = ['#93C5FD', '#FCA5A5', '#86EFAC', '#FDE68A']
+  const strokes = ['#2563EB', '#DC2626', '#16A34A', '#D97706']
+  const p: string[] = [`<rect width="${W}" height="${H}" fill="#FFFFFF"/>`]
+  fs.forEach((f, i) => {
+    const den = Number(f.den), num = Number(f.num)
+    const yy = PAD + i * (BAR_H + GAP)
+    // 分数ラベル（分子/分母を縦に）
+    p.push(`<text x="${PAD + 34}" y="${yy + 26}" text-anchor="middle" font-family="sans-serif" font-size="24" fill="#111827">${num}</text>`)
+    p.push(`<line x1="${PAD + 14}" y1="${yy + 33}" x2="${PAD + 54}" y2="${yy + 33}" stroke="#111827" stroke-width="2.5"/>`)
+    p.push(`<text x="${PAD + 34}" y="${yy + 58}" text-anchor="middle" font-family="sans-serif" font-size="24" fill="#111827">${den}</text>`)
+    // 帯本体（den等分し、num個を塗る）
+    const cw = BAR_W / den
+    for (let k = 0; k < den; k++) {
+      const filled = k < num
+      p.push(`<rect x="${LABEL_W + k * cw}" y="${yy}" width="${cw}" height="${BAR_H}" fill="${filled ? palette[i % palette.length] : '#F9FAFB'}" stroke="${strokes[i % strokes.length]}" stroke-width="2"/>`)
+    }
+    p.push(`<rect x="${LABEL_W}" y="${yy}" width="${BAR_W}" height="${BAR_H}" fill="none" stroke="#374151" stroke-width="3"/>`)
+  })
+  p.push(`<text x="${W / 2}" y="${H - 12}" text-anchor="middle" font-family="sans-serif" font-size="21" fill="#6B7280">1つ分の 大きさが ちがうことに 注目しよう</text>`)
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${p.join('')}</svg>`
+}
+
+/**
+ * 🎯 LLM が指定した diagram フィールドから SVG を描く。
+ *   テキスト解析（autoBuildProblemSVG）より優先される。
+ *   LLM は「型と数値」だけを指示し、描画はコードが行うので個数が必ず正確になる。
+ */
+function buildSVGFromDiagramSpec(spec: any): { svg: string; kind: string } | null {
+  if (!spec || typeof spec !== 'object') return null
+  const type = String(spec.type || '').toLowerCase()
+  try {
+    if (type === 'count') {
+      const svg = buildCountSVG(Number(spec.n), String(spec.label || ''))
+      return svg ? { svg, kind: 'count' } : null
+    }
+    if (type === 'order') {
+      const items = Array.isArray(spec.items) ? spec.items.map((x: any) => String(x)) : []
+      const idx = Number.isFinite(Number(spec.ask_index)) ? Number(spec.ask_index) : -1
+      const svg = buildOrderSVG(items, idx, String(spec.from_label || 'まえ'))
+      return svg ? { svg, kind: 'order' } : null
+    }
+    if (type === 'compare') {
+      const groups = (Array.isArray(spec.groups) ? spec.groups : [])
+        .map((g: any) => ({ label: String(g?.label || ''), n: Number(g?.n), counter: 'こ' }))
+        .filter((g: any) => Number.isFinite(g.n) && g.n > 0)
+      if (groups.length < 2) return null
+      const svg = buildCountingSVG(groups)
+      return svg ? { svg, kind: 'compare' } : null
+    }
+    if (type === 'decompose') {
+      const svg = buildDecomposeSVG(Number(spec.total), Number(spec.known), String(spec.label || ''))
+      return svg ? { svg, kind: 'decompose' } : null
+    }
+    if (type === 'numberline') {
+      const mark = spec.mark === null || spec.mark === undefined ? null : Number(spec.mark)
+      const svg = buildNumberLineSVG(Number(spec.min), Number(spec.max), mark, Number(spec.step) || 1)
+      return svg ? { svg, kind: 'numberline' } : null
+    }
+    if (type === 'tape') {
+      const bars = (Array.isArray(spec.bars) ? spec.bars : [])
+        .map((b: any) => ({ label: String(b?.label || ''), len: Number(b?.len) }))
+      const svg = buildTapeSVG(bars)
+      return svg ? { svg, kind: 'tape' } : null
+    }
+    if (type === 'fraction') {
+      const fr = (Array.isArray(spec.fractions) ? spec.fractions : [])
+        .map((f: any) => ({ num: Number(f?.num), den: Number(f?.den) }))
+      const svg = buildFractionSVG(fr)
+      return svg ? { svg, kind: 'fraction' } : null
+    }
+  } catch { /* 図の失敗で生成を止めない */ }
+  return null
 }
 
 /**
