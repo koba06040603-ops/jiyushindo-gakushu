@@ -2293,6 +2293,141 @@ ai_teacher_message, hints（3件: hint_level, hint_text）を必ず埋めるこ�
   }
 })
 
+// ============================================================
+// 🔍 指定カリキュラムのコース/カード実数を確認する（DIAG_KEY 保護）
+// ============================================================
+app.get('/api/diag/curriculum-cards/:id', async (c) => {
+  const { env } = c
+  const diagKey = (env as any).DIAG_KEY
+  if (diagKey && c.req.query('key') !== diagKey) {
+    return c.json({ success: false, error: 'invalid diag key' }, 403)
+  }
+  const id = c.req.param('id')
+  try {
+    const cur = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(id).first()
+    const courses = await env.DB.prepare('SELECT id, course_name FROM courses WHERE curriculum_id = ?').bind(id).all()
+    const detail: any[] = []
+    for (const co of (courses.results || []) as any[]) {
+      const cards = await env.DB.prepare(
+        `SELECT card_id, card_number, card_title,
+                SUBSTR(COALESCE(NULLIF(TRIM(problem_text),''), NULLIF(TRIM(problem_description),''), ''), 1, 40) AS body
+         FROM learning_cards WHERE course_id = ? ORDER BY card_number`
+      ).bind(co.id).all()
+      detail.push({
+        course_id: co.id,
+        course_name: co.course_name,
+        card_count: (cards.results || []).length,
+        cards: (cards.results || []).map((x: any) => ({ id: x.card_id, n: x.card_number, title: x.card_title, body: x.body })),
+      })
+    }
+    return c.json({
+      success: true,
+      curriculum: cur ? { id: (cur as any).id, unit_name: (cur as any).unit_name, grade: (cur as any).grade, subject: (cur as any).subject } : null,
+      course_count: detail.length,
+      total_cards: detail.reduce((s, d) => s + d.card_count, 0),
+      courses: detail,
+    })
+  } catch (e: any) {
+    return c.json({ success: false, error: String(e?.message ?? e) }, 500)
+  }
+})
+
+// 単元名で検索してカード数を一覧（DIAG_KEY 保護）
+app.get('/api/diag/find-unit', async (c) => {
+  const { env } = c
+  const diagKey = (env as any).DIAG_KEY
+  if (diagKey && c.req.query('key') !== diagKey) {
+    return c.json({ success: false, error: 'invalid diag key' }, 403)
+  }
+  const q = c.req.query('q') || ''
+  try {
+    const rows = await env.DB.prepare(
+      `SELECT c.id, c.grade, c.subject, c.unit_name, COALESCE(c.textbook_company,'') AS textbook_company,
+              (SELECT COUNT(*) FROM courses co WHERE co.curriculum_id = c.id) AS course_count,
+              (SELECT COUNT(*) FROM learning_cards lc
+                 JOIN courses co2 ON co2.id = lc.course_id
+                WHERE co2.curriculum_id = c.id) AS card_count
+         FROM curriculum c
+        WHERE c.unit_name LIKE ?
+        ORDER BY c.id DESC LIMIT 30`
+    ).bind(`%${q}%`).all()
+    return c.json({ success: true, count: (rows.results || []).length, units: rows.results })
+  } catch (e: any) {
+    return c.json({ success: false, error: String(e?.message ?? e) }, 500)
+  }
+})
+
+// ============================================================
+// 🔧 重複単元の統合
+//   同じ 学年 × 教科 × 教科書 × 単元名 で複数レコードがあると、
+//   「カードがある単元」と「空の単元」が並存し、
+//   空のほうを開いた先生には『カードがまだありません』と見える。
+//   → カードを持つレコードを「正」とし、空の重複を削除する。
+//   ?apply=1 で実行（既定は診断のみ）
+// ============================================================
+app.get('/api/diag/dedupe-units', async (c) => {
+  const { env } = c
+  const diagKey = (env as any).DIAG_KEY
+  if (diagKey && c.req.query('key') !== diagKey) {
+    return c.json({ success: false, error: 'invalid diag key' }, 403)
+  }
+  const apply = c.req.query('apply') === '1'
+  try {
+    const rows = await env.DB.prepare(
+      `SELECT c.id, c.grade, c.subject, COALESCE(c.textbook_company,'') AS tb, c.unit_name,
+              (SELECT COUNT(*) FROM learning_cards lc
+                 JOIN courses co ON co.id = lc.course_id
+                WHERE co.curriculum_id = c.id) AS card_count
+         FROM curriculum c
+        ORDER BY c.id`
+    ).all()
+
+    const groups = new Map<string, any[]>()
+    for (const r of (rows.results || []) as any[]) {
+      const k = `${r.grade}|${r.subject}|${r.tb}|${r.unit_name}`
+      if (!groups.has(k)) groups.set(k, [])
+      groups.get(k)!.push(r)
+    }
+
+    const plan: any[] = []
+    let removed = 0
+    for (const [k, list] of groups) {
+      if (list.length < 2) continue
+      const withCards = list.filter((x) => x.card_count > 0)
+      // カード付きが2件以上ある場合は自動削除しない（人手で判断すべき）
+      if (withCards.length > 1) {
+        plan.push({ key: k, action: 'skip_ambiguous', ids: list.map((x) => x.id) })
+        continue
+      }
+      const keep = withCards[0] || list[list.length - 1]   // 無ければ最新を残す
+      const drop = list.filter((x) => x.id !== keep.id && x.card_count === 0)
+      if (drop.length === 0) continue
+      plan.push({ key: k, keep: keep.id, keep_cards: keep.card_count, drop: drop.map((x) => x.id) })
+      if (apply) {
+        for (const d of drop) {
+          try {
+            await env.DB.prepare('DELETE FROM courses WHERE curriculum_id = ?').bind(d.id).run().catch(() => {})
+            await env.DB.prepare('DELETE FROM curriculum_metadata WHERE curriculum_id = ?').bind(d.id).run().catch(() => {})
+            await env.DB.prepare('DELETE FROM curriculum WHERE id = ?').bind(d.id).run()
+            removed++
+          } catch (e: any) {
+            plan.push({ key: k, id: d.id, error: e.message })
+          }
+        }
+      }
+    }
+    return c.json({
+      success: true,
+      applied: apply,
+      duplicate_groups: plan.length,
+      removed,
+      plan: plan.slice(0, 100),
+    })
+  } catch (e: any) {
+    return c.json({ success: false, error: String(e?.message ?? e) }, 500)
+  }
+})
+
 // 一時的DBスキーマ確認エンドポイント
 app.get('/api/debug/schema', async (c) => {
   const { env } = c
@@ -11486,7 +11621,7 @@ app.get('/guide/:curriculumId', async (c) => {
 
         // ジャケット画像（NB2が同時生成）
         if (data.cover_image_url) {
-          html += '<div style="text-align:center;margin-bottom:12px;"><img src="' + data.cover_image_url + '" alt="ジャケット画像" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'" /></div>';
+          html += '<div style="text-align:center;margin-bottom:12px;"><img src="' + data.cover_image_url + '" alt="ジャケット画像" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=&quot;scale(1.02)&quot;" onmouseout="this.style.transform=&quot;scale(1)&quot;" /></div>';
         }
 
         // 歌詞プレビュー
@@ -11655,7 +11790,7 @@ app.get('/guide/:curriculumId', async (c) => {
     .then(function(data) {
       if (data.success && data.image_url) {
         area.innerHTML = '<div style="text-align:center;">' +
-          '<img src="' + data.image_url + '" alt="ソングイメージ" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'" />' +
+          '<img src="' + data.image_url + '" alt="ソングイメージ" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=&quot;scale(1.02)&quot;" onmouseout="this.style.transform=&quot;scale(1)&quot;" />' +
           '<p style="font-size:0.7rem;color:#8B5CF6;margin-top:4px;">' + (data.model || 'Nano Banana 2') + '（' + ((data.generation_time_ms||0)/1000).toFixed(1) + '秒）</p>' +
           '<button onclick="generateSongImage(' + page + ')" style="margin-top:4px;background:#EC4899;color:white;border:none;padding:5px 12px;border-radius:8px;font-size:0.75rem;font-weight:bold;cursor:pointer;">🔄 別のイメージ</button></div>';
       } else {
@@ -11967,7 +12102,7 @@ app.get('/guide/:curriculumId', async (c) => {
         // 例題の図解（AI生成済みまたはボタン表示）
         html += '<div id="example-diagram-' + currentPage + '">';
         if (c.example_image_url) {
-          html += '<div style="text-align:center;margin:8px 0;"><img src="' + c.example_image_url + '" alt="例題の図" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #FDE68A;box-shadow:0 6px 24px rgba(245,158,11,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'"></div>';
+          html += '<div style="text-align:center;margin:8px 0;"><img src="' + c.example_image_url + '" alt="例題の図" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #FDE68A;box-shadow:0 6px 24px rgba(245,158,11,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=&quot;scale(1.02)&quot;" onmouseout="this.style.transform=&quot;scale(1)&quot;"></div>';
         } else {
           html += '<div style="display:flex;align-items:center;gap:8px;margin:8px 0;padding:8px 12px;background:linear-gradient(135deg,#FEF3C7,#FDE68A);border-radius:10px;">';
           html += '<i class="fas fa-image" style="color:#D97706;font-size:1.2rem;"></i>';
@@ -12002,7 +12137,7 @@ app.get('/guide/:curriculumId', async (c) => {
       } else if (/\\.(mp3|wav|ogg|m4a|aac)/i.test(imgUrl)) {
         html += '<div style="margin:10px 0;background:#F0FDF4;border:2px solid #BBF7D0;border-radius:12px;padding:12px;text-align:center;"><i class="fas fa-music" style="color:#10B981;font-size:1.5rem;margin-bottom:8px;display:block;"></i><audio controls style="width:100%;max-width:400px;"><source src="' + imgUrl + '" type="audio/mpeg"><source src="' + imgUrl + '" type="audio/mp4"><source src="' + imgUrl + '" type="audio/wav"></audio><p style="font-size:0.75rem;color:#6b7280;margin-top:4px;">🎵 音声を聞いてみよう</p></div>';
       } else {
-        html += '<div style="text-align:center;margin:10px 0;"><img src="' + imgUrl + '" alt="問題の図" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #e5e7eb;box-shadow:0 6px 24px rgba(0,0,0,0.1);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'"></div>';
+        html += '<div style="text-align:center;margin:10px 0;"><img src="' + imgUrl + '" alt="問題の図" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #e5e7eb;box-shadow:0 6px 24px rgba(0,0,0,0.1);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=&quot;scale(1.02)&quot;" onmouseout="this.style.transform=&quot;scale(1)&quot;"></div>';
       }
       // 画像があっても追加のAI図解を生成できるボタン
       html += '<div id="extra-diagram-' + currentPage + '" style="text-align:center;margin:4px 0;">';
@@ -12901,10 +13036,10 @@ app.get('/guide/:curriculumId', async (c) => {
     
     area.innerHTML = '<div style="text-align:center;padding:12px;"><i class="fas fa-spinner fa-spin" style="color:#D97706;font-size:1.5rem;"></i><p style="font-size:0.78rem;color:#D97706;margin-top:6px;font-weight:bold;">AIが例題の図を描いています...</p></div>';
     
-    var prompt = '日本の' + grade + subject + 'の教科書に載る例題の図解を描いてください。\n';
-    prompt += '【カードタイトル】' + cardTitle + '\n';
-    prompt += '【例題】' + exProblem + '\n';
-    if (exSolution) prompt += '【解き方】' + exSolution + '\n';
+    var prompt = '日本の' + grade + subject + 'の教科書に載る例題の図解を描いてください。\\n';
+    prompt += '【カードタイトル】' + cardTitle + '\\n';
+    prompt += '【例題】' + exProblem + '\\n';
+    if (exSolution) prompt += '【解き方】' + exSolution + '\\n';
     prompt += '条件：教科書のイラスト風。児童にわかりやすい色使い。文字は大きく日本語で。幾何の図形は正確に描く。ラベル（頂点名ABCD等）を明確に。白い背景。';
     
     fetch('/api/ai/generate-image', {
@@ -12928,7 +13063,7 @@ app.get('/guide/:curriculumId', async (c) => {
         var cid = c.card_id || c.id || 0;
         var html = '<div style="text-align:center;margin:8px 0;">';
         html += '<p style="font-size:0.68rem;font-weight:bold;color:#92400E;margin-bottom:4px;">📐 例題の図解</p>';
-        html += '<img src="' + data.image_url + '" alt="例題の図" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #FDE68A;box-shadow:0 6px 24px rgba(245,158,11,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'">';
+        html += '<img src="' + data.image_url + '" alt="例題の図" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #FDE68A;box-shadow:0 6px 24px rgba(245,158,11,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=&quot;scale(1.02)&quot;" onmouseout="this.style.transform=&quot;scale(1)&quot;">';
         html += '<div style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;">';
         html += '<p style="font-size:0.65rem;color:#9CA3AF;margin:0;">' + (data.model || 'AI') + ' / ' + Math.round((data.generation_time_ms || 0) / 1000) + '秒</p>';
         html += '<button onclick="generateExampleDiagram(' + page + ')" style="font-size:0.7rem;color:#D97706;background:none;border:1px solid #FDE68A;padding:2px 10px;border-radius:6px;cursor:pointer;">🖼️ 図を再生成</button>';
@@ -12961,10 +13096,10 @@ app.get('/guide/:curriculumId', async (c) => {
     
     area.innerHTML = '<div style="text-align:center;padding:10px;"><i class="fas fa-spinner fa-spin" style="color:#D97706;font-size:1.3rem;"></i><p style="font-size:0.75rem;color:#D97706;margin-top:4px;font-weight:bold;">AIがやり方の図を描いています...</p></div>';
     
-    var prompt = '日本の' + grade + subject + 'の児童向け体験活動の図解イラスト。\n';
-    prompt += '【カード】' + cardTitle + '\n';
-    prompt += '【やる活動】' + tactile + '\n';
-    prompt += '【問題】' + (c.problem_text || '').substring(0, 200) + '\n';
+    var prompt = '日本の' + grade + subject + 'の児童向け体験活動の図解イラスト。\\n';
+    prompt += '【カード】' + cardTitle + '\\n';
+    prompt += '【やる活動】' + tactile + '\\n';
+    prompt += '【問題】' + (c.problem_text || '').substring(0, 200) + '\\n';
     prompt += '条件：手順がわかるステップバイステップのイラスト。明るく楽しい色使い。日本語で手順番号(①②③)を大きく表示。子どもの手が作業している様子。白い背景。教科書の挿絵風。';
     
     fetch('/api/ai/generate-image', {
@@ -12985,7 +13120,7 @@ app.get('/guide/:curriculumId', async (c) => {
     .then(function(data) {
       if (data.success && data.image_url) {
         var html = '<div style="text-align:center;margin:8px 0;">';
-        html += '<img src="' + data.image_url + '" alt="やり方の図" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #FDE68A;box-shadow:0 6px 24px rgba(245,158,11,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'">';
+        html += '<img src="' + data.image_url + '" alt="やり方の図" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #FDE68A;box-shadow:0 6px 24px rgba(245,158,11,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=&quot;scale(1.02)&quot;" onmouseout="this.style.transform=&quot;scale(1)&quot;">';
         html += '<div style="display:flex;justify-content:center;gap:8px;margin-top:6px;">';
         html += '<p style="font-size:0.6rem;color:#9CA3AF;">' + (data.model || 'AI') + ' / ' + Math.round((data.generation_time_ms || 0)/1000) + '秒</p>';
         html += '<button onclick="generateTactileDiagram(' + page + ')" style="font-size:0.7rem;color:#D97706;background:none;border:1px solid #FDE68A;padding:2px 10px;border-radius:6px;cursor:pointer;">🔄 もう一度</button>';
@@ -13084,10 +13219,10 @@ app.get('/guide/:curriculumId', async (c) => {
     
     resultArea.innerHTML = '<div style="text-align:center;padding:12px;"><i class="fas fa-spinner fa-spin" style="color:#8B5CF6;font-size:1.5rem;"></i><p style="font-size:0.78rem;color:#8B5CF6;margin-top:6px;font-weight:bold;">AIが図を描いています...</p></div>';
     
-    var prompt = '日本の' + (CURRICULUM.grade||'') + (CURRICULUM.subject||'') + 'の教科書に載る図解を描いてください。\n';
-    prompt += '【カード】' + (c.card_title || '') + '\n';
-    prompt += '【図の説明】' + imageDesc + '\n';
-    if (c.problem_text) prompt += '【もんだい】' + (c.problem_text || '').substring(0, 200) + '\n';
+    var prompt = '日本の' + (CURRICULUM.grade||'') + (CURRICULUM.subject||'') + 'の教科書に載る図解を描いてください。\\n';
+    prompt += '【カード】' + (c.card_title || '') + '\\n';
+    prompt += '【図の説明】' + imageDesc + '\\n';
+    if (c.problem_text) prompt += '【もんだい】' + (c.problem_text || '').substring(0, 200) + '\\n';
     prompt += '条件：教科書のイラスト風。児童にわかりやすい色使い。文字は大きく日本語で。幾何の図形は正確に描く。ラベルを明確に。白い背景。';
     
     fetch('/api/ai/generate-image', {
@@ -13105,7 +13240,7 @@ app.get('/guide/:curriculumId', async (c) => {
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.success && data.image_url) {
-        resultArea.innerHTML = '<div style="text-align:center;margin-top:4px;"><img src="' + data.image_url + '" alt="AI図解" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'"><div style="margin-top:4px;"><span style="font-size:0.6rem;color:#9CA3AF;">' + (data.model || 'AI') + ' / ' + Math.round((data.generation_time_ms || 0)/1000) + '秒</span> <button onclick="generateImageFromDesc(' + page + ')" style="font-size:0.65rem;color:#8B5CF6;background:none;border:1px solid #DDD6FE;padding:2px 8px;border-radius:6px;cursor:pointer;margin-left:4px;">🔄 再生成</button></div></div>';
+        resultArea.innerHTML = '<div style="text-align:center;margin-top:4px;"><img src="' + data.image_url + '" alt="AI図解" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=&quot;scale(1.02)&quot;" onmouseout="this.style.transform=&quot;scale(1)&quot;"><div style="margin-top:4px;"><span style="font-size:0.6rem;color:#9CA3AF;">' + (data.model || 'AI') + ' / ' + Math.round((data.generation_time_ms || 0)/1000) + '秒</span> <button onclick="generateImageFromDesc(' + page + ')" style="font-size:0.65rem;color:#8B5CF6;background:none;border:1px solid #DDD6FE;padding:2px 8px;border-radius:6px;cursor:pointer;margin-left:4px;">🔄 再生成</button></div></div>';
       } else {
         resultArea.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">図の生成に失敗 <button onclick="generateImageFromDesc(' + page + ')" style="color:#8B5CF6;background:none;border:none;cursor:pointer;text-decoration:underline;">再試行</button></p>';
       }
@@ -13122,7 +13257,7 @@ app.get('/guide/:curriculumId', async (c) => {
     var lyrics = lyricsEl ? lyricsEl.textContent.trim() : '';
     if (!lyrics) { lyrics = c.card_title || '学習ソング'; }
     // セクションタグ除去
-    var cleanText = lyrics.replace(/\[.*?\]/g, '').replace(/\n+/g, '。').substring(0, 600);
+    var cleanText = lyrics.replace(/\\[.*?\\]/g, '').replace(/\\n+/g, '。').substring(0, 600);
     var origHTML = btn.innerHTML;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 読み込み中...';
     btn.disabled = true;
@@ -13241,7 +13376,7 @@ app.get('/guide/:curriculumId', async (c) => {
     .then(function(data) {
       if (data.success && data.image_url) {
         var html = '<div style="text-align:center;margin-top:8px;">';
-        html += '<img src="' + data.image_url + '" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #BBF7D0;box-shadow:0 6px 24px rgba(5,150,105,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'" alt="AI図解">';
+        html += '<img src="' + data.image_url + '" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #BBF7D0;box-shadow:0 6px 24px rgba(5,150,105,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=&quot;scale(1.02)&quot;" onmouseout="this.style.transform=&quot;scale(1)&quot;" alt="AI図解">';
         html += '<div style="display:flex;justify-content:center;gap:8px;margin-top:6px;">';
         html += '<p style="font-size:0.6rem;color:#9CA3AF;">' + (data.model || 'AI') + ' / ' + Math.round((data.generation_time_ms || 0)/1000) + '秒</p>';
         html += '<button onclick="generateDiagramFallback(' + page + ')" style="font-size:0.7rem;color:#059669;background:none;border:1px solid #BBF7D0;padding:3px 10px;border-radius:6px;cursor:pointer;">🔄 再生成</button>';
@@ -13288,8 +13423,8 @@ app.get('/guide/:curriculumId', async (c) => {
         html += '<textarea id="suno-lyrics-' + page + '" rows="8" style="width:100%;border:2px solid #FBCFE8;border-radius:8px;padding:6px 10px;font-size:0.75rem;resize:vertical;box-sizing:border-box;margin:4px 0;font-family:monospace;">' + (sd.suno_lyrics || '').replace(/</g, '&lt;') + '</textarea>';
         if (sd.usage_tips) html += '<p style="font-size:0.65rem;color:#6B7280;margin-top:4px;"><i class="fas fa-lightbulb" style="color:#F59E0B;margin-right:4px;"></i>' + sd.usage_tips + '</p>';
         html += '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">';
-        html += '<button onclick="(function(){var el=document.getElementById(\'suno-lyrics-' + page + '\');if(el)navigator.clipboard.writeText(el.value).then(function(){showCoachBubble(\'歌詞をコピーしました！Sunoに貼り付けてね\',\'celebrate\',2000,false)})})()" style="background:#EC4899;color:white;border:none;padding:8px 16px;border-radius:10px;font-size:0.78rem;font-weight:bold;cursor:pointer;"><i class="fas fa-copy" style="margin-right:4px;"></i>歌詞コピー</button>';
-        html += '<button onclick="(function(){var el=document.getElementById(\'suno-style-' + page + '\');if(el)navigator.clipboard.writeText(el.value).then(function(){showCoachBubble(\'スタイルをコピーしました！\',\'encourage\',2000,false)})})()" style="background:#F9A8D4;color:#BE185D;border:none;padding:8px 16px;border-radius:10px;font-size:0.78rem;font-weight:bold;cursor:pointer;"><i class="fas fa-copy" style="margin-right:4px;"></i>スタイルコピー</button>';
+        html += '<button onclick="(function(){var el=document.getElementById(\\'suno-lyrics-' + page + '\\');if(el)navigator.clipboard.writeText(el.value).then(function(){showCoachBubble(\\'歌詞をコピーしました！Sunoに貼り付けてね\\',\\'celebrate\\',2000,false)})})()" style="background:#EC4899;color:white;border:none;padding:8px 16px;border-radius:10px;font-size:0.78rem;font-weight:bold;cursor:pointer;"><i class="fas fa-copy" style="margin-right:4px;"></i>歌詞コピー</button>';
+        html += '<button onclick="(function(){var el=document.getElementById(\\'suno-style-' + page + '\\');if(el)navigator.clipboard.writeText(el.value).then(function(){showCoachBubble(\\'スタイルをコピーしました！\\',\\'encourage\\',2000,false)})})()" style="background:#F9A8D4;color:#BE185D;border:none;padding:8px 16px;border-radius:10px;font-size:0.78rem;font-weight:bold;cursor:pointer;"><i class="fas fa-copy" style="margin-right:4px;"></i>スタイルコピー</button>';
         html += '<a href="https://suno.com" target="_blank" style="margin-left:auto;display:inline-flex;align-items:center;gap:4px;background:#1F2937;color:white;padding:8px 16px;border-radius:10px;font-size:0.78rem;font-weight:bold;text-decoration:none;"><i class="fas fa-external-link-alt"></i>Sunoを開く</a>';
         html += '</div>';
         html += '<p style="font-size:0.6rem;color:#9CA3AF;margin-top:8px;">💡 Suno（suno.com）で4分以下の曲を1日5曲まで無料で生成できます</p>';
@@ -14971,13 +15106,13 @@ app.get('/guide/:curriculumId', async (c) => {
         // NB2 AI出力からシステムUI風の不正なボタン・リンク・ツールバーを徹底除去
         var safeWidgetHtml = (data.widget_html || '')
           // onclickに編集系キーワードを含むボタン・要素を除去
-          .replace(/<[^>]*onclick[^>]*(問題の図|例題|編集|差し替え|削除|replace|delete|edit|remove|modify)[^>]*>[^<]*<\/[^>]*>/gi, '')
+          .replace(/<[^>]*onclick[^>]*(問題の図|例題|編集|差し替え|削除|replace|delete|edit|remove|modify)[^>]*>[^<]*<\\/[^>]*>/gi, '')
           // 「問題の図」「編集」「差し替え」「削除」を含むリンク・ボタン・スパンを除去（アイコン付きも対応）
-          .replace(/<(a|button|span)[^>]*>[^<]*(問題の図|編集|差し替え|削除)[^<]*<\/(a|button|span)>/gi, '')
+          .replace(/<(a|button|span)[^>]*>[^<]*(問題の図|編集|差し替え|削除)[^<]*<\\/(a|button|span)>/gi, '')
           // ツールバー風の行（問題の図・編集・差し替え・削除が並ぶ）を丸ごと除去
-          .replace(/<(div|p|span)[^>]*>[\s\S]*?(問題の図|編集)[\s\S]*?(差し替え|削除)[\s\S]*?<\/(div|p|span)>/gi, '')
+          .replace(/<(div|p|span)[^>]*>[\\s\\S]*?(問題の図|編集)[\\s\\S]*?(差し替え|削除)[\\s\\S]*?<\\/(div|p|span)>/gi, '')
           // 隠しinputやdata属性で画像URLを保持する要素を除去
-          .replace(/<input[^>]*(image_url|img_src|edit_target)[^>]*\/?>\s*/gi, '');
+          .replace(/<input[^>]*(image_url|img_src|edit_target)[^>]*\\/?>\\s*/gi, '');
         
         widgetArea.innerHTML = '<div id="nb2-content-' + page + '" style="background:white;border-radius:14px;border:2px solid #C4B5FD;overflow:hidden;box-shadow:0 2px 8px rgba(124,58,237,0.1);">' +
           '<div style="background:linear-gradient(135deg,#7C3AED,#EC4899);padding:6px 14px;display:flex;align-items:center;justify-content:space-between;">' +
@@ -15044,14 +15179,14 @@ app.get('/guide/:curriculumId', async (c) => {
         // イラスト画像がある場合
         if (data.illustration_url) {
           widgetArea.innerHTML += '<div style="margin-top:10px;text-align:center;">' +
-            '<img src="' + data.illustration_url + '" alt="NB2イラスト" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'" />' +
+            '<img src="' + data.illustration_url + '" alt="NB2イラスト" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=&quot;scale(1.02)&quot;" onmouseout="this.style.transform=&quot;scale(1)&quot;" />' +
             '<p style="font-size:0.65rem;color:#9CA3AF;margin-top:4px;">🎨 Nano Banana 2 生成イラスト</p></div>';
         }
       } else if (data.success && data.illustration_url) {
         // HTMLなし、画像のみ
         widgetArea.innerHTML = '<div style="text-align:center;padding:12px;">' +
           '<p style="font-size:0.85rem;color:#6B7280;margin-bottom:8px;"><i class="fas fa-hand-pointer" style="margin-right:4px;"></i>' + (tactile || 'やってみよう') + '</p>' +
-          '<img src="' + data.illustration_url + '" alt="NB2教材" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'" />' +
+          '<img src="' + data.illustration_url + '" alt="NB2教材" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=&quot;scale(1.02)&quot;" onmouseout="this.style.transform=&quot;scale(1)&quot;" />' +
           '<p style="font-size:0.65rem;color:#9CA3AF;margin-top:4px;">Nano Banana 2（' + ((data.generation_time_ms||0)/1000).toFixed(1) + '秒）</p></div>';
       } else {
         // フォールバック: テキスト表示
@@ -15137,10 +15272,10 @@ app.get('/guide/:curriculumId', async (c) => {
       if (!widgetArea) return;
       if (data.success && data.widget_html) {
         var safeHtml = (data.widget_html || '')
-          .replace(/<[^>]*onclick[^>]*(問題の図|例題|編集|差し替え|削除|replace|delete|edit|remove|modify)[^>]*>[^<]*<\/[^>]*>/gi, '')
-          .replace(/<a[^>]*(問題の図|例題|編集|差し替え|削除|edit|replace|delete)[^>]*>[^<]*<\/a>/gi, '')
-          .replace(/<div[^>]*>\s*(<(button|a)[^>]*(編集|削除|差し替え|edit|delete|replace)[^>]*>[^<]*<\/(button|a)>\s*)+<\/div>/gi, '')
-          .replace(/<input[^>]*(image_url|img_src|edit_target)[^>]*\/?>\s*/gi, '');
+          .replace(/<[^>]*onclick[^>]*(問題の図|例題|編集|差し替え|削除|replace|delete|edit|remove|modify)[^>]*>[^<]*<\\/[^>]*>/gi, '')
+          .replace(/<a[^>]*(問題の図|例題|編集|差し替え|削除|edit|replace|delete)[^>]*>[^<]*<\\/a>/gi, '')
+          .replace(/<div[^>]*>\\s*(<(button|a)[^>]*(編集|削除|差し替え|edit|delete|replace)[^>]*>[^<]*<\\/(button|a)>\\s*)+<\\/div>/gi, '')
+          .replace(/<input[^>]*(image_url|img_src|edit_target)[^>]*\\/?>\\s*/gi, '');
         widgetArea.innerHTML = '<div style="background:white;border-radius:14px;border:2px solid #F59E0B;overflow:hidden;box-shadow:0 2px 8px rgba(245,158,11,0.15);">' +
           '<div style="background:linear-gradient(135deg,#F59E0B,#D97706);padding:6px 14px;display:flex;align-items:center;justify-content:space-between;">' +
           '<span style="color:white;font-size:0.75rem;font-weight:bold;"><i class="fas fa-edit" style="margin-right:4px;"></i>修正版 by Nano Banana 2</span>' +
@@ -15148,7 +15283,7 @@ app.get('/guide/:curriculumId', async (c) => {
           '</div>' +
           '<div style="padding:12px;">' + safeHtml + '</div></div>';
         if (data.illustration_url) {
-          widgetArea.innerHTML += '<div style="margin-top:8px;text-align:center;"><img src="' + data.illustration_url + '" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'" /></div>';
+          widgetArea.innerHTML += '<div style="margin-top:8px;text-align:center;"><img src="' + data.illustration_url + '" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=&quot;scale(1.02)&quot;" onmouseout="this.style.transform=&quot;scale(1)&quot;" /></div>';
         }
       } else {
         widgetArea.innerHTML = '<div style="padding:12px;text-align:center;color:#DC2626;font-size:0.85rem;">修正失敗: ' + (data.error || '再度お試しください') + '</div>';

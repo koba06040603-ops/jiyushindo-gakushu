@@ -620,3 +620,74 @@ POST /api/diag/gen-smoke {"cards_count":10} # 生成のみ実施（DB書き込�
 > これらは `DIAG_KEY`（Cloudflare Secret）を設定すると
 > `?key=` での認証が必須になる。未設定なら誰でも叩けるため、
 > 運用時は `npx wrangler pages secret put DIAG_KEY` の設定を推奨。
+
+---
+
+## 16. 学習のてびきが空白になる不具合（2026-09-19）
+
+### 症状
+
+`/guide/:id` を開くと、ヘッダーとボタンだけが表示され、
+学習カードが1枚も描画されない。
+
+### 原因：ページ内クライアントJSの構文エラー
+
+サーバーは**カードデータを正しく返していた**（HTML 1.8MB、ALL_CARDS に33枚）。
+しかしブラウザで
+
+```
+Uncaught SyntaxError: Unexpected identifier 'scale'
+```
+
+が発生し、**カード描画スクリプト全体が実行されず**に白紙になっていた。
+
+これはデータや画面デザインの問題ではなく、
+`/guide` のHTMLを生成する**テンプレートリテラル内のエスケープ崩れ**。
+
+TypeScript ソース側では正しく `\'` `\n` `\/` と書かれているが、
+テンプレートリテラル（`` ` ``）の中にあるためビルド時に1段階展開され、
+ブラウザに届く時点では生の `'` `改行` `/` になって文字列や正規表現が壊れていた。
+
+| 壊れ方 | 箇所数 | 例 |
+|--------|--------|-----|
+| `\'` → `'`（文字列が途中で閉じる） | 11 + 3 | `transform=\'scale(1.02)\'` |
+| `\n` → 生の改行（文字列が改行で切れる） | 12 | `prompt += '...\n'` |
+| `\[` `\/` → `[` `/`（正規表現が壊れる） | 9 | `.replace(/<...<\/...>/gi,'')` |
+
+合計 **35箇所**を修正。
+
+### 検証
+
+`node --check` でページ内の全 `<script>` ブロックを構文検査する手順を確立し、
+エラーが 0 になるまで反復した。
+
+| 段階 | 構文エラー |
+|------|-----------|
+| 修正前 | ❌ `Unexpected identifier 'scale'` |
+| scale修正後 | ❌ `Invalid or unexpected token`（改行） |
+| 改行修正後 | ❌ `Invalid regular expression` |
+| 正規表現修正後 | ✅ **BLOCK 0 OK / BLOCK 1 OK** |
+
+実ブラウザ（Playwright）でも構文エラーが消え、
+`ALL_CARDS` 33枚がすべて正しい問題文付きで読み込まれることを確認。
+
+> 残る 401 エラーは未ログイン状態で叩いた保存系APIのもので、
+> ログインすれば発生しない（描画には影響しない）。
+
+### 再発防止
+
+このページは巨大なテンプレートリテラルでクライアントJSを組み立てているため、
+**`\` を含む文字列・正規表現を追加する際は必ず `\\` と2重に書く**必要がある。
+変更後は以下で検査できる。
+
+```bash
+curl -s https://<host>/guide/<id> -o /tmp/g.html
+python3 - <<'P'
+import re,subprocess
+h=open('/tmp/g.html',encoding='utf-8',errors='replace').read()
+for i,b in enumerate(re.findall(r'<script[^>]*>(.*?)</script>',h,re.S)):
+    open('/tmp/b%d.js'%i,'w').write(b)
+    r=subprocess.run(['node','--check','/tmp/b%d.js'%i],capture_output=True,text=True)
+    print(i,'OK' if r.returncode==0 else r.stderr[:300])
+P
+```
