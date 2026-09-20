@@ -538,6 +538,291 @@ interface CardQualityReport {
   fixed: number
 }
 
+/**
+ * 🎓 2026-09 追加: 自由進度学習の必須要件をサーバー側で機械的に担保する。
+ * プロンプトで指示しても LLM は守りきれないため、生成後に検査して是正する。
+ * 専門家評価の指摘（総合15点）に対応:
+ *   ①図が無いのに「えを見て」 ②未習記号の混入 ③ヒントが答え
+ *   ④例題欠落 ⑤誤字
+ */
+function enforceSelfLearningQuality(cards: any[], grade: string, unitName: string) {
+  const issues: string[] = []
+  let fixed = 0
+  if (!Array.isArray(cards)) return { issues, fixed }
+
+  const gn = (() => {
+    const m = String(grade || '').match(/([0-9１-９一二三四五六])/)
+    if (!m) return 0
+    const map: Record<string, number> = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6 }
+    const ch = m[1]
+    if (map[ch]) return map[ch]
+    return parseInt(ch.replace(/[１-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)), 10) || 0
+  })()
+  const isLow = /小学/.test(String(grade || '')) && gn > 0 && gn <= 2
+  // たし算・ひき算の単元なら記号を許可する
+  const allowsArith = /たしざん|ひきざん|たし算|ひき算|加法|減法|けいさん|計算/.test(String(unitName || ''))
+
+  // よくある誤字（実データで観測されたもの）
+  const TYPOS: Array<[RegExp, string]> = [
+    [/なんてすか/g, 'なんですか'],
+    [/([0-9０-９])\s*くだい/g, '$1だい'],
+    [/なんたい/g, 'なんだい'],
+    [/なんてしょう/g, 'なんでしょう'],
+    [/おはしき/g, 'おはじき'],
+  ]
+
+  for (let i = 0; i < cards.length; i++) {
+    const card = cards[i]
+    if (!card) continue
+    const no = card.card_number ?? i + 1
+
+    // --- A. 誤字の自動修正 ---
+    for (const f of ['problem_description', 'answer_explanation', 'example_problem', 'example_solution', 'ai_teacher_message']) {
+      const v = card[f]
+      if (typeof v !== 'string' || !v) continue
+      let nv = v
+      for (const [re, rep] of TYPOS) nv = nv.replace(re, rep)
+      if (nv !== v) {
+        card[f] = nv
+        issues.push(`カード${no}: ${f} の誤字を修正`)
+        fixed++
+      }
+    }
+
+    // --- B. 未習記号のことば化（小1〜2で計算単元以外） ---
+    if (isLow && !allowsArith) {
+      for (const f of ['answer_explanation', 'example_solution']) {
+        const v = String(card[f] || '')
+        if (!v) continue
+        if (/[0-9０-９]\s*[＋+\-−×÷]\s*[0-9０-９?？]|[＝=]\s*[0-9０-９?？]/.test(v)) {
+          issues.push(`カード${no}: ${f} に未習の式が含まれる（学年: ${grade}）`)
+        }
+      }
+      if (Array.isArray(card.hints)) {
+        card.hints.forEach((h: any, hi: number) => {
+          const t = String(h?.hint_text || '')
+          if (/[0-9０-９]\s*[＋+\-−×÷]\s*[0-9０-９?？]|[＝=]\s*[0-9０-９?？]/.test(t)) {
+            issues.push(`カード${no}: ヒント${hi + 1} に未習の式が含まれる`)
+          }
+        })
+      }
+    }
+
+    // --- C. 「絵を見て」なのに数が本文に無い → 解けない問題の検出 ---
+    const prob = String(card.problem_description || card.problem_text || '')
+    if (prob) {
+      const refersVisual = /えに|絵に|えを|絵を|ずに|図に|ずを|図を|ひょうに|表に|グラフ/.test(prob)
+      const hasNumber = /[0-9０-９]/.test(prob)
+      if (refersVisual && !hasNumber) {
+        issues.push(`カード${no}: ⚠️図を参照しているが本文に数が無い（自力で解けない）`)
+      }
+    }
+
+    // --- D. 例題の欠落検出 ---
+    const exP = String(card.example_problem || '').trim()
+    const exA = String(card.example_answer || '').trim()
+    if (!exP || !exA) {
+      issues.push(`カード${no}: ⚠️例題が欠落（example_problem=${!!exP}, example_answer=${!!exA}）`)
+    }
+
+    // --- E. ヒントが「答えを言うだけ」になっていないか ---
+    if (Array.isArray(card.hints)) {
+      card.hints.forEach((h: any, hi: number) => {
+        const t = String(h?.hint_text || '').trim()
+        if (!t) return
+        // 中身の無い励ましだけのヒント
+        if (t.length <= 12 && /がんばろ|がんばって|できるよ|やってみよう$/.test(t)) {
+          issues.push(`カード${no}: ヒント${hi + 1} が励ましのみで足場になっていない`)
+        }
+        // 「さいごの◯◯がこたえ」のような思考を奪う表現
+        if (/さいごの.{0,6}が\s*こたえ|それが\s*こたえだよ$/.test(t) && hi < 2) {
+          issues.push(`カード${no}: ヒント${hi + 1} が早すぎる段階で答えを示している`)
+        }
+      })
+    }
+
+    // --- E2. ヒントに答えの数値が含まれていないか（部分一致も検出） ---
+    //   「3つ おおいですね」のように答えの数を書いてしまう事故を防ぐ
+    const ansStr = String(card.answer || '').trim()
+    const ansNums = (ansStr.match(/[0-9０-９]+/g) || []).map((x) =>
+      x.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    )
+    if (Array.isArray(card.hints) && ansNums.length > 0) {
+      card.hints.forEach((h: any, hi: number) => {
+        const t = String(h?.hint_text || '')
+        if (!t) return
+        const tNums = (t.match(/[0-9０-９]+/g) || []).map((x) =>
+          x.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+        )
+        // 答えの数が、その数を含む言い回しでヒントに出ていたら漏洩
+        for (const an of ansNums) {
+          if (!tNums.includes(an)) continue
+          // 「〇こ おおい」「〇ばんめ」のように、答えの形で書かれているか
+          const leakPattern = new RegExp(an + '\\s*(こ|つ|ばんめ|番目|ほん|本|まい|枚|だい|台|にん|人)?\\s*(おおい|多い|すくない|少ない|あまり|のこ|です|だよ|になります)')
+          if (leakPattern.test(t)) {
+            issues.push(`カード${no}: ⚠️ヒント${hi + 1}に答え「${an}」が漏れている「${t.slice(0, 30)}」`)
+            // 数字を「？」に置き換えて漏洩を防ぐ
+            h.hint_text = t.replace(new RegExp(an + '(?=\\s*(こ|つ|ばんめ|番目|ほん|本|まい|枚|だい|台|にん|人))', 'g'), '？')
+            fixed++
+            break
+          }
+        }
+      })
+    }
+
+    // --- E3. 「□に入る数」なのに□が無い等の指示不整合 ---
+    if (/□|しかく|四角|空欄|くうらん|カッコ|かっこ/.test(prob)) {
+      if (!/[□▢☐（）\(\)「」]/.test(prob)) {
+        issues.push(`カード${no}: ⚠️「□に入る」と指示しているが問題文に□が無い`)
+        // 問題文の末尾に空欄記号を補う代わりに、指示を言い換える
+        card.problem_description = String(card.problem_description || '')
+          .replace(/(しかく|四角|□)\s*(（□）)?\s*に\s*(はいる|入る)/g, 'あてはまる')
+        fixed++
+      }
+    }
+
+    // --- F. 選択肢がある場合、答えが選択肢に含まれるか ---
+    const choiceMatches = [...prob.matchAll(/[\[［]([^\]］]{2,60})[\]］]/g)]
+    if (choiceMatches.length > 0) {
+      const ans = String(card.answer || '').trim()
+      const last = choiceMatches[choiceMatches.length - 1][1]
+      const choices = last.split(/[,、，]/).map((x) => x.trim()).filter(Boolean)
+      if (ans && choices.length >= 2 && !choices.some((ch) => ch === ans || ch.includes(ans) || ans.includes(ch))) {
+        issues.push(`カード${no}: ⚠️答え「${ans}」が選択肢 [${choices.join(', ')}] に無い（正解不能）`)
+      }
+    }
+  }
+
+  return { issues, fixed }
+}
+
+/**
+ * 🧮 2026-09 追加: 答えの検算層
+ *   教材で最も許されないのは「答えが間違っている」こと。
+ *   生成時とは独立に、別プロンプトで問題を解き直して照合する。
+ *   不一致・矛盾があれば issues に上げ、明確な誤りは修正する。
+ */
+async function verifyCardAnswers(
+  cards: any[],
+  apiKey: string,
+  grade: string,
+  subject: string
+): Promise<{ issues: string[]; fixed: number; checked: number }> {
+  const issues: string[] = []
+  let fixed = 0
+  if (!Array.isArray(cards) || cards.length === 0 || !apiKey) return { issues, fixed, checked: 0 }
+
+  // 検算対象を組み立てる（本問＋例題）
+  const items = cards.map((c: any, i: number) => ({
+    i,
+    n: c?.card_number ?? i + 1,
+    problem: String(c?.problem_description || c?.problem_text || '').slice(0, 400),
+    answer: String(c?.answer || ''),
+    example_problem: String(c?.example_problem || '').slice(0, 300),
+    example_answer: String(c?.example_answer || ''),
+  })).filter((x) => x.problem && x.answer)
+
+  if (items.length === 0) return { issues, fixed, checked: 0 }
+
+  const prompt = `あなたは小学校${grade} ${subject}のベテラン教師です。
+以下の問題と「用意されている答え」が **本当に正しいか** を1問ずつ検算してください。
+
+【検算のしかた】
+1. 問題文だけを読み、あなた自身で答えを出す
+2. 用意されている答えと突き合わせる
+3. 食い違う場合、どちらが正しいかを判断する
+4. そもそも問題文の情報が足りず解けない場合は solvable=false にする
+
+【重要】
+- 表記ゆれ（「3」と「3こ」、「3ばんめ」と「3番目」）は一致とみなす
+- 問題文に数値が無く、絵や図に依存していて解けない場合は solvable=false
+- 用意されている答えが正しければ verdict="ok"
+
+JSONのみで回答:
+{"results":[{"n":カード番号,"solvable":true/false,"my_answer":"あなたが出した答え","verdict":"ok"|"wrong"|"unsolvable","correct_answer":"正しい答え(wrongのときのみ)","reason":"簡潔な理由"}]}
+
+【検算対象】
+${JSON.stringify(items.map((x) => ({ n: x.n, problem: x.problem, given_answer: x.answer })), null, 1)}`
+
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 60000)
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_QUALITY}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0, maxOutputTokens: 8192, responseMimeType: 'application/json' },
+        }),
+        signal: controller.signal,
+      }
+    )
+    clearTimeout(timer)
+    if (!res.ok) {
+      issues.push(`検算スキップ（API ${res.status}）`)
+      return { issues, fixed, checked: 0 }
+    }
+    const data: any = await res.json()
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    const parsed = parseGeminiJSON<any>(text)
+    if (!parsed.ok) {
+      issues.push('検算スキップ（応答のパース失敗）')
+      return { issues, fixed, checked: 0 }
+    }
+    const results: any[] = parsed.data?.results || []
+    for (const r of results) {
+      const card = cards.find((c: any, i: number) => (c?.card_number ?? i + 1) === r?.n)
+      if (!card) continue
+      if (r.verdict === 'wrong' && r.correct_answer) {
+        issues.push(`カード${r.n}: ⚠️答えが誤り「${card.answer}」→検算結果「${r.correct_answer}」(${r.reason || ''})`)
+        // 明確な誤りは検算結果で上書きする（教材の正確性を最優先）
+        card.answer = String(r.correct_answer)
+        fixed++
+      } else if (r.solvable === false || r.verdict === 'unsolvable') {
+        issues.push(`カード${r.n}: ⚠️問題文だけでは解けない（${r.reason || '情報不足'}）`)
+      }
+    }
+    return { issues, fixed, checked: results.length }
+  } catch (e: any) {
+    issues.push(`検算スキップ（${e?.name === 'AbortError' ? 'タイムアウト' : e?.message}）`)
+    return { issues, fixed, checked: 0 }
+  }
+}
+
+/**
+ * 🎨 2026-09 追加: 図が無いと解けないカードに、正確なSVG図を自動で付ける。
+ *   専門家評価「図が無いので一人では解けない」への対応。
+ *   AI画像生成ではなくコードで描くので、個数・順序が必ず正しい。
+ */
+function attachAutoDiagrams(cards: any[]): { issues: string[]; attached: number } {
+  const issues: string[] = []
+  let attached = 0
+  if (!Array.isArray(cards)) return { issues, attached }
+  for (let i = 0; i < cards.length; i++) {
+    const card = cards[i]
+    if (!card) continue
+    const no = card.card_number ?? i + 1
+    // すでに図があるならそのまま
+    if (card.problem_image_url) continue
+    const text = String(card.problem_description || card.problem_text || '')
+    if (!text) continue
+    try {
+      const built = autoBuildProblemSVG(text)
+      if (built) {
+        card.problem_image_url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(built.svg)))
+        card._auto_diagram = built.kind
+        issues.push(`カード${no}: ${built.kind}を自動生成`)
+        attached++
+      }
+    } catch (e: any) {
+      issues.push(`カード${no}: 図の自動生成に失敗（${e?.message}）`)
+    }
+  }
+  return { issues, attached }
+}
+
 function enforceCardQuality(cards: any[]): CardQualityReport {
   const issues: string[] = []
   let fixed = 0
@@ -2659,6 +2944,58 @@ app.get('/api/diag/fix-counting-images', async (c) => {
       verify,
       targets: targets.slice(0, 50),
     })
+  } catch (e: any) {
+    return c.json({ success: false, error: String(e?.message ?? e) }, 500)
+  }
+})
+
+// 実カードの中身（問題文/答え/ヒント/例題）をまとめて監査用に取得
+app.get('/api/diag/card-audit/:id', async (c) => {
+  const { env } = c
+  const diagKey = (env as any).DIAG_KEY
+  if (diagKey && c.req.query('key') !== diagKey) {
+    return c.json({ success: false, error: 'invalid diag key' }, 403)
+  }
+  const id = c.req.param('id')
+  const byCurriculum = c.req.query('curriculum') === '1'
+  try {
+    let cards: any[] = []
+    if (byCurriculum) {
+      const r = await env.DB.prepare(
+        `SELECT lc.* FROM learning_cards lc JOIN courses co ON co.id = lc.course_id
+          WHERE co.curriculum_id = ? ORDER BY lc.course_id, lc.card_number LIMIT 40`
+      ).bind(id).all()
+      cards = (r.results || []) as any[]
+    } else {
+      const r = await env.DB.prepare('SELECT * FROM learning_cards WHERE card_id = ?').bind(id).first()
+      if (r) cards = [r]
+    }
+    const out: any[] = []
+    for (const k of cards) {
+      let hints: any[] = []
+      try {
+        const h = await hintQuery(env.DB, (sc) => hintSelectSQL(sc), [k.card_id])
+        hints = (h.results || []) as any[]
+      } catch {}
+      out.push({
+        card_id: k.card_id,
+        course_id: k.course_id,
+        n: k.card_number,
+        title: k.card_title,
+        problem: k.problem_text || k.problem_description || '',
+        answer: k.correct_answer || k.answer || '',
+        answer_keywords: k.answer_keywords,
+        explanation: (k.answer_explanation || k.explanation || '').slice(0, 300),
+        example_problem: k.example_problem,
+        example_answer: k.example_answer,
+        example_solution: (k.example_solution || '').slice(0, 200),
+        ai_teacher_message: k.ai_teacher_message,
+        hints: hints.map((x: any) => ({ lv: x.hint_level, text: x.hint_text, tool: x.thinking_tool_suggestion })),
+        has_problem_img: !!k.problem_image_url,
+        has_example_img: !!k.example_image_url,
+      })
+    }
+    return c.json({ success: true, count: out.length, cards: out })
   } catch (e: any) {
     return c.json({ success: false, error: String(e?.message ?? e) }, 500)
   }
@@ -18909,8 +19246,81 @@ app.post('/api/ai/generate-course', async (c) => {
     // 教科の「見方・考え方」を取得
     const mikataKangaekata = getMikataKangaekata(subject)
     const mikataSection = mikataKangaekata ? `\n【この教科の「見方・考え方」（学習指導要領）】\n${mikataKangaekata}\n→ この「見方・考え方」を問題文・ヒント・解説・AI先生メッセージに自然に織り込んでください。児童生徒が教科固有の思考の視点を無意識に身につけられるよう、問いかけ方や解説の切り口に反映させてください。\n` : ''
-    const prompt = `あなたは小学校の教科指導に精通した優秀な教師です。以下の単元の学習カード${numCards}枚を生成してください。
+    // ============================================================
+    // 🎓 2026-09 大改修: 自由進度学習の必須要件
+    //   専門家評価で「総合15点 / 自力学習10点 / ヒント20点」という
+    //   深刻な結果が出たため、最上位ルールとして以下を明文化する。
+    //   主な欠陥: ①図が無いのに「えを見て」と書く ②未習記号(+ - =)の混入
+    //            ③ヒントが答えそのもの ④例題欠落 ⑤誤字
+    // ============================================================
+    const gradeNumForRule = (() => {
+      const m = String(grade || '').match(/([0-9１-９一二三四五六])/)
+      if (!m) return 0
+      const map: Record<string, number> = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6 }
+      const ch = m[1]
+      if (map[ch]) return map[ch]
+      return parseInt(ch.replace(/[１-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)), 10) || 0
+    })()
+    const isElementaryLow = /小学/.test(String(grade || '')) && gradeNumForRule > 0 && gradeNumForRule <= 2
 
+    const selfLearningRules = `
+════════════════════════════════════════════════
+★★★★★ 最優先ルール：自由進度学習の絶対要件 ★★★★★
+このシステムは「児童が先生に頼らず、ひとりで学び進める」ためのものです。
+以下に1つでも違反したカードは教材として失格です。必ず全て守ってください。
+════════════════════════════════════════════════
+
+【絶対要件1｜問題は文章だけで完結させる】
+★ problem_description は「それを読むだけで解ける」状態にすること。
+✗ 悪い例: 「えにかいてある りんごの かずを かぞえましょう」（絵が無いので解けない）
+✗ 悪い例: 「どんぐりが ならんでいます。なんこ ありますか」（数が書いていないので解けない）
+○ 良い例: 「おさらに りんごが 3こ、みかんが 5こ あります。どちらが なんこ おおいですか」
+→ 「え」「図」「ひょう」「グラフ」を参照する表現を使うなら、
+　 **必要な数・情報を必ず本文中にも文字で書く**こと。
+→ 迷ったら「絵への言及をやめて、数を本文に書く」を選ぶこと。
+
+【絶対要件2｜ヒントは答えを言わない。手の動かし方を教える】
+★ hints は「答えを小出しにするもの」ではなく「自分で解くための足場」です。
+✗ 悪い例: 「さいごの かずが こたえだよ」（考える余地がない）
+✗ 悪い例: 「3こめは『？』」（答えを言っている）
+✗ 悪い例: 「がんばろう！」（何の助けにもならない）
+○ hint_level 1 = **どこに注目するか**（例:「2つの かずを くらべるんだね。まず おおきいほうを さがそう」）
+○ hint_level 2 = **手を動かす具体的な方法**（例:「おはじきを 4こと 3こ ならべて、1こずつ ペアに してみよう」）
+○ hint_level 3 = **答えの直前まで導くが答えは言わない**（例:「ペアに ならずに のこったのは なんこ？ それが こたえだよ」）
+★ answer の値そのもの（数字・語句）を hint_text に絶対に書かないこと。
+
+【絶対要件3｜例題は必ず付ける。本問より易しくする】
+★ example_problem / example_answer / example_solution は **省略禁止**。
+★ 例題は本問と「同じ考え方・より易しい数」にすること。
+★ 例題の答えは本問の答えと **必ず別の値** にすること。
+
+【絶対要件4｜誤字を出さない】
+★ 生成後に自分で読み返し、助数詞・送りがなを確認すること。
+✗ 「4くだい」→ ○「4だい」　✗「なんてすか」→ ○「なんですか」
+★ ${isElementaryLow ? '小学1〜2年なので、漢字はできるだけ使わず、ひらがな中心・わかち書きにすること。' : '学年に応じた漢字を使い、習っていない漢字にはふりがなの配慮をすること。'}
+
+【絶対要件5｜未習の記号・用語を使わない】${isElementaryLow ? `
+★ この学年（小学${gradeNumForRule}年）では以下を **解説・ヒント・例題に一切書かない**:
+　 ✗ 「＋」「−」「×」「÷」「＝」の記号（単元がたし算・ひき算の場合のみ使用可）
+　 ✗ 式の形（例: 「5 + ? = 8」「4 - 3 = 1」）
+○ かわりに ことばで書く: 「8は 5と いくつ？」「4は 3より 1 おおきい」
+★ 文はみじかく。1文は25字以内を目安にすること。` : `
+★ その学年でまだ習っていない用語・記号・公式を使わないこと。
+★ 使う必要がある場合は、その場で意味を説明すること。`}
+
+【絶対要件6｜答えは検算して確定させる】
+★ answer を書く前に、自分で問題文の条件から計算し直すこと。
+★ 問題文の数値と answer が矛盾していないか必ず確認すること。
+★ 選択肢を出す場合、answer は必ず選択肢の中に含めること。
+
+【絶対要件7｜答え合わせまで一人でできるようにする】
+★ answer_explanation は「なぜその答えになるか」を①②③の手順で書くこと。
+★ 単に答えを繰り返すのではなく、**児童が自分の考えと見比べられる**書き方にすること。
+════════════════════════════════════════════════
+`
+
+    const prompt = `あなたは小学校の教科指導に精通した優秀な教師です。以下の単元の学習カード${numCards}枚を生成してください。
+${selfLearningRules}
 【単元情報】
 - 学年: ${grade}
 - 教科: ${subject}
@@ -19352,6 +19762,32 @@ ${customInfo}${mikataSection}
     // 意味的制約は強制できない。実測でも 6枚中2枚に例題重複が発生したため、
     // サーバー側で検出し自動是正する。
     // ============================================================
+    // 🧮 答えの検算（教材の正確性を最優先。誤りがあれば検算結果で上書き）
+    const verifyReport = await verifyCardAnswers(
+      courseData.cards, apiKey, String(grade || ''), String(subject || '')
+    )
+    if (verifyReport.issues.length > 0) {
+      console.warn('🧮 検算で検出:', verifyReport.issues.slice(0, 15))
+      console.log(`🔧 答えの訂正: ${verifyReport.fixed}件 / 検算 ${verifyReport.checked}問`)
+    } else {
+      console.log(`🧮 検算: 全${verifyReport.checked}問 正常`)
+    }
+
+    // 🎨 図が必要な問題に、正確なSVG図を自動で付ける
+    const diagReport = attachAutoDiagrams(courseData.cards)
+    if (diagReport.attached > 0) {
+      console.log(`🎨 図を自動生成: ${diagReport.attached}枚`, diagReport.issues.slice(0, 10))
+    }
+
+    // 🎓 自由進度学習の要件チェック（誤字自動修正＋自力解決の阻害要因を検出）
+    const selfReport = enforceSelfLearningQuality(courseData.cards, String(grade || ''), String(unitName || ''))
+    if (selfReport.issues.length > 0) {
+      console.warn('🎓 自由進度学習チェック:', selfReport.issues.slice(0, 15))
+      console.log(`🔧 誤字自動修正: ${selfReport.fixed}件`)
+    } else {
+      console.log('🎓 自由進度学習チェック: 問題なし')
+    }
+
     const qualityReport = enforceCardQuality(courseData.cards)
     if (qualityReport.issues.length > 0) {
       console.warn('⚠️ 品質ゲート検出:', qualityReport.issues)
@@ -29318,7 +29754,27 @@ ${forbiddenNote}
 - 良い: 「水」「二酸化炭素」「日光」「葉緑体」「酸素」「デンプン」「土」「酸性雨」の8カードから、「材料」「装置」「産物」「無関係」4ゾーンに振り分け。間違ったゾーンに置くと「これは光合成に必要ないよ」と即時フィードバック。
 - 悪い: スライダー1個で何かが動くだけ ← 何を学んだか不明
 
+[本質]「2つの数を1対1で対応させると、多い少ないが分かる」（小1算数）
+- 良い: あかい玉4個・あおい玉3個を実際に **指で1つずつ線で結べる**（タップで結線）。
+  結び終わると、ペアにならず余った玉が点滅し「あかが ？こ あまったね」と気づきメッセージ。
+  結ぶ前に答えは出さない。児童が自分の手で対応づけた結果として差が見える。
+- 悪い: 玉が並んでいるだけで動かせない／線が最初から引いてある ← 児童の思考が発生しない
+
+[本質]「10はいくつといくつに分けられる」（小1算数）
+- 良い: 10個のブロックを2つの箱に **自由にドラッグで分けられる**。
+  分けるたびに「6と4」「7と3」と表示され、児童が **何通りもあることに自分で気づく**。
+  「ぜんぶで何通り見つけられるかな？」と探索を促す。
+- 悪い: 「6と4」と答えを表示して終わり ← 発見の機会を奪っている
+
+★★★ 算数の教材で特に守ること ★★★
+・**児童が自分の手で操作した結果として答えが見える**構造にすること
+・答えを先に表示しない。操作の結果として現れるようにする
+・「数を数えるだけ」で終わらせず、**なぜそうなるかの気づき**まで運ぶ
+・低学年（小1〜2）なら、文字は最小限にして **触って動かす**ことを中心にする
+
 【★ 悪い設計例 — 絶対にやってはいけない ★】
+- 「操作できない飾りの要素を大量に置く」→ 画面が散らかるだけ（例: 教室の机・スプーン等の無関係カード）
+- 「本題と無関係なミニゲームを横に付ける」→ 集中を削ぐ。本題だけに絞ること
 - 「丸が1個もない画面で『あと8つ配置してね』と書く」→ 動かないウィジェット、最悪
 - 「江戸からの距離だけで分類させる」→ 本質である『なぜそう配置したか』に触れていない
 - 「具体例の名前を使わず、抽象的な丸だけ」→ 学習にならない
@@ -35147,6 +35603,131 @@ function escXml(t: string) {
  * 2グループの一対一対応（くらべる）を SVG で描く。
  * 個数はコードで制御するので必ず正確になる。
  */
+/**
+ * 🎨 2026-09 追加: 小学校低学年に必須の「図」を自動生成する。
+ *   専門家評価で「図が無いので一人では解けない（自己完結40点）」と
+ *   指摘されたため、問題文の型を判定して適切な図をコードで描く。
+ *   AI画像生成と違い、個数・順序が100%正確になる。
+ */
+
+// ① 順序（なんばんめ）の図
+function buildOrderSVG(items: string[], markIndex: number, fromLabel = 'まえ') {
+  if (!items.length) return null
+  const R = 30, GAP = 34, PAD = 60
+  const W = Math.max(540, PAD * 2 + items.length * (R * 2 + GAP))
+  const H = 250
+  const p: string[] = [`<rect width="${W}" height="${H}" fill="#FFFFFF"/>`]
+  // 「まえ」の矢印
+  p.push(`<text x="${PAD - 20}" y="70" font-family="sans-serif" font-size="26" font-weight="bold" fill="#2563EB">${escXml(fromLabel)}</text>`)
+  p.push(`<line x1="${PAD - 20}" y1="82" x2="${W - PAD}" y2="82" stroke="#93C5FD" stroke-width="3"/>`)
+  p.push(`<polygon points="${W - PAD},76 ${W - PAD + 14},82 ${W - PAD},88" fill="#93C5FD"/>`)
+  items.forEach((it, i) => {
+    const cx = PAD + R + i * (R * 2 + GAP)
+    const cy = 140
+    const isMark = i === markIndex
+    p.push(`<circle cx="${cx}" cy="${cy}" r="${R}" fill="${isMark ? '#FDE68A' : '#F3F4F6'}" stroke="${isMark ? '#D97706' : '#9CA3AF'}" stroke-width="${isMark ? 5 : 3}"/>`)
+    p.push(`<text x="${cx}" y="${cy + 8}" text-anchor="middle" font-family="sans-serif" font-size="22" fill="#111827">${escXml(String(it).slice(0, 3))}</text>`)
+    // 順番の数字は書かない（それが答えになるため）
+    if (isMark) {
+      p.push(`<text x="${cx}" y="${cy + R + 34}" text-anchor="middle" font-family="sans-serif" font-size="26" font-weight="bold" fill="#D97706">?</text>`)
+    }
+  })
+  p.push(`<text x="${W / 2}" y="${H - 14}" text-anchor="middle" font-family="sans-serif" font-size="22" fill="#6B7280">${escXml(fromLabel)}から じゅんばんに かぞえてみよう</text>`)
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${p.join('')}</svg>`
+}
+
+// ② 分解・合成（いくつといくつ / あといくつ）の図
+function buildDecomposeSVG(total: number, known: number, label = '') {
+  if (!total || total > 20) return null
+  const R = 26, GAP = 20, PAD = 46
+  const W = Math.max(560, PAD * 2 + total * (R * 2 + GAP))
+  const H = 260
+  const p: string[] = [`<rect width="${W}" height="${H}" fill="#FFFFFF"/>`]
+  p.push(`<text x="${W / 2}" y="44" text-anchor="middle" font-family="sans-serif" font-size="26" font-weight="bold" fill="#111827">ぜんぶで ${total}${escXml(label || 'こ')}</text>`)
+  // 全体のブロック列
+  for (let i = 0; i < total; i++) {
+    const cx = PAD + R + i * (R * 2 + GAP)
+    const known_ = i < known
+    p.push(`<circle cx="${cx}" cy="110" r="${R}" fill="${known_ ? '#60A5FA' : '#F9FAFB'}" stroke="${known_ ? '#1E40AF' : '#9CA3AF'}" stroke-width="3" ${known_ ? '' : 'stroke-dasharray="6 4"'}/>`)
+  }
+  // 区切り線
+  const splitX = PAD + known * (R * 2 + GAP) - GAP / 2
+  p.push(`<line x1="${splitX}" y1="62" x2="${splitX}" y2="164" stroke="#EF4444" stroke-width="3" stroke-dasharray="8 5"/>`)
+  p.push(`<text x="${(PAD + splitX) / 2}" y="200" text-anchor="middle" font-family="sans-serif" font-size="26" font-weight="bold" fill="#1E40AF">${known}</text>`)
+  p.push(`<text x="${(splitX + W - PAD) / 2}" y="200" text-anchor="middle" font-family="sans-serif" font-size="30" font-weight="bold" fill="#B45309">?</text>`)
+  p.push(`<text x="${W / 2}" y="${H - 14}" text-anchor="middle" font-family="sans-serif" font-size="22" fill="#6B7280">てんせんの まるは いくつ かな？</text>`)
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${p.join('')}</svg>`
+}
+
+// ③ 単純カウント（〇個ある。いくつ？）の図
+function buildCountSVG(n: number, label: string) {
+  if (!n || n > 20) return null
+  const R = 30, GAP = 26, PER = Math.min(n, 10)
+  const rows = Math.ceil(n / PER)
+  const PAD = 40
+  const W = Math.max(480, PAD * 2 + PER * (R * 2 + GAP))
+  const H = 110 + rows * (R * 2 + 26)
+  const col = pickCounterColor(label, 0)
+  const p: string[] = [`<rect width="${W}" height="${H}" fill="#FFFFFF"/>`]
+  p.push(`<text x="${PAD}" y="48" font-family="sans-serif" font-size="28" font-weight="bold" fill="#111827">${escXml(label || '')}</text>`)
+  for (let i = 0; i < n; i++) {
+    const r = Math.floor(i / PER), c = i % PER
+    const cx = PAD + R + c * (R * 2 + GAP)
+    const cy = 90 + r * (R * 2 + 26) + R
+    p.push(`<circle cx="${cx}" cy="${cy}" r="${R}" fill="${col.fill}" stroke="${col.stroke}" stroke-width="4"/>`)
+  }
+  p.push(`<text x="${W / 2}" y="${H - 12}" text-anchor="middle" font-family="sans-serif" font-size="22" fill="#6B7280">ひとつずつ ゆびで さして かぞえてみよう</text>`)
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${p.join('')}</svg>`
+}
+
+/**
+ * 問題文を解析して、最適な図を自動で選んで描く。
+ * 図を描けない場合は null（AI画像生成にフォールバック）。
+ */
+function autoBuildProblemSVG(problemText: string): { svg: string; kind: string } | null {
+  const t = String(problemText || '')
+  if (!t) return null
+
+  // --- 型A: 順序（なんばんめ） ---
+  if (/なんばんめ|何番目|ばんめ|順番|じゅんばん/.test(t)) {
+    // 「まえから いぬ、ねこ、うさぎ、くま、りす」のような列挙を拾う
+    const m = t.match(/(?:まえから|前から|ひだりから|左から|順に|じゅんに)[はも、:：\s]*「?([^。｡\n]{4,80}?)」?(?:です|が ならんで|と ならんで|の じゅん|。)/)
+    let items: string[] = []
+    if (m) {
+      items = m[1].split(/[、,，]/).map((x) => x.replace(/[「」\s]/g, '')).filter((x) => x && x.length <= 6)
+    }
+    if (items.length >= 3) {
+      // 問われている対象を探す
+      let markIdx = -1
+      for (let i = 0; i < items.length; i++) {
+        const re = new RegExp(items[i] + '\\s*(は|が)\\s*(まえから|前から|なんばんめ)')
+        if (re.test(t)) { markIdx = i; break }
+      }
+      if (markIdx < 0) {
+        for (let i = 0; i < items.length; i++) {
+          if (t.lastIndexOf(items[i]) > t.indexOf('ならんで')) { markIdx = i }
+        }
+      }
+      const svg = buildOrderSVG(items, markIdx)
+      if (svg) return { svg, kind: '順序の図' }
+    }
+  }
+
+  // --- 型B: 分解・合成（ぜんぶで◯こ、◯こ ある。あと なんこ） ---
+  const decomp = t.match(/ぜんぶで\s*([0-9０-９]{1,2})\s*(こ|個|つ|ほん|本|まい|枚)/)
+  const known = t.match(/([0-9０-９]{1,2})\s*(こ|個|つ|ほん|本|まい|枚)\s*(?:あります|のせました|はいっています|いれました)/)
+  if (decomp && known && /あと|のこり|なんこ いれ|いくつ いれ|わけ/.test(t)) {
+    const toN = (x: string) => parseInt(x.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)), 10)
+    const tot = toN(decomp[1]), kn = toN(known[1])
+    if (tot > kn && tot <= 20) {
+      const svg = buildDecomposeSVG(tot, kn, decomp[2])
+      if (svg) return { svg, kind: '分解の図' }
+    }
+  }
+
+  return null
+}
+
 function buildCountingSVG(groups: Array<{ label: string; n: number; counter: string }>, ctx?: string) {
   const gs = groups.slice(0, 2)
   if (gs.length < 1) return null
