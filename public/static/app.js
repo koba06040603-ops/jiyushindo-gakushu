@@ -1758,10 +1758,6 @@ if (document.readyState === 'loading') {
 // トップページ（学年・教科・単元選択）
 // ============================================
 async function renderTopPage() {
-  // 未完了の単元生成ジョブがあれば進捗を再開（一気通貫・再訪時の再開）
-  if (typeof resumeOpenGenerationJob === 'function' && !activeJobPoll) {
-    resumeOpenGenerationJob()
-  }
   state.currentView = 'top'
   window.scrollTo(0, 0) // ★ 先にスクロールリセット
   
@@ -23636,86 +23632,242 @@ async function startUnitGeneration() {
   }
 }
 
-// 単元生成（一気通貫）：ジョブを作成し、サーバー側で「生成→自動保存→後続生成」を進める
-// 保存ボタンは不要。完了したら印刷ページへ移動する。
-const JOB_STEP_LABELS = {
-  generate_unit: ['単元の基本情報を生成しています...', 10],
-  generate_courses: ['しっかりコースを生成しています...（約30〜60秒）', 35],
-  save: ['生成した単元を自動で保存しています...', 60],
-  intro: ['導入問題を生成しています...', 68],
-  assessment: ['評価問題を生成しています...', 76],
-  course_problems: ['コース選択問題を生成しています...', 84],
-  design: ['学習環境デザインを生成しています...', 90],
-  visuals: ['図解を生成しています...', 95],
-}
-let activeJobPoll = null
-
+// 単元生成の実際の処理（段階的生成）
 async function executeUnitGeneration(params) {
+  console.log('📦 executeUnitGeneration が開始されました')
+  console.log('📋 パラメータ:', params)
+  
   const { grade, subject, textbook, unitName, studentNeeds, teacherGoals, learningStyle, specialSupport, qualityMode } = params
+  
+  // カスタマイズ情報
   const customization = {
     studentNeeds: studentNeeds || '',
     teacherGoals: teacherGoals || '',
     learningStyle: learningStyle || '',
     specialSupport: specialSupport || ''
   }
+
+  // モーダルを閉じる
   closeUnitGeneratorModal()
+
+  // 生成プロセス画面を表示
   showGenerationProgress(grade, subject, unitName, qualityMode)
-  updateGenerationProgress(JOB_STEP_LABELS.generate_unit[0], JOB_STEP_LABELS.generate_unit[1])
+
   try {
-    const resp = await axios.post('/api/jobs', { grade, subject, textbook, unitName, customization, qualityMode }, { timeout: 60000 })
-    if (!resp.data?.success) throw new Error(resp.data?.error || 'ジョブを作成できませんでした')
-    localStorage.setItem('active_job_id', String(resp.data.job_id))
-    pollGenerationJob(resp.data.job_id)
-  } catch (e) {
-    alert('単元生成を開始できませんでした: ' + (e.response?.data?.error || e.message))
-    if (typeof renderTopPage === 'function') renderTopPage()
+    // 【段階的生成】まず単元の基本情報を生成
+    console.log('📝 ステップ1/4: 単元基本情報を生成中...')
+    updateGenerationProgress('単元の基本情報を生成しています...', 10)
+    
+    const unitInfoResponse = await axios.post('/api/ai/generate-unit', {
+      grade,
+      subject,
+      textbook,
+      unitName,
+      customization,
+      qualityMode
+    }, { timeout: 180000 })  // 180秒タイムアウト
+
+    if (unitInfoResponse.data.error) {
+      throw new Error(unitInfoResponse.data.error)
+    }
+
+    const unitData = unitInfoResponse.data.data
+    const unitGoal = unitData.curriculum.unit_goal
+    
+    console.log('✅ 単元基本情報の生成完了')
+    console.log('📚 単元目標:', unitGoal)
+    
+    // 【段階的生成】3つのコースを個別に生成
+    const courseDefinitions = [
+      {
+        level: 'slow',
+        info: {
+          name: 'じっくりコース',
+          label: '見て・さわって・たしかめるコース',
+          description: '絵や図を使ってていねいに学びたい人におすすめ',
+          color_code: 'green'
+        }
+      },
+      {
+        level: 'steady',
+        info: {
+          name: 'しっかりコース',
+          label: '調べて・くらべて・考えるコース',
+          description: '資料やデータを読み取る力をつけたい人におすすめ',
+          color_code: 'blue'
+        }
+      },
+      {
+        level: 'fast',
+        info: {
+          name: 'ぐんぐんコース',
+          label: '世界とつながる・自分の考えを伝えるコース',
+          description: '今の社会の問題や自分の意見を発信したい人におすすめ',
+          color_code: 'purple'
+        }
+      }
+    ]
+    
+    const generatedCourses = []
+    
+    // 【高速化】3つのコースを並列生成（Promise.allSettled）
+    console.log('🚀 3コースを並列生成開始...')
+    // ★ 15%で中間表示（10→15のスムーズ遷移）、コース完了時に個別更新
+    updateGenerationProgress('3つのコースを同時に生成しています...（約60〜90秒）', 15)
+    
+    const coursePromises = courseDefinitions.map((courseDef, i) => {
+      // 少しずらして送信（レート制限対策: 0秒、1秒、2秒）
+      return new Promise(async (resolve, reject) => {
+        if (i > 0) await new Promise(r => setTimeout(r, i * 1500))
+        
+        let lastError = null
+        for (let retry = 0; retry < 3; retry++) {
+          try {
+            if (retry > 0) {
+              console.log(`🔄 ${courseDef.info.name} リトライ ${retry}...`)
+              await new Promise(r => setTimeout(r, 5000))
+            }
+            
+            const resp = await axios.post('/api/ai/generate-course', {
+              grade,
+              subject,
+              textbook,
+              unitName,
+              unitGoal,
+              courseLevel: courseDef.level,
+              courseInfo: courseDef.info,
+              customization
+            }, { timeout: 180000 })
+            
+            if (resp.data.error) {
+              lastError = new Error(resp.data.error)
+              continue
+            }
+            resolve(resp.data.course)
+            return
+          } catch (e) {
+            lastError = e
+          }
+        }
+        reject(lastError)
+      })
+    })
+    
+    const results = await Promise.allSettled(coursePromises)
+    
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i]
+      if (result.status === 'fulfilled') {
+        generatedCourses.push(result.value)
+        console.log(`✅ ${courseDefinitions[i].info.name}の生成完了（${result.value.cards.length}枚）`)
+        // ★ 各コース完了ごとに均等に進行: 20→40→60
+        updateGenerationProgress(`${courseDefinitions[i].info.name} 完了！`, 20 + ((i + 1) * 13))
+      } else {
+        console.error(`❌ ${courseDefinitions[i].info.name}の生成失敗:`, result.reason)
+        throw new Error(`${courseDefinitions[i].info.name}の生成に失敗: ${result.reason?.message || 'Unknown'}`)
+      }
+    }
+    
+    // 生成されたコースをunitDataに統合（配列として直接設定）
+    unitData.courses = generatedCourses
+    
+    console.log('✅ 全コースの生成完了:', {
+      コース1: generatedCourses[0].name + ' ' + generatedCourses[0].cards.length + '枚',
+      コース2: generatedCourses[1].name + ' ' + generatedCourses[1].cards.length + '枚',
+      コース3: generatedCourses[2].name + ' ' + generatedCourses[2].cards.length + '枚'
+    })
+    
+    // ★ 保存中は70%→90%へスムーズに
+    updateGenerationProgress('生成完了！保存しています...', 70)
+
+    // 保存処理完了後に90%→100%へスムーズに
+    setTimeout(() => {
+      updateGenerationProgress('保存中...', 90)
+    }, 500)
+    
+    // 100%にして完了アニメーション（保存が完了してから）
+    setTimeout(() => {
+      updateGenerationProgress('✨ 生成完了！プレビューを表示します...', 100)
+      const progressBar = document.getElementById('progressBar')
+      if (progressBar) {
+        progressBar.style.background = 'linear-gradient(90deg, #10b981, #34d399)'
+      }
+    }, 1200)
+
+    // プレビュー画面を表示（スムーズなアニメーション完了後に表示）
+    const modelUsed = unitInfoResponse.data.model_used
+    setTimeout(() => showUnitPreview(unitData, modelUsed), 2500)
+
+  } catch (error) {
+    console.error('❌❌❌ 単元生成エラー:', error)
+    console.error('エラータイプ:', typeof error)
+    console.error('エラー詳細:', error.response?.data)
+    console.error('エラースタック:', error.stack)
+    
+    // ローディングオーバーレイを確実に解除
+    loadingManager.hide()
+    
+    // エラー詳細を取得
+    const errorDetails = error.response?.data?.details || error.message || '不明なエラー'
+    const errorMessage = error.response?.data?.error || '単元の生成に失敗しました'
+    const validationErrors = error.response?.data?.validation_errors || []
+    
+    // エラー表示
+    const app = document.getElementById('app')
+    app.innerHTML = `
+      <div class="container mx-auto px-4 py-8">
+        <div class="bg-white rounded-lg shadow-lg p-8">
+          <div class="text-center mb-6">
+            <i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i>
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">単元生成エラー</h2>
+            <p class="text-gray-600 mb-4">
+              ${errorMessage}
+            </p>
+          </div>
+          
+          <div class="bg-red-50 border-2 border-red-200 rounded-lg p-4 mb-6">
+            <h3 class="font-bold text-red-800 mb-2">
+              <i class="fas fa-info-circle mr-2"></i>エラー詳細
+            </h3>
+            <p class="text-sm text-red-700 whitespace-pre-wrap">${errorDetails}</p>
+            ${validationErrors.length > 0 ? `
+              <div class="mt-4">
+                <h4 class="font-bold text-red-800 mb-2">データ検証エラー:</h4>
+                <ul class="list-disc list-inside text-sm text-red-700">
+                  ${validationErrors.map(err => `<li>${err}</li>`).join('')}
+                </ul>
+              </div>
+            ` : ''}
+          </div>
+          
+          <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-6">
+            <h3 class="font-bold text-blue-800 mb-2">
+              <i class="fas fa-lightbulb mr-2"></i>対処方法
+            </h3>
+            <ul class="text-sm text-blue-700 list-disc list-inside space-y-1">
+              <li>もう一度お試しください（一時的なエラーの可能性があります）</li>
+              <li>単元名を変えてみてください</li>
+              <li>カスタマイズ内容を簡潔にしてください</li>
+              <li>標準モードで試してみてください</li>
+            </ul>
+          </div>
+          
+          <div class="flex gap-4">
+            <button onclick="renderTopPage()" 
+                    class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg">
+              <i class="fas fa-home mr-2"></i>
+              トップページに戻る
+            </button>
+            <button onclick="retryUnitGeneration()" 
+                    class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg">
+              <i class="fas fa-redo mr-2"></i>
+              もう一度生成する
+            </button>
+          </div>
+        </div>
+      </div>
+    `
   }
-}
-
-// 進捗ポーリング。完了で印刷ページへ、失敗で理由を表示
-function pollGenerationJob(jobId) {
-  if (activeJobPoll) clearInterval(activeJobPoll)
-  activeJobPoll = setInterval(async () => {
-    try {
-      const r = await axios.get(`/api/jobs/${jobId}`, { timeout: 20000 })
-      const j = r.data
-      if (!j.success) return
-      const label = JOB_STEP_LABELS[j.current_step] || ['処理中...', 50]
-      const pct = Math.round(label[1])
-      updateGenerationProgress(label[0], pct)
-      // 90秒以上進まないジョブは、ブラウザ側から次のステップを再開させる（ロックで二重実行は防止）
-      if (j.status === 'running' && j.updated_at) {
-        const idleMs = Date.now() - new Date(j.updated_at + 'Z').getTime()
-        if (idleMs > 90000) axios.post(`/api/jobs/${jobId}/step`, {}, { timeout: 150000 }).catch(() => {})
-      }
-      if (j.status === 'done') {
-        clearInterval(activeJobPoll); activeJobPoll = null
-        localStorage.removeItem('active_job_id')
-        updateGenerationProgress('✨ 生成が完了しました。印刷ページへ移動します...', 100)
-        setTimeout(() => { window.location.href = `/print/unit/${j.curriculum_id}?part=all` }, 1200)
-      } else if (j.status === 'failed') {
-        clearInterval(activeJobPoll); activeJobPoll = null
-        localStorage.removeItem('active_job_id')
-        alert('単元生成が失敗しました: ' + (j.error_message || '不明なエラー'))
-        if (typeof renderTopPage === 'function') renderTopPage()
-      }
-    } catch (e) {
-      console.warn('ジョブ進捗の取得に失敗（再試行します）:', e.message)
-    }
-  }, 4000)
-}
-
-// 再訪時：未完了ジョブがあれば進捗を再開する
-async function resumeOpenGenerationJob() {
-  try {
-    const r = await axios.get('/api/jobs', { timeout: 15000 })
-    const open = (r.data?.jobs || [])[0]
-    if (open) {
-      showGenerationProgress('', '', open.unit_name, 'standard')
-      updateGenerationProgress('未完了の単元生成を再開しています...', 10)
-      pollGenerationJob(open.job_id)
-    }
-  } catch (e) { console.warn('未完了ジョブの確認に失敗:', e.message) }
 }
 
 // 同じパラメータで単元を再生成
@@ -24628,10 +24780,12 @@ function showUnitPreview(unitData, modelUsed) {
             <i class="fas fa-times mr-2"></i>
             破棄してトップへ
           </button>
-          <p class="flex-1 text-center text-sm text-gray-600 py-4">
-            <i class="fas fa-circle-check text-green-600 mr-1"></i>
-            内容は生成完了時に自動で保存されます（保存ボタンは不要です）
-          </p>
+          <button onclick="saveGeneratedUnit(${JSON.stringify(unitData).replace(/"/g, '&quot;')})" 
+                  class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 px-6 rounded-lg transition shadow-lg"
+                  id="save-unit-button">
+            <i class="fas fa-save mr-2"></i>
+            この単元を保存して使用する
+          </button>
         </div>
       </div>
     </div>
@@ -26643,7 +26797,7 @@ function showTeacherOverview(unitData) {
           <li>✅ 学習計画表で時数の調整・カードの並び替えができます</li>
           <li>✅ 学習のてびき、チェックテスト、選択課題、解答・解説も含まれます</li>
           <li>✅ 各カードの「編集」ボタンで内容を修正できます</li>
-          <li>✅ 問題がなければそのままにしてください（自動で保存されます）</li>
+          <li>✅ 問題がなければ「この単元を保存して使用する」をクリック</li>
           <li>🆕 <strong>コースの折りたたみ</strong>：コース名をクリックで折りたたみ・展開</li>
           <li>🆕 <strong>一括編集モード</strong>：複数カードの難易度・タイプを一括変更</li>
           <li>🆕 <strong>ドラッグ&ドロップ</strong>：カードをドラッグして並び替え（同一コース内のみ）</li>
@@ -26677,7 +26831,7 @@ function showTeacherOverview(unitData) {
           </div>
         </div>
       </div>
-          <li>✅ 問題がなければそのままにしてください（自動で保存されます）</li>
+          <li>✅ 問題がなければ「この単元を保存して使用する」をクリック</li>
         </ul>
       </div>
 
@@ -27718,10 +27872,11 @@ function showTeacherOverview(unitData) {
             <i class="fas fa-arrow-left mr-2"></i>
             プレビューに戻る
           </button>
-          <p class="flex-1 text-center text-sm text-gray-600 py-4">
-            <i class="fas fa-circle-check text-green-600 mr-1"></i>
-            内容は生成完了時に自動で保存されます（保存ボタンは不要です）
-          </p>
+          <button onclick="saveGeneratedUnit(${JSON.stringify(unitData).replace(/"/g, '&quot;')})" 
+                  class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 px-6 rounded-lg transition shadow-lg">
+            <i class="fas fa-save mr-2"></i>
+            ✅ 確認完了：この単元を保存して使用する
+          </button>
         </div>
       </div>
     </div>
