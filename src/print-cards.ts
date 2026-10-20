@@ -83,17 +83,12 @@ export interface PrintOptions {
   onePerPage?: boolean
 }
 
-export function renderCardsPrintPage(
-  meta: { unitName?: string; grade?: string; courseName?: string; subject?: string },
-  cards: PrintCardRow[],
-  opts: PrintOptions = {}
-): string {
+/** 学習カードの本体（カード列＋答えの別紙）だけを返す。枠（HTML/ヘッダー）は含まない */
+export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOptions = {}): string {
   const answersMode = opts.answers || 'append'
   const showHints = opts.hints !== false
   const showExamples = opts.examples !== false
   const onePerPage = opts.onePerPage !== false
-
-  const title = `${meta.unitName || '学習カード'}${meta.courseName ? '（' + meta.courseName + '）' : ''}`
 
   const cardHTML = cards.map((card, i) => {
     const no = card.card_number ?? i + 1
@@ -173,6 +168,27 @@ export function renderCardsPrintPage(
        </section>`
     : ''
 
+  return `${cardHTML || '<p>印刷できるカードがありません。</p>'}
+    ${answerSheet}`
+}
+
+export function renderCardsPrintPage(
+  meta: { unitName?: string; grade?: string; courseName?: string; subject?: string },
+  cards: PrintCardRow[],
+  opts: PrintOptions = {}
+): string {
+  const title = `${meta.unitName || '学習カード'}${meta.courseName ? '（' + meta.courseName + '）' : ''}`
+  return wrapPrintDocument(title, {
+    unitName: meta.unitName, grade: meta.grade, subject: meta.subject, courseName: meta.courseName,
+  }, renderCardsBodyForPrint(cards, opts))
+}
+
+export interface PrintMeta {
+  unitName?: string; grade?: string; subject?: string; courseName?: string; textbook?: string
+}
+
+/** 紙の枠（ツールバー・見出し・氏名欄）で本体を包む */
+export function wrapPrintDocument(title: string, meta: PrintMeta, bodyHTML: string): string {
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -268,10 +284,24 @@ export function renderCardsPrintPage(
   .p-ans-val { font-size: 10.5pt; }
   .p-ans-expl { font-size: 9.5pt; color:#333; }
 
+  /* 単元印刷の区切り（てびき・チェックテスト・えらべるもんだい） */
+  .p-part-title { font-size: 13pt; font-weight: 700; border-left: 5px solid var(--ink); padding: 1mm 3mm; margin: 2mm 0 4mm; }
+  .p-check-q { margin-bottom: 4mm; page-break-inside: avoid; break-inside: avoid; }
+  .p-check-q .p-problem { margin-bottom: 2mm; }
+  .p-check-note { font-size: 9.5pt; color:#444; margin: 0 0 4mm; }
+  .p-check-answer-box { border: 1.5px solid var(--ink); min-height: 14mm; margin-top: 2mm; }
+  .p-answer-key { border-top: 1px dashed var(--line); margin-top: 2mm; padding-top: 1mm; font-size: 9.5pt; color:#333; }
+  .p-opt-title { font-weight: 700; font-size: 11.5pt; margin: 0 0 1mm; }
+  .p-opt-chip { display:inline-block; font-size: 8.5pt; border:1px solid var(--line); padding: 0 2mm; margin-left: 2mm; }
+
   /* ===== 印刷時 ===== */
   @media print {
-    @page { size: A4 portrait; margin: 12mm; }
-    body { background:#fff; font-size: 10.5pt; }
+    @page { size: A4 portrait; margin: 10mm; }
+    body { background:#fff; font-size: 10pt; }
+    .p-card { font-size: 10pt; line-height: 1.5; }
+    .p-hints { margin-top: 2mm; padding: 2mm 3mm; }
+    .p-hint { margin-top: 1mm; }
+    .p-answer-box { min-height: 0 !important; }
     .p-sheet { width: auto; min-height: 0; margin: 0; padding: 0; }
     .p-toolbar { display: none !important; }
     .p-card { page-break-inside: avoid; break-inside: avoid; margin-bottom: 0; }
@@ -300,15 +330,84 @@ export function renderCardsPrintPage(
     <div class="p-header">
       <h1 class="p-unit">${esc(meta.unitName || '学習カード')}</h1>
       <div class="p-meta">
-        ${esc(meta.grade || '')}${meta.subject ? '　' + esc(meta.subject) : ''}${meta.courseName ? '　' + esc(meta.courseName) : ''}
+        ${esc(meta.grade || '')}${meta.subject ? '　' + esc(meta.subject) : ''}${meta.textbook ? '　' + esc(meta.textbook) : ''}${meta.courseName ? '　' + esc(meta.courseName) : ''}
       </div>
       <div class="p-nameplate">
         <span>組：</span><span>番号：</span><span>名前：</span>
       </div>
     </div>
-    ${cardHTML || '<p>印刷できるカードがありません。</p>'}
-    ${answerSheet}
+    ${bodyHTML}
   </div>
 </body>
 </html>`
+}
+
+// ============================================================
+// 単元印刷: チェックテスト / えらべるもんだい
+//   児童が紙に解答する前提。答えは各問の下に小さく「答え（先生用）」として
+//   出すが、?answers=none 相当で隠せるように showAnswers で切り替える。
+// ============================================================
+
+export interface CheckProblemRow {
+  problem_number?: number
+  problem_text?: string
+  answer?: string
+  difficulty?: string
+  problem_image_url?: string | null
+}
+
+export function renderCheckTestForPrint(title: string, problems: CheckProblemRow[], showAnswers = false): string {
+  if (problems.length === 0) {
+    return `<section class="p-card p-break"><h2 class="p-sheet-title">${esc(title)}</h2><p>この単元のチェックテストはまだ登録されていません。</p></section>`
+  }
+  const items = problems.map((p, i) => {
+    const no = p.problem_number ?? i + 1
+    return `
+      <section class="p-check-q">
+        <div class="p-card-head">
+          <span class="p-card-no">${no}</span>
+          <h2 class="p-card-title">もんだい ${no}</h2>
+        </div>
+        <div class="p-problem">${escMultiline(p.problem_text || '')}</div>
+        ${figureHTML(p.problem_image_url)}
+        <div class="p-check-answer-box"><div class="p-answer-label">じぶんの こたえ</div></div>
+        ${showAnswers && p.answer ? `<div class="p-answer-key">こたえ（先生用）: ${escMultiline(p.answer)}</div>` : ''}
+      </section>`
+  }).join('')
+  return `
+    <section class="p-card p-break">
+      <h2 class="p-sheet-title">${esc(title)}</h2>
+      <p class="p-check-note">ぜんぶ じぶんの ちからで といてみよう。</p>
+    </section>
+    ${items}`
+}
+
+export interface OptionalRow {
+  problem_title?: string
+  problem_content?: string
+  answer?: string
+  problem_image_url?: string | null
+}
+
+export function renderOptionalForPrint(items: OptionalRow[], showAnswers = false): string {
+  if (items.length === 0) {
+    return `<section class="p-card p-break"><h2 class="p-sheet-title">えらべるもんだい</h2><p>この単元のえらべるもんだいはまだ登録されていません。</p></section>`
+  }
+  const body = items.map((p, i) => `
+      <section class="p-check-q">
+        <div class="p-card-head">
+          <span class="p-card-no">${i + 1}</span>
+          <h2 class="p-card-title">${esc(p.problem_title || 'もんだい ' + (i + 1))}</h2>
+        </div>
+        <div class="p-problem">${escMultiline(p.problem_content || '')}</div>
+        ${figureHTML(p.problem_image_url)}
+        <div class="p-check-answer-box"><div class="p-answer-label">じぶんの こたえ</div></div>
+        ${showAnswers && p.answer ? `<div class="p-answer-key">こたえ（先生用）: ${escMultiline(p.answer)}</div>` : ''}
+      </section>`).join('')
+  return `
+    <section class="p-card p-break">
+      <h2 class="p-sheet-title">えらべるもんだい</h2>
+      <p class="p-check-note">チェックテストに合格したら、やりたいもんだいを えらんで といてみよう。</p>
+    </section>
+    ${body}`
 }

@@ -63,7 +63,7 @@ import { AdaptiveLearningEngine } from './adaptive-learning'
 import { SchoolManagementSystem } from './school-management'
 import { AIContentGenerator } from './ai-content-generator'
 import { buildQualityRules, buildQualityChecklist, buildReviseCardsPrompt } from './quality-rules'
-import { renderCardsPrintPage } from './print-cards'
+import { renderCardsPrintPage, renderCardsBodyForPrint, renderCheckTestForPrint, renderOptionalForPrint, wrapPrintDocument } from './print-cards'
 import { 
   addToMistakeNotebook, 
   getMistakeNotebook, 
@@ -16717,6 +16717,82 @@ app.get('/print/course/:courseId', async (c) => {
     ))
   } catch (error: any) {
     console.error('印刷ページ生成エラー:', error)
+    return c.html('<h1>印刷ページを作れませんでした</h1><p>' + escapeHTML(error?.message || '') + '</p>', 500)
+  }
+})
+
+// ============================================================
+// 🖨 単元の印刷（学習のてびき・チェックテスト・えらべるもんだい）
+//   /print/unit/:curriculumId?part=guide|check|optional|all
+//   既定は all（てびき → チェックテスト → えらべるもんだい）。
+//   part で単独印刷もできる。ログイン不要（既存の印刷ページと同じ扱い）。
+// ============================================================
+app.get('/print/unit/:curriculumId', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  const part = String(c.req.query('part') || 'all')
+  try {
+    const unit = await env.DB.prepare(
+      'SELECT id, unit_name, grade, subject, textbook_company, unit_goal FROM curriculum WHERE id = ?'
+    ).bind(curriculumId).first() as any
+    if (!unit) return c.html('<h1>単元が見つかりません</h1>', 404)
+
+    const metaRes = await env.DB.prepare(
+      'SELECT meta_key, meta_value FROM curriculum_metadata WHERE curriculum_id = ?'
+    ).bind(curriculumId).all()
+    const meta: Record<string, any> = {}
+    for (const row of (metaRes.results || []) as any[]) {
+      try { meta[row.meta_key] = JSON.parse(row.meta_value || 'null') } catch { /* 壊れた値は無視 */ }
+    }
+    const checkTest = meta.common_check_test || null
+    const selection = Array.isArray(meta.course_selection_problems) ? meta.course_selection_problems : []
+
+    const optRows = await optSelectByCurriculum(env.DB, curriculumId)
+
+    const pieces: string[] = []
+    const want = (p: string) => part === 'all' || part === p
+    const parts = { guide: want('guide'), check: want('check'), optional: want('optional') }
+
+    if (parts.guide) {
+      const courses = await env.DB.prepare(
+        'SELECT id, course_name FROM courses WHERE curriculum_id = ? AND course_level != ? ORDER BY CASE course_level WHEN ? THEN 1 WHEN ? THEN 2 WHEN ? THEN 3 ELSE 4 END'
+      ).bind(curriculumId, 'personalized', 'basic', 'standard', 'advanced').all()
+      for (const course of (courses.results || []) as any[]) {
+        const rows = await env.DB.prepare(
+          'SELECT * FROM learning_cards WHERE course_id = ? AND (is_active IS NULL OR is_active = 1) ORDER BY card_number'
+        ).bind(course.id).all()
+        const cards = await attachHintsForPrint(env.DB, (rows.results || []) as any[])
+        if (cards.length === 0) continue
+        pieces.push(`<div class="p-part-title">${escapeHTML(course.course_name || 'コース')}</div>`)
+        pieces.push(renderCardsBodyForPrint(cards, parsePrintOptions(c)))
+      }
+    }
+
+    const showKeys = String(c.req.query('answers') || '') === 'inline'
+
+    if (parts.check) {
+      const probs: any[] = Array.isArray(checkTest?.sample_problems) ? checkTest.sample_problems : []
+      pieces.push(renderCheckTestForPrint(checkTest?.test_title || 'チェックテスト', probs, showKeys))
+    }
+
+    if (parts.optional) {
+      const items = [...selection, ...optRows.map((p: any) => ({
+        problem_title: p.problem_title || p.title || '',
+        problem_content: p.problem_content || p.problem_description || '',
+        answer: p.answer || p.answer_text || '',
+      }))]
+      pieces.push(renderOptionalForPrint(items, showKeys))
+    }
+
+    const title = `${unit.unit_name || '単元'}（${part === 'all' ? '全体' : part === 'guide' ? '学習のてびき' : part === 'check' ? 'チェックテスト' : 'えらべるもんだい'}）`
+    return c.html(wrapPrintDocument(title, {
+      unitName: unit.unit_name || '',
+      grade: unit.grade || '',
+      subject: unit.subject || '',
+      textbook: unit.textbook_company || '',
+    }, pieces.join('\n')))
+  } catch (error: any) {
+    console.error('単元印刷エラー:', error)
     return c.html('<h1>印刷ページを作れませんでした</h1><p>' + escapeHTML(error?.message || '') + '</p>', 500)
   }
 })
