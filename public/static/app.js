@@ -4645,6 +4645,30 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                 </button>
               </div>
 
+              <!-- 単元の部分だけを印刷（学習のてびき・チェックテスト・えらべる問題） -->
+              <div class="mt-4 pt-4 border-t border-gray-200">
+                <p class="text-sm font-bold text-gray-800 mb-1">
+                  <i class="fas fa-layer-group text-indigo-600 mr-1"></i>部分ごとに印刷
+                </p>
+                <p class="text-xs text-gray-600 mb-3">
+                  必要な部分だけを、A4の配布用ページとして別のタブで開きます。
+                </p>
+                <div class="flex flex-wrap gap-2">
+                  <button id="print-unit-guide-btn" onclick="printUnitPart(${curriculumId}, 'guide')"
+                    class="text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold transition">
+                    <i class="fas fa-book mr-1"></i>学習のてびきだけ印刷
+                  </button>
+                  <button id="print-unit-check-btn" onclick="printUnitPart(${curriculumId}, 'check')"
+                    class="text-sm bg-white hover:bg-gray-100 text-indigo-700 border border-indigo-600 px-4 py-2 rounded-lg font-bold transition">
+                    <i class="fas fa-check-circle mr-1"></i>チェックテストだけ印刷
+                  </button>
+                  <button id="print-unit-optional-btn" onclick="printUnitPart(${curriculumId}, 'optional')"
+                    class="text-sm bg-white hover:bg-gray-100 text-pink-700 border border-pink-600 px-4 py-2 rounded-lg font-bold transition">
+                    <i class="fas fa-star mr-1"></i>えらべる問題だけ印刷
+                  </button>
+                </div>
+              </div>
+
               <!-- 学習カードの紙印刷（画面用の操作部品を省いた、配布用レイアウト） -->
               <div class="mt-4 pt-4 border-t border-gray-200">
                 <p class="text-sm font-bold text-gray-800 mb-1">
@@ -29935,6 +29959,20 @@ function printCourseCards(courseId, mode = 'append') {
   }
   const url = `/print/course/${courseId}?answers=${encodeURIComponent(mode)}`
   window.open(url, '_blank', 'noopener')
+}
+
+/**
+ * 単元の部分だけを紙印刷用ページで開く。
+ *   part: 'guide'(学習のてびき) / 'check'(チェックテスト) / 'optional'(えらべる問題)
+ */
+function printUnitPart(curriculumId, part = 'guide') {
+  if (!curriculumId) {
+    alert('単元が特定できませんでした')
+    return
+  }
+  const allowed = ['guide', 'check', 'optional']
+  const p = allowed.includes(part) ? part : 'guide'
+  window.open(`/print/unit/${encodeURIComponent(curriculumId)}?part=${p}`, '_blank', 'noopener')
 }
 
 /** 1枚だけ印刷したいとき（カード詳細から呼ぶ） */
