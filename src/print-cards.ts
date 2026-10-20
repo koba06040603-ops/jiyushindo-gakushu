@@ -81,6 +81,8 @@ export interface PrintOptions {
   examples?: boolean
   /** 1枚のカードごとに改ページするか（既定 true）。false で詰めて印刷 */
   onePerPage?: boolean
+  /** 画面上で図の差し替え・削除ボタンを出すか（印刷では非表示） */
+  editable?: boolean
 }
 
 /** 学習カードの本体（カード列＋答えの別紙）だけを返す。枠（HTML/ヘッダー）は含まない */
@@ -132,14 +134,25 @@ export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOption
          </div>`
       : ''
 
+    const cardId = (card as any).card_id ?? (card as any).id
+    const figureTools = (opts.editable && cardId)
+      ? `<div class="p-edit-bar no-print">
+           <span>図：</span>
+           <button type="button" onclick="pickFigure(${Number(cardId)}, this)">図を差し替える</button>
+           <button type="button" onclick="removeFigure(${Number(cardId)}, this)">図を外す</button>
+           <span class="p-edit-msg"></span>
+         </div>`
+      : ''
+
     return `
-      <section class="p-card${onePerPage ? ' p-break' : ''}">
+      <section class="p-card${onePerPage ? ' p-break' : ''}" data-card-id="${cardId ?? ''}">
         <div class="p-card-head">
           <span class="p-card-no">${no}</span>
           <h2 class="p-card-title">${esc(card.card_title || '')}</h2>
         </div>
         ${passageBlock}
         <div class="p-problem">${escMultiline(problem)}</div>
+        ${figureTools}
         ${figureHTML(card.problem_image_url)}
         ${exampleBlock}
         <div class="p-answer-box" style="min-height:${answerBoxHeight(answer)}">
@@ -180,15 +193,62 @@ export function renderCardsPrintPage(
   const title = `${meta.unitName || '学習カード'}${meta.courseName ? '（' + meta.courseName + '）' : ''}`
   return wrapPrintDocument(title, {
     unitName: meta.unitName, grade: meta.grade, subject: meta.subject, courseName: meta.courseName,
-  }, renderCardsBodyForPrint(cards, opts))
+  }, renderCardsBodyForPrint(cards, opts), !!opts.editable)
 }
 
 export interface PrintMeta {
   unitName?: string; grade?: string; subject?: string; courseName?: string; textbook?: string
 }
 
+/** 図の差し替え・削除を行う画面用スクリプト（印刷には出ない）。保存はログイン中のトークンを使う */
+function editorScript(): string {
+  return `<script>
+(function(){
+  var TOKEN = null;
+  try { TOKEN = localStorage.getItem('session_token'); } catch (e) {}
+  function msg(btn, text){ var m = btn.parentElement.querySelector('.p-edit-msg'); if (m) m.textContent = text || ''; }
+  function card(btn){ return btn.closest('section.p-card'); }
+  function save(cardId, body, btn){
+    if (!TOKEN) { msg(btn, 'ログインしてから保存してください（ログイン画面で開き直してください）'); return; }
+    msg(btn, '保存中…');
+    fetch('/api/card/' + cardId, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
+      body: JSON.stringify(body)
+    }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(){ msg(btn, '保存しました。印刷前に再読み込みして確認してください。'); })
+      .catch(function(e){ msg(btn, '保存できませんでした（' + e.message + '）'); });
+  }
+  window.removeFigure = function(cardId, btn){
+    if (!confirm('この問題の図を外しますか？（問題文だけになります）')) return;
+    var c = card(btn); var img = c.querySelector('.p-figure'); if (img) img.remove();
+    save(cardId, { problem_image_url: null }, btn);
+  };
+  window.pickFigure = function(cardId, btn){
+    var input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/png,image/jpeg,image/svg+xml';
+    input.onchange = function(){
+      var f = input.files && input.files[0]; if (!f) return;
+      if (f.size > 700 * 1024) { msg(btn, '画像が大きすぎます（700KB 以下にしてください）'); return; }
+      var rd = new FileReader();
+      rd.onload = function(){
+        var dataUrl = rd.result;
+        var c = card(btn); var old = c.querySelector('.p-figure');
+        var box = document.createElement('div'); box.className = 'p-figure';
+        box.innerHTML = '<img alt="">'; box.firstChild.src = dataUrl;
+        if (old) old.replaceWith(box); else c.querySelector('.p-edit-bar').after(box);
+        save(cardId, { problem_image_url: dataUrl }, btn);
+      };
+      rd.readAsDataURL(f);
+    };
+    input.click();
+  };
+})();
+</script>`
+}
+
 /** 紙の枠（ツールバー・見出し・氏名欄）で本体を包む */
-export function wrapPrintDocument(title: string, meta: PrintMeta, bodyHTML: string): string {
+export function wrapPrintDocument(title: string, meta: PrintMeta, bodyHTML: string, editable = false): string {
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -284,6 +344,12 @@ export function wrapPrintDocument(title: string, meta: PrintMeta, bodyHTML: stri
   .p-ans-val { font-size: 10.5pt; }
   .p-ans-expl { font-size: 9.5pt; color:#333; }
 
+  /* 図の編集ツール（画面のみ） */
+  .p-edit-bar { display:flex; gap:2mm; align-items:center; font-size: 9.5pt; margin: 2mm 0; }
+  .p-edit-bar button { font: inherit; font-size: 9pt; padding: 2px 8px; border: 1px solid #4F46E5; background:#fff; color:#4F46E5; border-radius: 4px; cursor: pointer; }
+  .p-edit-bar button:hover { background:#EEF2FF; }
+  .p-edit-msg { color:#b91c1c; }
+
   /* 単元印刷の区切り（てびき・チェックテスト・えらべるもんだい） */
   .p-part-title { font-size: 13pt; font-weight: 700; border-left: 5px solid var(--ink); padding: 1mm 3mm; margin: 2mm 0 4mm; }
   .p-check-q { margin-bottom: 4mm; page-break-inside: avoid; break-inside: avoid; }
@@ -304,6 +370,7 @@ export function wrapPrintDocument(title: string, meta: PrintMeta, bodyHTML: stri
     .p-answer-box { min-height: 0 !important; }
     .p-sheet { width: auto; min-height: 0; margin: 0; padding: 0; }
     .p-toolbar { display: none !important; }
+    .no-print { display: none !important; }
     .p-card { page-break-inside: avoid; break-inside: avoid; margin-bottom: 0; }
     .p-break { page-break-after: always; break-after: page; }
     .p-card:last-child, .p-answersheet { page-break-after: auto; break-after: auto; }
@@ -317,7 +384,7 @@ export function wrapPrintDocument(title: string, meta: PrintMeta, bodyHTML: stri
 </style>
 </head>
 <body>
-  <div class="p-toolbar">
+  <div class="p-toolbar no-print">
     <button onclick="window.print()">🖨 印刷する</button>
     <a class="sub" href="?answers=none">答えなし</a>
     <a class="sub" href="?answers=append">答えを別紙に</a>
@@ -338,6 +405,7 @@ export function wrapPrintDocument(title: string, meta: PrintMeta, bodyHTML: stri
     </div>
     ${bodyHTML}
   </div>
+${editable ? editorScript() : ''}
 </body>
 </html>`
 }

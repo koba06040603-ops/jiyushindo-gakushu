@@ -16660,6 +16660,7 @@ function parsePrintOptions(c: any) {
     hints: q('hints') !== '0',
     examples: q('examples') !== '0',
     onePerPage: q('compact') !== '1',
+    editable: q('edit') === '1',
   }
 }
 
@@ -16764,7 +16765,7 @@ app.get('/print/unit/:curriculumId', async (c) => {
         const cards = await attachHintsForPrint(env.DB, (rows.results || []) as any[])
         if (cards.length === 0) continue
         pieces.push(`<div class="p-part-title">${escapeHTML(course.course_name || 'コース')}</div>`)
-        pieces.push(renderCardsBodyForPrint(cards, parsePrintOptions(c)))
+        pieces.push(renderCardsBodyForPrint(cards, { ...parsePrintOptions(c), editable: c.req.query('edit') === '1' }))
       }
     }
 
@@ -16790,7 +16791,7 @@ app.get('/print/unit/:curriculumId', async (c) => {
       grade: unit.grade || '',
       subject: unit.subject || '',
       textbook: unit.textbook_company || '',
-    }, pieces.join('\n')))
+    }, pieces.join('\n'), parsePrintOptions(c).editable))
   } catch (error: any) {
     console.error('単元印刷エラー:', error)
     return c.html('<h1>印刷ページを作れませんでした</h1><p>' + escapeHTML(error?.message || '') + '</p>', 500)
