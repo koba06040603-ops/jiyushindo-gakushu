@@ -4644,6 +4644,37 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                   <i class="fas fa-file-pdf mr-1"></i>PDF保存
                 </button>
               </div>
+
+              <!-- 学習カードの紙印刷（画面用の操作部品を省いた、配布用レイアウト） -->
+              <div class="mt-4 pt-4 border-t border-gray-200">
+                <p class="text-sm font-bold text-gray-800 mb-1">
+                  <i class="fas fa-copy text-indigo-600 mr-1"></i>学習カードを紙で配る
+                </p>
+                <p class="text-xs text-gray-600 mb-3">
+                  ボタンやチャットなど画面だけの部分を外し、A4たて・1問1ページ・解答欄つきで印刷します。
+                </p>
+                <div class="space-y-2">
+                  ${standardCourses.map(co => {
+                    const cid = co.course_id || co.id
+                    return `
+                      <div class="flex items-center gap-2 flex-wrap bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
+                        <span class="text-sm font-bold text-gray-800 flex-1 min-w-[120px]">${co.course_name || 'コース'}</span>
+                        <button onclick="printCourseCards(${cid}, 'append')"
+                          class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-bold transition">
+                          <i class="fas fa-print mr-1"></i>答えは別紙
+                        </button>
+                        <button onclick="printCourseCards(${cid}, 'none')"
+                          class="text-xs bg-white hover:bg-gray-100 text-indigo-700 border border-indigo-600 px-3 py-1.5 rounded-lg font-bold transition">
+                          答えなし（児童用）
+                        </button>
+                        <button onclick="printCourseCards(${cid}, 'inline')"
+                          class="text-xs bg-white hover:bg-gray-100 text-gray-700 border border-gray-400 px-3 py-1.5 rounded-lg font-bold transition">
+                          答え入り（先生用）
+                        </button>
+                      </div>`
+                  }).join('')}
+                </div>
+              </div>
             </div>
             
             <!-- オンライン配信タブ -->
@@ -29889,6 +29920,30 @@ function saveLocalLearningPlan() {
 // 印刷機能
 function printGuide() {
   window.print()
+}
+
+/**
+ * 学習カードを紙印刷用のページで開く。
+ * 画面用SPAをそのまま印刷するとボタン・タブ・チャットが混ざるため、
+ * サーバー側で紙に必要な要素だけを組んだページ（/print/course/:id）を使う。
+ *   mode: 'append'(答えは別紙) / 'none'(答えなし・児童用) / 'inline'(答え入り・先生用)
+ */
+function printCourseCards(courseId, mode = 'append') {
+  if (!courseId) {
+    alert('コースが特定できませんでした')
+    return
+  }
+  const url = `/print/course/${courseId}?answers=${encodeURIComponent(mode)}`
+  window.open(url, '_blank', 'noopener')
+}
+
+/** 1枚だけ印刷したいとき（カード詳細から呼ぶ） */
+function printSingleCard(cardId, mode = 'append') {
+  if (!cardId) {
+    alert('カードが特定できませんでした')
+    return
+  }
+  window.open(`/print/card/${cardId}?answers=${encodeURIComponent(mode)}`, '_blank', 'noopener')
 }
 
 // PDF出力機能

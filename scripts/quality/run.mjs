@@ -1,9 +1,14 @@
 import fs from 'fs';
-import { CASES, callGemini, judge } from './harness.mjs';
+import { CASES, CASES_JA, callGemini, judge } from './harness.mjs';
 const ver = process.argv[2] || 'v1';
 const mod = await import(`./prompt-${ver}.mjs`);
 const { buildPrompt, buildRevisePrompt } = mod;
-const only = process.argv[3] ? [CASES[+process.argv[3]]] : CASES;
+// 第3引数: 'ja' で国語ケース、数字で単一ケース、'ja:N' で国語の1件
+const arg = process.argv[3] || '';
+const isJa = /^ja/.test(arg);
+const pool = isJa ? CASES_JA : CASES;
+const idx = arg.replace(/^ja:?/, '');
+const only = idx !== '' ? [pool[+idx]] : pool;
 const results = [];
 for (const c of only) {
   process.stdout.write(`\n[${ver}] ${c.grade} ${c.unit} ... 生成`);

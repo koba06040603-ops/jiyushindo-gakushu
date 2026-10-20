@@ -63,6 +63,7 @@ import { AdaptiveLearningEngine } from './adaptive-learning'
 import { SchoolManagementSystem } from './school-management'
 import { AIContentGenerator } from './ai-content-generator'
 import { buildQualityRules, buildQualityChecklist, buildReviseCardsPrompt } from './quality-rules'
+import { renderCardsPrintPage } from './print-cards'
 import { 
   addToMistakeNotebook, 
   getMistakeNotebook, 
@@ -865,6 +866,30 @@ ${JSON.stringify(items.map((x) => ({ n: x.n, problem: x.problem, given_answer: x
  *   専門家評価「図が無いので一人では解けない」への対応。
  *   AI画像生成ではなくコードで描くので、個数・順序が必ず正しい。
  */
+/**
+ * 図が答えそのものを見せてしまっていないか検査する。
+ * 実測で `answer="4こ"` なのに `diagram={type:'decompose', total:12, known:4}`
+ * という漏洩が発生した（known が答えの4になっており、図を見るだけで解けてしまう）。
+ * プロンプトで注意しても確率的に起きるため、サーバー側で機械的に落とす。
+ */
+function diagramLeaksAnswer(spec: any, answer: string): boolean {
+  if (!spec || typeof spec !== 'object') return false
+  const nums = String(answer || '').match(/\d+(?:\.\d+)?/g)
+  if (!nums || nums.length === 0) return false
+  const a = Number(nums[0])
+  if (!Number.isFinite(a)) return false
+  const type = String(spec.type || '').toLowerCase()
+  // decompose: known が答えなら、残りを問う図のはずが答えを描いてしまっている
+  if (type === 'decompose') {
+    if (Number(spec.known) === a) return true
+    // total - known が答えでも、既知側に答えが見えている状態は同じく漏洩
+    if (Number(spec.total) - Number(spec.known) === a && Number(spec.known) === a) return true
+  }
+  // count: 数えさせたい個数がそのまま答えなのは正常（数える活動そのもの）なので除外しない
+  // order: ask_index+1 が答え（なんばんめ）になるのは図に「?」が付くので漏洩しない
+  return false
+}
+
 function attachAutoDiagrams(cards: any[]): { issues: string[]; attached: number } {
   const issues: string[] = []
   let attached = 0
@@ -877,6 +902,14 @@ function attachAutoDiagrams(cards: any[]): { issues: string[]; attached: number 
     if (card.problem_image_url) continue
     const text = String(card.problem_description || card.problem_text || '')
     try {
+      // 図が答えを見せてしまっている場合は、その指定を破棄する
+      if (card.diagram && diagramLeaksAnswer(card.diagram, String(card.answer || ''))) {
+        issues.push(`カード${no}: diagramが答えを表示していたため破棄`)
+        card.diagram = null
+      }
+      if (card.example_diagram && diagramLeaksAnswer(card.example_diagram, String(card.example_answer || ''))) {
+        card.example_diagram = null
+      }
       // ① LLM が指定した diagram 仕様を最優先で使う（型と数値が明示されているため最も正確）
       let built = buildSVGFromDiagramSpec(card.diagram)
       // ② 指定が無い／描けなかった場合は、問題文のパターンから推測する
@@ -16609,6 +16642,106 @@ app.get('/guide/:curriculumId', async (c) => {
   }
 })
 
+// ============================================================
+// 🖨 学習カードの紙印刷ページ
+//   画面用SPAをそのまま印刷するとボタン・タブ・AIチャット等が混ざり、
+//   紙としては読みにくく枚数も膨らむ。サーバー側で紙に必要な要素だけを
+//   組み直して返す。児童に配布する前提のレイアウト（A4たて・1問1ページ）。
+//
+//   /print/course/:courseId … コース内の全カードを印刷
+//   /print/card/:cardId     … 1枚だけ印刷
+//   クエリ: ?answers=none|append|inline  ?hints=0  ?examples=0  ?compact=1
+// ============================================================
+function parsePrintOptions(c: any) {
+  const q = (k: string) => String(c.req.query(k) ?? '')
+  const a = q('answers')
+  return {
+    answers: (a === 'none' || a === 'inline' || a === 'append' ? a : 'append') as 'none' | 'inline' | 'append',
+    hints: q('hints') !== '0',
+    examples: q('examples') !== '0',
+    onePerPage: q('compact') !== '1',
+  }
+}
+
+/** カード行に hints を付けて返す（ヒントは別テーブル） */
+async function attachHintsForPrint(db: D1Database, cards: any[]): Promise<any[]> {
+  const out: any[] = []
+  for (const card of cards) {
+    const id = card.card_id ?? card.id
+    let hints: any[] = []
+    try {
+      const r = await hintQuery(db, (s) => hintSelectSQL(s), [id])
+      hints = (r.results || []) as any[]
+    } catch { /* ヒントが取れなくても印刷は続行する */ }
+    out.push({ ...card, hints })
+  }
+  return out
+}
+
+app.get('/print/course/:courseId', async (c) => {
+  const { env } = c
+  const courseId = c.req.param('courseId')
+  try {
+    // courses は id のみ。単元名・学年は curriculum 側にあるので結合して取る。
+    const course = await env.DB.prepare(`
+      SELECT c.id, c.course_name, c.curriculum_id,
+             cu.unit_name AS unit_name, cu.grade AS grade, cu.subject AS subject
+      FROM courses c
+      LEFT JOIN curriculum cu ON cu.id = c.curriculum_id
+      WHERE c.id = ?
+    `).bind(courseId).first() as any
+
+    // passage 列は後から追加したため、未適用の環境では存在しないことがある。
+    // 列指定で落ちると印刷自体ができなくなるので、SELECT * にして存在する列だけ使う。
+    const res = await env.DB.prepare(`
+      SELECT * FROM learning_cards
+      WHERE course_id = ? AND (is_active IS NULL OR is_active = 1)
+      ORDER BY card_number
+    `).bind(courseId).all()
+
+    const rows = (res.results || []) as any[]
+    if (rows.length === 0) {
+      return c.html('<h1>印刷できるカードがありません</h1><p>このコースにはまだ学習カードが登録されていません。</p>', 404)
+    }
+    const cards = await attachHintsForPrint(env.DB, rows)
+    const first = rows[0] || {}
+    return c.html(renderCardsPrintPage(
+      {
+        unitName: course?.unit_name || first.unit_name || '学習カード',
+        grade: course?.grade || first.grade_level || '',
+        subject: course?.subject || first.subject || '',
+        courseName: course?.course_name || '',
+      },
+      cards,
+      parsePrintOptions(c)
+    ))
+  } catch (error: any) {
+    console.error('印刷ページ生成エラー:', error)
+    return c.html('<h1>印刷ページを作れませんでした</h1><p>' + escapeHTML(error?.message || '') + '</p>', 500)
+  }
+})
+
+app.get('/print/card/:cardId', async (c) => {
+  const { env } = c
+  const cardId = c.req.param('cardId')
+  try {
+    const card = await env.DB.prepare('SELECT * FROM learning_cards WHERE card_id = ?').bind(cardId).first() as any
+    if (!card) return c.html('<h1>カードが見つかりません</h1>', 404)
+    const cards = await attachHintsForPrint(env.DB, [card])
+    return c.html(renderCardsPrintPage(
+      {
+        unitName: card.unit_name || '学習カード',
+        grade: card.grade_level || '',
+        subject: card.subject || '',
+      },
+      cards,
+      parsePrintOptions(c)
+    ))
+  } catch (error: any) {
+    return c.html('<h1>印刷ページを作れませんでした</h1><p>' + escapeHTML(error?.message || '') + '</p>', 500)
+  }
+})
+
 app.get('/', (c) => {
   // ルートアクセス → ログインページにリダイレクト
   return c.redirect('/login.html')
@@ -16695,6 +16828,9 @@ app.get('/landing', (c) => {
         <link href="/static/tailwind-full.css" rel="stylesheet">
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <!-- 紙印刷用スタイル（画面専用の操作部品を落とし、A4に最適化する）
+             media指定なしで読み込む: .print-only を画面側で隠す基底ルールが必要なため -->
+        <link href="/static/print.css" rel="stylesheet">
         
         <!-- Deferred Libraries (non-critical) -->
         <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>

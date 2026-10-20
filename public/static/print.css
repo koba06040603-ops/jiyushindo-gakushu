@@ -1,35 +1,207 @@
-/* 印刷用スタイル */
+/* ============================================================
+   紙印刷用スタイル
+   画面（PC/タブレット）でしか意味を持たない要素を落とし、
+   A4に収まる密度・配色に落とし込む。
+   方針:
+     ①操作部品（ボタン・入力欄・タブ・ナビ）は印刷しない
+     ②画面演出（影・角丸・グラデーション・アニメ）は落とす
+     ③背景色は薄いグレーの罫線に置き換え、インクを節約する
+     ④カードは1枚ずつ改ページし、途中で切れないようにする
+     ⑤児童が紙に書き込む「解答欄」を印刷時だけ出す
+   ============================================================ */
+
+/* 画面では隠しておき、印刷時だけ現れる要素 */
+.print-only { display: none !important; }
+
 @media print {
-  /* ボタンなどを非表示 */
-  .no-print {
-    display: none !important;
-  }
-  
-  /* ページ設定 */
+
+  /* ---------- ページ設定 ---------- */
   @page {
-    size: A4;
-    margin: 15mm;
+    size: A4 portrait;
+    margin: 12mm 12mm 14mm 12mm;
   }
-  
-  /* 改ページ制御 */
-  .page-break {
-    page-break-before: always;
-  }
-  
-  /* 背景色を印刷 */
-  * {
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    font-size: 10.5pt;
+    line-height: 1.55;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  
-  /* ナビゲーションなどを非表示 */
-  nav, header, footer, .sidebar {
+
+  /* ---------- ① 画面専用の操作部品は印刷しない ---------- */
+  .no-print,
+  .print\:hidden,
+  nav, header, footer, .sidebar,
+  button,
+  .btn,
+  input[type="button"],
+  input[type="submit"],
+  select,
+  textarea,
+  [role="tablist"],
+  [onclick*="switchTab"],
+  [onclick*="switch"],
+  .fixed,                      /* 固定配置のFAB・トースト・モーダル土台 */
+  .sticky,
+  .animate-spin,
+  .animate-pulse,
+  .animate-bounce,
+  audio, video, iframe,
+  .chat-panel,
+  #chatPanel,
+  .ai-chat,
+  .tooltip,
+  .dropdown-menu {
     display: none !important;
   }
-  
-  /* メインコンテンツを全幅に */
-  body {
-    margin: 0;
-    padding: 0;
+
+  /* 印刷時だけ出す要素 */
+  .print-only { display: block !important; }
+  tr.print-only { display: table-row !important; }
+  span.print-only { display: inline !important; }
+
+  /* ---------- ② 画面演出を落とす ---------- */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    transition: none !important;
+    animation: none !important;
+    filter: none !important;
   }
+
+  .rounded, .rounded-md, .rounded-lg, .rounded-xl,
+  .rounded-2xl, .rounded-3xl, .rounded-full {
+    border-radius: 2px !important;
+  }
+
+  /* グラデーション背景 → 白地に */
+  [class*="bg-gradient"] {
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  /* ---------- ③ 背景色はインク節約のため薄く ---------- */
+  /* 濃い背景（-500〜-900）は白地＋黒文字に反転 */
+  [class*="bg-"][class*="-500"],
+  [class*="bg-"][class*="-600"],
+  [class*="bg-"][class*="-700"],
+  [class*="bg-"][class*="-800"],
+  [class*="bg-"][class*="-900"] {
+    background: #fff !important;
+    color: #111 !important;
+  }
+  /* 薄い背景（-50/-100）は、ごく薄いグレーに統一 */
+  [class*="bg-"][class*="-50"],
+  [class*="bg-"][class*="-100"] {
+    background: #f5f5f5 !important;
+  }
+
+  /* 文字色は黒に寄せる（カラー印刷でなくても読めるように） */
+  [class*="text-"] { color: #111 !important; }
+  .text-gray-500, .text-gray-400 { color: #555 !important; }
+
+  /* 枠線はグレーの実線に統一 */
+  [class*="border-"] { border-color: #999 !important; }
+
+  /* ---------- ④ 改ページ制御 ---------- */
+  .page-break,
+  .print-page-break { page-break-before: always; break-before: page; }
+
+  /* カードは1枚ずつ独立したページに。途中で切らない */
+  .print-card,
+  .print-page {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    page-break-after: always;
+    break-after: page;
+  }
+  .print-card:last-child,
+  .print-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  /* 見出し・図・表はページ跨ぎさせない */
+  h1, h2, h3, h4 {
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+  img, svg, table, .print-figure, .hint-box, .answer-box {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* ---------- 版面 ---------- */
+  /* 画面用の最大幅・中央寄せを解除して紙幅いっぱいに */
+  .max-w-xs, .max-w-sm, .max-w-md, .max-w-lg, .max-w-xl,
+  .max-w-2xl, .max-w-3xl, .max-w-4xl, .max-w-5xl,
+  .max-w-6xl, .max-w-7xl, .container {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* 画面前提の高さ制限・スクロールを解除（中身が切れるのを防ぐ） */
+  [class*="max-h-"], [class*="h-["], .overflow-auto,
+  .overflow-y-auto, .overflow-x-auto, .overflow-hidden {
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* 余白を詰める（A4の歩留まりを上げる） */
+  .p-6, .p-8 { padding: 8px !important; }
+  .p-4 { padding: 6px !important; }
+  .mb-6, .mb-8 { margin-bottom: 8px !important; }
+  .gap-6, .gap-8 { gap: 8px !important; }
+
+  /* 図は紙幅に収める */
+  img, svg {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* リンクはURLを出さない（児童の紙面に不要） */
+  a, a:visited { text-decoration: none !important; color: #111 !important; }
+  a[href]:after { content: "" !important; }
+
+  /* ---------- ⑤ 紙面専用パーツ ---------- */
+  /* 解答欄（画面では不要、紙では必須） */
+  .answer-box {
+    border: 1.5px solid #333 !important;
+    min-height: 22mm;
+    margin-top: 4mm;
+    padding: 3mm;
+  }
+  .answer-box-label {
+    font-size: 9pt;
+    font-weight: bold;
+    color: #333 !important;
+  }
+
+  /* 氏名欄 */
+  .print-nameplate {
+    display: flex !important;
+    gap: 10mm;
+    font-size: 10pt;
+    border-bottom: 1px solid #333;
+    padding-bottom: 2mm;
+    margin-bottom: 4mm;
+  }
+
+  /* ヒントは紙では折りたたみが効かないので、枠で区切って全部出す */
+  details { display: block !important; }
+  details > summary { display: block !important; font-weight: bold; }
+  details[open] > *, details > * { display: revert !important; }
+
+  .hint-box {
+    border: 1px dashed #666 !important;
+    padding: 3mm;
+    margin-top: 3mm;
+  }
+
+  /* 答え・解説は「裏面」に回したいことが多いので、クラスで明示的に改ページ */
+  .print-answer-section { page-break-before: always; break-before: page; }
 }
