@@ -16734,7 +16734,7 @@ app.get('/print/unit/:curriculumId', async (c) => {
   const part = String(c.req.query('part') || 'all')
   try {
     const unit = await env.DB.prepare(
-      'SELECT id, unit_name, grade, subject, textbook_company, unit_goal FROM curriculum WHERE id = ?'
+      'SELECT id, unit_name, grade, subject, textbook_company, unit_goal, non_cognitive_goal, total_hours FROM curriculum WHERE id = ?'
     ).bind(curriculumId).first() as any
     if (!unit) return c.html('<h1>単元が見つかりません</h1>', 404)
 
@@ -16755,13 +16755,25 @@ app.get('/print/unit/:curriculumId', async (c) => {
     const parts = { guide: want('guide'), check: want('check'), optional: want('optional') }
 
     if (parts.guide) {
-      // 学習のてびき：単元の目標・進め方・コースの説明（学習カードは含めない）
+      // 学習のてびき：画面と同じ順（もくひょう → こころ・じかん → コースをえらぼう）。学習カードは含めない
       const courseRows = await env.DB.prepare(
-        "SELECT course_name, description FROM courses WHERE curriculum_id = ? AND course_level != ? ORDER BY CASE course_level WHEN ? THEN 1 WHEN ? THEN 2 WHEN ? THEN 3 ELSE 4 END"
+        "SELECT id, course_name, course_label, description FROM courses WHERE curriculum_id = ? AND course_level != ? ORDER BY CASE course_level WHEN ? THEN 1 WHEN ? THEN 2 WHEN ? THEN 3 ELSE 4 END"
       ).bind(curriculumId, 'personalized', 'basic', 'standard', 'advanced').all()
+      const selList: any[] = Array.isArray(meta.course_selection_problems) ? meta.course_selection_problems : []
+      const guideCourses = ((courseRows.results || []) as any[]).map((co, i) => ({
+        course_name: co.course_name,
+        course_label: co.course_label,
+        description: co.description,
+        selection_title: selList[i]?.problem_title || '',
+        selection_content: selList[i]?.problem_content || selList[i]?.problem_description || '',
+      }))
       pieces.push(renderGuideForPrint(
-        { unit_name: unit.unit_name, grade: unit.grade, subject: unit.subject, textbook: unit.textbook_company, unit_goal: unit.unit_goal },
-        (courseRows.results || []) as any[]
+        {
+          unit_name: unit.unit_name, grade: unit.grade, subject: unit.subject,
+          textbook: unit.textbook_company, unit_goal: unit.unit_goal,
+          non_cognitive_goal: unit.non_cognitive_goal, total_hours: unit.total_hours,
+        },
+        guideCourses
       ))
     }
 

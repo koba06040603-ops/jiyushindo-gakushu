@@ -355,14 +355,25 @@ export function wrapPrintDocument(title: string, meta: PrintMeta, bodyHTML: stri
   .p-check-q { margin-bottom: 4mm; page-break-inside: avoid; break-inside: avoid; }
   .p-check-q .p-problem { margin-bottom: 2mm; }
   .p-check-note { font-size: 9.5pt; color:#444; margin: 0 0 4mm; }
-  .p-guide-meta { font-size: 10pt; color:#444; margin: 0 0 4mm; }
-  .p-guide-heading { font-size: 12pt; margin: 5mm 0 2mm; padding-left: 2mm; border-left: 3mm solid #4f46e5; }
-  .p-guide-body { font-size: 11pt; line-height: 1.7; white-space: pre-wrap; }
-  .p-guide-steps { font-size: 11pt; line-height: 1.8; margin: 0 0 2mm 6mm; }
-  .p-guide-courses { list-style: none; padding: 0; margin: 0; }
-  .p-guide-course { border: 0.4mm solid #c7d2fe; border-radius: 2mm; padding: 3mm; margin: 0 0 3mm; }
-  .p-guide-course-name { font-size: 12pt; font-weight: bold; }
-  .p-guide-course-desc { font-size: 10.5pt; color:#333; margin-top: 1mm; }
+  .p-guide-unit { font-size: 16pt; font-weight: bold; text-align:center; margin: 1mm 0; }
+  .p-guide-meta { font-size: 10pt; color:#444; text-align:center; margin: 0 0 4mm; }
+  .p-guide-box { border-left: 2mm solid #2563eb; background:#eff6ff; border-radius: 2mm; padding: 3mm 4mm; margin: 0 0 3mm; }
+  .p-guide-box-title { font-size: 11pt; font-weight: bold; margin-bottom: 1mm; }
+  .p-guide-box-goal { border-left-color:#2563eb; }
+  .p-guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; margin-bottom: 3mm; }
+  .p-guide-box-heart { border-left-color:#16a34a; background:#f0fdf4; margin: 0; }
+  .p-guide-box-time { border-left-color:#9333ea; background:#faf5ff; margin: 0; }
+  .p-guide-hours { font-size: 16pt; font-weight: bold; color:#7e22ce; }
+  .p-guide-body { font-size: 10.5pt; line-height: 1.6; white-space: pre-wrap; }
+  .p-guide-heading { font-size: 12pt; text-align:center; margin: 5mm 0 3mm; padding-bottom: 1mm; border-bottom: 0.4mm solid #999; }
+  .p-guide-courses { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 3mm; }
+  .p-guide-course { border: 0.6mm solid #94a3b8; border-radius: 3mm; padding: 3mm; }
+  .p-guide-course-no { text-align:center; font-weight:bold; color:#fff; background:#16a34a; border-radius: 99mm; width: 7mm; margin: 0 auto 1mm; }
+  .p-guide-course-name { font-size: 11pt; font-weight: bold; text-align:center; }
+  .p-guide-course-label { font-size: 9pt; color:#444; text-align:center; margin-bottom: 2mm; }
+  .p-guide-selection { border: 0.3mm solid #cbd5e1; border-radius: 2mm; padding: 2mm; }
+  .p-guide-selection-title { font-size: 9.5pt; font-weight: bold; }
+  .p-guide-selection-body { font-size: 8.5pt; line-height: 1.5; white-space: pre-wrap; }
   .p-check-answer-box { border: 1.5px solid var(--ink); min-height: 14mm; margin-top: 2mm; }
   .p-answer-key { border-top: 1px dashed var(--line); margin-top: 2mm; padding-top: 1mm; font-size: 9.5pt; color:#333; }
   .p-opt-title { font-weight: 700; font-size: 11.5pt; margin: 0 0 1mm; }
@@ -490,12 +501,16 @@ export function renderOptionalForPrint(items: OptionalRow[], showAnswers = false
 
 // ============================================================
 // 📘 学習のてびき（紙面）
-//   単元の目標・学習の進め方・コースの説明だけを載せる。
-//   学習カードや問題は含めない（学習カードは /print/course/:id で別に印刷）。
+//   画面の「学習のてびき」と同じ順番で、紙に必要な部分だけを載せる：
+//   単元のもくひょう → こころのせいちょう・じゅぎょうじかん → コースをえらぼう（3コース）
+//   学習カード・問題本文は含めない。
 // ============================================================
 export interface GuideCourseRow {
   course_name?: string
+  course_label?: string | null
   description?: string
+  selection_title?: string
+  selection_content?: string
 }
 
 export interface GuideUnitRow {
@@ -504,36 +519,53 @@ export interface GuideUnitRow {
   subject?: string
   textbook?: string
   unit_goal?: string | null
+  non_cognitive_goal?: string | null
+  total_hours?: number | null
 }
 
 export function renderGuideForPrint(unit: GuideUnitRow, courses: GuideCourseRow[]): string {
   const headLine = [unit.grade, unit.subject, unit.textbook].filter(Boolean).map(esc).join(' ・ ')
   const goal = (unit.unit_goal || '').trim()
-  const courseItems = courses.length === 0
-    ? '<p>この単元のコースはまだ登録されていません。</p>'
-    : `<ol class="p-guide-courses">${courses.map((co) => `
-        <li class="p-guide-course">
+  const heart = (unit.non_cognitive_goal || '').trim()
+  const hours = unit.total_hours ? `ぜんぶで ${esc(unit.total_hours)} じかん` : ''
+
+  const courseCards = courses.length === 0
+    ? '<p class="p-guide-body">この単元のコースは まだ とうろくされていません。</p>'
+    : `<div class="p-guide-courses">${courses.map((co, i) => `
+        <section class="p-guide-course">
+          <div class="p-guide-course-no">${i + 1}</div>
           <div class="p-guide-course-name">${esc(co.course_name || 'コース')}</div>
-          ${co.description ? `<div class="p-guide-course-desc">${escMultiline(co.description)}</div>` : ''}
-        </li>`).join('')}</ol>`
+          <div class="p-guide-course-label">${esc(co.course_label || co.description || '')}</div>
+          ${co.selection_title || co.selection_content ? `
+            <div class="p-guide-selection">
+              <div class="p-guide-selection-title">✨ ${esc(co.selection_title || '')}</div>
+              <div class="p-guide-selection-body">${escMultiline(co.selection_content || '')}</div>
+            </div>` : ''}
+        </section>`).join('')}</div>`
+
   return `
     <section class="p-card p-break p-guide">
-      <h2 class="p-sheet-title">${esc(unit.unit_name || '単元')}</h2>
+      <h2 class="p-sheet-title">学習のてびき</h2>
+      <div class="p-guide-unit">${esc(unit.unit_name || '単元')}</div>
       ${headLine ? `<p class="p-guide-meta">${headLine}</p>` : ''}
 
-      <h3 class="p-guide-heading">この単元のめあて</h3>
-      ${goal ? `<div class="p-guide-body">${escMultiline(goal)}</div>` : '<p class="p-guide-body">（めあては先生が入力します）</p>'}
+      <div class="p-guide-box p-guide-box-goal">
+        <div class="p-guide-box-title">たんげんのもくひょう</div>
+        <div class="p-guide-body">${goal ? escMultiline(goal) : '（先生が入力します）'}</div>
+      </div>
 
-      <h3 class="p-guide-heading">学習の進め方</h3>
-      <ol class="p-guide-steps">
-        <li>てびきを読む（この紙）</li>
-        <li>コースを1つ選ぶ（この単元のコース）</li>
-        <li>学習カードを 1 まいずつ解く</li>
-        <li>チェックテストに挑戦する</li>
-        <li>えらべるもんだいを選んで解く</li>
-      </ol>
+      <div class="p-guide-grid">
+        <div class="p-guide-box p-guide-box-heart">
+          <div class="p-guide-box-title">こころのせいちょう</div>
+          <div class="p-guide-body">${heart ? escMultiline(heart) : '（先生が入力します）'}</div>
+        </div>
+        <div class="p-guide-box p-guide-box-time">
+          <div class="p-guide-box-title">じゅぎょうじかん</div>
+          <div class="p-guide-hours">${hours || '（先生が入力します）'}</div>
+        </div>
+      </div>
 
-      <h3 class="p-guide-heading">コースの説明</h3>
-      ${courseItems}
+      <h3 class="p-guide-heading">コースをえらぼう！（3つのコースから1つえらんでね）</h3>
+      ${courseCards}
     </section>`
 }
