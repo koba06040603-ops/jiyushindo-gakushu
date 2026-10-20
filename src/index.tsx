@@ -63,7 +63,7 @@ import { AdaptiveLearningEngine } from './adaptive-learning'
 import { SchoolManagementSystem } from './school-management'
 import { AIContentGenerator } from './ai-content-generator'
 import { buildQualityRules, buildQualityChecklist, buildReviseCardsPrompt } from './quality-rules'
-import { renderCardsPrintPage, renderCardsBodyForPrint, renderCheckTestForPrint, renderOptionalForPrint, wrapPrintDocument } from './print-cards'
+import { renderCardsPrintPage, renderCardsBodyForPrint, renderCheckTestForPrint, renderOptionalForPrint, renderGuideForPrint, wrapPrintDocument } from './print-cards'
 import { 
   addToMistakeNotebook, 
   getMistakeNotebook, 
@@ -16755,18 +16755,14 @@ app.get('/print/unit/:curriculumId', async (c) => {
     const parts = { guide: want('guide'), check: want('check'), optional: want('optional') }
 
     if (parts.guide) {
-      const courses = await env.DB.prepare(
-        'SELECT id, course_name FROM courses WHERE curriculum_id = ? AND course_level != ? ORDER BY CASE course_level WHEN ? THEN 1 WHEN ? THEN 2 WHEN ? THEN 3 ELSE 4 END'
+      // 学習のてびき：単元の目標・進め方・コースの説明（学習カードは含めない）
+      const courseRows = await env.DB.prepare(
+        "SELECT course_name, description FROM courses WHERE curriculum_id = ? AND course_level != ? ORDER BY CASE course_level WHEN ? THEN 1 WHEN ? THEN 2 WHEN ? THEN 3 ELSE 4 END"
       ).bind(curriculumId, 'personalized', 'basic', 'standard', 'advanced').all()
-      for (const course of (courses.results || []) as any[]) {
-        const rows = await env.DB.prepare(
-          'SELECT * FROM learning_cards WHERE course_id = ? AND (is_active IS NULL OR is_active = 1) ORDER BY card_number'
-        ).bind(course.id).all()
-        const cards = await attachHintsForPrint(env.DB, (rows.results || []) as any[])
-        if (cards.length === 0) continue
-        pieces.push(`<div class="p-part-title">${escapeHTML(course.course_name || 'コース')}</div>`)
-        pieces.push(renderCardsBodyForPrint(cards, { ...parsePrintOptions(c), editable: c.req.query('edit') === '1' }))
-      }
+      pieces.push(renderGuideForPrint(
+        { unit_name: unit.unit_name, grade: unit.grade, subject: unit.subject, textbook: unit.textbook_company, unit_goal: unit.unit_goal },
+        (courseRows.results || []) as any[]
+      ))
     }
 
     const showKeys = String(c.req.query('answers') || '') === 'inline'

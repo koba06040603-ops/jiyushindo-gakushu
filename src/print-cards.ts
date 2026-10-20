@@ -355,6 +355,14 @@ export function wrapPrintDocument(title: string, meta: PrintMeta, bodyHTML: stri
   .p-check-q { margin-bottom: 4mm; page-break-inside: avoid; break-inside: avoid; }
   .p-check-q .p-problem { margin-bottom: 2mm; }
   .p-check-note { font-size: 9.5pt; color:#444; margin: 0 0 4mm; }
+  .p-guide-meta { font-size: 10pt; color:#444; margin: 0 0 4mm; }
+  .p-guide-heading { font-size: 12pt; margin: 5mm 0 2mm; padding-left: 2mm; border-left: 3mm solid #4f46e5; }
+  .p-guide-body { font-size: 11pt; line-height: 1.7; white-space: pre-wrap; }
+  .p-guide-steps { font-size: 11pt; line-height: 1.8; margin: 0 0 2mm 6mm; }
+  .p-guide-courses { list-style: none; padding: 0; margin: 0; }
+  .p-guide-course { border: 0.4mm solid #c7d2fe; border-radius: 2mm; padding: 3mm; margin: 0 0 3mm; }
+  .p-guide-course-name { font-size: 12pt; font-weight: bold; }
+  .p-guide-course-desc { font-size: 10.5pt; color:#333; margin-top: 1mm; }
   .p-check-answer-box { border: 1.5px solid var(--ink); min-height: 14mm; margin-top: 2mm; }
   .p-answer-key { border-top: 1px dashed var(--line); margin-top: 2mm; padding-top: 1mm; font-size: 9.5pt; color:#333; }
   .p-opt-title { font-weight: 700; font-size: 11.5pt; margin: 0 0 1mm; }
@@ -478,4 +486,54 @@ export function renderOptionalForPrint(items: OptionalRow[], showAnswers = false
       <p class="p-check-note">チェックテストに合格したら、やりたいもんだいを えらんで といてみよう。</p>
     </section>
     ${body}`
+}
+
+// ============================================================
+// 📘 学習のてびき（紙面）
+//   単元の目標・学習の進め方・コースの説明だけを載せる。
+//   学習カードや問題は含めない（学習カードは /print/course/:id で別に印刷）。
+// ============================================================
+export interface GuideCourseRow {
+  course_name?: string
+  description?: string
+}
+
+export interface GuideUnitRow {
+  unit_name?: string
+  grade?: string
+  subject?: string
+  textbook?: string
+  unit_goal?: string | null
+}
+
+export function renderGuideForPrint(unit: GuideUnitRow, courses: GuideCourseRow[]): string {
+  const headLine = [unit.grade, unit.subject, unit.textbook].filter(Boolean).map(esc).join(' ・ ')
+  const goal = (unit.unit_goal || '').trim()
+  const courseItems = courses.length === 0
+    ? '<p>この単元のコースはまだ登録されていません。</p>'
+    : `<ol class="p-guide-courses">${courses.map((co) => `
+        <li class="p-guide-course">
+          <div class="p-guide-course-name">${esc(co.course_name || 'コース')}</div>
+          ${co.description ? `<div class="p-guide-course-desc">${escMultiline(co.description)}</div>` : ''}
+        </li>`).join('')}</ol>`
+  return `
+    <section class="p-card p-break p-guide">
+      <h2 class="p-sheet-title">${esc(unit.unit_name || '単元')}</h2>
+      ${headLine ? `<p class="p-guide-meta">${headLine}</p>` : ''}
+
+      <h3 class="p-guide-heading">この単元のめあて</h3>
+      ${goal ? `<div class="p-guide-body">${escMultiline(goal)}</div>` : '<p class="p-guide-body">（めあては先生が入力します）</p>'}
+
+      <h3 class="p-guide-heading">学習の進め方</h3>
+      <ol class="p-guide-steps">
+        <li>てびきを読む（この紙）</li>
+        <li>コースを1つ選ぶ（この単元のコース）</li>
+        <li>学習カードを 1 まいずつ解く</li>
+        <li>チェックテストに挑戦する</li>
+        <li>えらべるもんだいを選んで解く</li>
+      </ol>
+
+      <h3 class="p-guide-heading">コースの説明</h3>
+      ${courseItems}
+    </section>`
 }
