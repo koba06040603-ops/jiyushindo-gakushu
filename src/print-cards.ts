@@ -379,6 +379,24 @@ export function wrapPrintDocument(title: string, meta: PrintMeta, bodyHTML: stri
   .p-opt-title { font-weight: 700; font-size: 11.5pt; margin: 0 0 1mm; }
   .p-opt-chip { display:inline-block; font-size: 8.5pt; border:1px solid var(--line); padding: 0 2mm; margin-left: 2mm; }
 
+  /* チェックテスト・えらべるもんだい：チェックテストは紙1枚、えらべるもんだいは表裏2ページに収める詰め方 */
+  .p-part-intro { margin: 0 0 2mm; }
+  .p-part-intro .p-sheet-title { font-size: 13pt; margin: 0; }
+  .p-part .p-check-note { font-size: 9pt; margin: 0 0 2mm; }
+  .p-part .p-check-q { margin-bottom: 3mm; }
+  .p-part .p-card-head { margin-bottom: 1mm; gap: 2mm; }
+  .p-part .p-card-no { width: 7mm; height: 7mm; font-size: 10pt; border-width: 1.5px; }
+  .p-part .p-card-title { font-size: 11pt; }
+  .p-part .p-problem { font-size: 10pt; line-height: 1.55; margin-bottom: 1.5mm; }
+  .p-part .p-figure { margin: 1.5mm 0; }
+  .p-part .p-check-answer-box { min-height: 10mm; margin-top: 1mm; padding: 1mm 2mm; }
+  .p-part .p-answer-label { font-size: 8pt; }
+  .p-part .p-answer-key { font-size: 9pt; margin-top: 1mm; }
+  .p-part .p-check-q { page-break-inside: avoid; break-inside: avoid; }
+  /* 部分ごとの印刷：各部分は新しい紙（ページ）から始める。先頭の部分はヘッダーの直後から */
+  .p-part { break-before: page; page-break-before: always; }
+  .p-header + .p-part { break-before: auto; page-break-before: auto; }
+
   /* ===== 印刷時 ===== */
   @media print {
     @page { size: A4 portrait; margin: 10mm; }
@@ -462,11 +480,13 @@ export function renderCheckTestForPrint(title: string, problems: CheckProblemRow
       </section>`
   }).join('')
   return `
-    <section class="p-card p-break">
+    <div class="p-part">
+    <section class="p-part-intro">
       <h2 class="p-sheet-title">${esc(title)}</h2>
       <p class="p-check-note">ぜんぶ じぶんの ちからで といてみよう。</p>
     </section>
-    ${items}`
+    ${items}
+    </div>`
 }
 
 export interface OptionalRow {
@@ -492,11 +512,13 @@ export function renderOptionalForPrint(items: OptionalRow[], showAnswers = false
         ${showAnswers && p.answer ? `<div class="p-answer-key">こたえ（先生用）: ${escMultiline(p.answer)}</div>` : ''}
       </section>`).join('')
   return `
-    <section class="p-card p-break">
+    <div class="p-part">
+    <section class="p-part-intro">
       <h2 class="p-sheet-title">えらべるもんだい</h2>
       <p class="p-check-note">チェックテストに合格したら、やりたいもんだいを えらんで といてみよう。</p>
     </section>
-    ${body}`
+    ${body}
+    </div>`
 }
 
 // ============================================================
