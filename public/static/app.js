@@ -10451,8 +10451,8 @@ const STAGED_LESSON_CONFIG = {
     // 段階ヒント（不正解時に順に表示）
     hints: [
       '「前の量が後ろの量の何倍か」を分数で表すよ。前の数（コーヒーの3）を分子、後ろの数（牛乳の5）を分母にしてみよう。',
-      '比 3:5 の値は 3 ÷ 5 だよ。分数は「分子 ÷ 分母」と同じ。',
-      '答えは 3 を 5 でわった分数。分子が3、分母が5だよ。'
+      '「前の数÷後ろの数」の計算になるよ。分数は、わり算の答えを表す形だよ。',
+      '前の数（コーヒーの量）が分子、後ろの数（牛乳の量）が分母になるよ。どちらが上かを、さっきの式で確かめてみよう。'
     ],
     // 答えの後の「内省」
     reflectionPrompt: 'コーヒーが牛乳の何倍かを、ことばで一言書いてみよう。'
@@ -10632,7 +10632,7 @@ function stagedStep3Html(cardId) {
     <p style="font-size:0.9rem;color:#374151;margin-bottom:8px;">比 3:5 の値を分数で書こう。</p>
     <div style="display:flex;gap:8px;align-items:center;justify-content:center;">
       <input id="staged-answer-${cardId}" type="text" inputmode="text" autocomplete="off"
-             placeholder="例：3/5" style="font-size:1.25rem;padding:8px 12px;border:2px solid #C4B5FD;border-radius:10px;width:200px;text-align:center;" />
+             placeholder="分数で入力" style="font-size:1.25rem;padding:8px 12px;border:2px solid #C4B5FD;border-radius:10px;width:200px;text-align:center;" />
       <button onclick="stagedCheck(${cardId})" style="background:#16A34A;color:#fff;border:none;border-radius:10px;padding:10px 16px;font-weight:bold;">答え合わせ</button>
     </div>
     <div id="staged-result-${cardId}" style="margin-top:10px;"></div>
