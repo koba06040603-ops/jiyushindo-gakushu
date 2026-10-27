@@ -10446,7 +10446,7 @@ const STAGED_LESSON_CONFIG = {
     formulaChoices: ['3 ÷ 5', '5 ÷ 3', '3 + 5', '3 × 5'],
     formulaCorrect: '3 ÷ 5',
     // 抽象: 分数の答え（許容表記）
-    answerAccepted: ['3/5', '3／5', '５分の３', '3分の5', '5分の3'],
+    answerAccepted: ['3/5', '3／5', '５分の３', '5分の3'],
     answerAcceptedNormalize: true,
     // 段階ヒント（不正解時に順に表示）
     hints: [
