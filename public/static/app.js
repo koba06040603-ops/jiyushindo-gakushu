@@ -10435,19 +10435,55 @@ function initTactileWidgets() {
 // ========== 段階式レッスン（具体→半具体→抽象）==========
 // 五感（触覚・体験）を残しつつ、操作結果を答えと結びつけて正誤を返す。
 // 対象は STAGED_LESSON_CARD_IDS のカードのみ。DBの問題文・答えは変更しない。
-const STAGED_LESSON_CARD_IDS = [2868]
+// concrete.type: 省略時＝計量（2カップ）、'balance'＝板のつり合い
+const STAGED_LESSON_CARD_IDS = [2810, 2868]
 
 // 段階式レッスンの設定（カードごと）
 const STAGED_LESSON_CONFIG = {
+  // 図工「感じたことを形に（未来の私）」: 重心（2810）
+  2810: {
+    concrete: {
+      type: 'balance',
+      max: 10,
+      start: 0,
+      target: 6,
+      intro: '板の下の支えを左右に動かして、板がかたむかないところを探してみよう。（教室では、ものさしや板を実際に指で支えてみてもよい。）'
+    },
+    step2Question: '未来の自分の作品が倒れずに立つためには、どこの真上に作品の重さの中心があればよいでしょう？',
+    formulaChoices: ['頭の真上', '両足の間の真上あたり', '手の先の真上', '台座の端の真上'],
+    formulaCorrect: '両足の間の真上あたり',
+    formulaOkText: '○ せいかい！ 板がかたむかなかった場所と同じで、両足の間の真上に重さの中心があると安定するね。',
+    formulaNgText: '× ちがうよ。板をつり合わせた場所を思い出そう。',
+    step3ButtonLabel: '次へ（言葉で答える）',
+    step3Question: '（　　）に入る言葉を書こう。',
+    placeholder: '言葉で入力',
+    answerAccepted: ['重心', 'じゅうしん'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 答えは「重心」だよ。',
+    hints: [
+      '板がかたむかなくなった場所は、作品の重さがつり合う点だよ。その点を何と呼ぶか思い出そう。',
+      '作品の「重さが集まるところ」を表す、漢字2文字の言葉だよ。',
+      '板がかたむかなかった点は、作品の「重さの中心」だったね。その中心を表す言葉を書いてみよう。'
+    ],
+    reflectionPrompt: '自分の作品で、重心が両足の間の真上にくるように、ポーズをことばで一言書いてみよう。'
+  },
+  // 比の値を調べよう（ID 2868、コーヒー牛乳 3:5）
   2868: {
     // 具体: 計量カップに入れる量（コーヒー・牛乳の液面の目盛り）
     concrete: { leftLabel: 'コーヒー', rightLabel: '牛乳', leftTarget: 3, rightTarget: 5, max: 5 },
+    step2Question: 'コーヒー 3、牛乳 5 のとき、「コーヒーが牛乳の何倍か」を表す式はどれ？',
     // 半具体: 式の選択肢（正解は前÷後）
     formulaChoices: ['3 ÷ 5', '5 ÷ 3', '3 + 5', '3 × 5'],
     formulaCorrect: '3 ÷ 5',
+    formulaOkText: '○ せいかい！ 比 3:5 の「前÷後」は 3 ÷ 5 だね。',
+    formulaNgText: '× ちがうよ。「前の量が後ろの量の何倍か」を表す式を選ぼう。',
+    step3ButtonLabel: '次へ（分数で答える）',
+    step3Question: '比 3:5 の値を分数で書こう。',
+    placeholder: '分数で入力',
     // 抽象: 分数の答え（許容表記）
     answerAccepted: ['3/5', '3／5', '５分の３', '5分の3'],
     answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 答えは 3/5 だよ。',
     // 段階ヒント（不正解時に順に表示）
     hints: [
       '「前の量が後ろの量の何倍か」を分数で表すよ。前の数（コーヒーの3）を分子、後ろの数（牛乳の5）を分母にしてみよう。',
@@ -10489,7 +10525,12 @@ function renderStagedLesson(card) {
   const tw = document.getElementById('tactile-widget-' + cardId)
   if (tw) tw.style.display = 'none'
 
-  const st = { step: 1, cfg, cardId, placed: { left: 0, right: 0 }, selectedFormula: null, hintLevel: 0 }
+  const st = {
+    step: 1, cfg, cardId,
+    placed: { left: 0, right: 0 },
+    pos: cfg.concrete.start || 0,
+    selectedFormula: null, hintLevel: 0
+  }
   window._stagedLesson = st
   host.innerHTML = `
     <div id="staged-lesson-body-${cardId}" style="background:linear-gradient(135deg,#F5F3FF,#FDF2F8);border:2px solid #C4B5FD;border-radius:16px;padding:14px;">
@@ -10502,7 +10543,7 @@ function renderStagedLesson(card) {
 
 function renderStagedSteps(cardId) {
   const st = window._stagedLesson
-  const labels = ['1 具体：はかる', '2 図と式：えらぶ', '3 抽象：書いて確かめる']
+  const labels = ['1 具体：ためす', '2 考えてえらぶ', '3 抽象：書いて確かめる']
   const el = document.getElementById('staged-steps-' + cardId)
   if (!el) return
   el.innerHTML = labels.map((l, i) => {
@@ -10526,9 +10567,10 @@ function renderStagedStep(cardId) {
   else panel.innerHTML = stagedStep3Html(cardId)
 }
 
-// ステップ1: 具体（タップで量を入れる。ドラッグなし）
+// ステップ1: 具体（タップで操作。ドラッグなし）
 function stagedStep1Html(cardId) {
   const st = window._stagedLesson
+  if (st.cfg.concrete.type === 'balance') return stagedBalanceHtml(cardId)
   const c = st.cfg.concrete
   const cup = (key, label) => {
     const v = st.placed[key]
@@ -10566,6 +10608,39 @@ function stagedStep1Html(cardId) {
     </div>`
 }
 
+// 板のつり合い（重心）: 支えの位置を動かし、板がかたむかない点を探す
+function stagedBalanceHtml(cardId) {
+  const st = window._stagedLesson
+  const c = st.cfg.concrete
+  const pos = st.pos
+  const pct = (pos / c.max) * 100
+  const ok = pos === c.target
+  // 重さの中心が支えより右にあれば右側が下がる（CSSの正の回転）
+  const tilt = ok ? 0 : Math.max(-20, Math.min(20, (c.target - pos) * 3))
+  return `
+    <p style="font-size:0.9rem;color:#374151;margin-bottom:8px;">${c.intro}</p>
+    <div style="position:relative;width:300px;max-width:100%;height:90px;margin:16px auto 0;">
+      <div style="position:absolute;left:0;right:0;top:20px;height:14px;background:#b5651d;border-radius:6px;transform-origin:${pct}% 50%;transform:rotate(${tilt}deg);transition:transform .3s;"></div>
+      <div style="position:absolute;left:calc(${pct}% - 12px);top:34px;width:0;height:0;border-left:12px solid transparent;border-right:12px solid transparent;border-bottom:24px solid #374151;"></div>
+    </div>
+    <p style="text-align:center;font-weight:bold;margin-top:8px;color:${ok ? '#16A34A' : '#374151'};">いまの支えの位置：${pos}（${ok ? 'つり合った！ 板がかたむかないよ' : 'ななめにかたむいている'}）</p>
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;">
+      <button onclick="stagedBalance(-1,${cardId})" style="background:#e5e7eb;border:none;border-radius:8px;padding:8px 14px;font-weight:bold;">← 左へ</button>
+      <button onclick="stagedBalance(1,${cardId})" style="background:#7C3AED;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:bold;">右へ →</button>
+    </div>
+    <div style="text-align:center;margin-top:12px;">
+      <button onclick="stagedNext(${cardId})" ${ok ? '' : 'disabled'} style="background:${ok ? '#16A34A' : '#D1D5DB'};color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:bold;">つり合ったら次へ</button>
+    </div>`
+}
+
+function stagedBalance(delta, cardId) {
+  const st = window._stagedLesson
+  if (!st || st.cardId !== cardId) return
+  st.pos = Math.max(0, Math.min(st.cfg.concrete.max, st.pos + delta))
+  try { TactileSounds.play('tap') } catch (_) {}
+  renderStagedStep(cardId)
+}
+
 function stagedPour(key, delta, cardId) {
   const st = window._stagedLesson
   if (!st || st.cardId !== cardId) return
@@ -10582,7 +10657,7 @@ function stagedNext(cardId) {
   renderStagedStep(cardId)
 }
 
-// ステップ2: 半具体（式を選ぶ。正誤を即時表示）
+// ステップ2: 半具体（選んで答える。正誤を即時表示）
 function stagedStep2Html(cardId) {
   const st = window._stagedLesson
   const c = st.cfg
@@ -10596,14 +10671,14 @@ function stagedStep2Html(cardId) {
     return `<button onclick="stagedPickFormula('${f}',${cardId})" style="background:${bg};border:2px solid ${bd};border-radius:10px;padding:10px 14px;font-size:1.1rem;font-weight:bold;">${f}</button>`
   }).join('')
   const feedback = sel === null ? '' : (sel === c.formulaCorrect
-    ? `<p style="color:#16A34A;font-weight:bold;margin-top:8px;">○ せいかい！ 比 3:5 の「前÷後」は 3 ÷ 5 だね。</p>`
-    : `<p style="color:#DC2626;font-weight:bold;margin-top:8px;">× ちがうよ。「前の量が後ろの量の何倍か」を表す式を選ぼう。</p>`)
+    ? `<p style="color:#16A34A;font-weight:bold;margin-top:8px;">${c.formulaOkText}</p>`
+    : `<p style="color:#DC2626;font-weight:bold;margin-top:8px;">${c.formulaNgText}</p>`)
   return `
-    <p style="font-size:0.9rem;color:#374151;margin-bottom:8px;">コーヒー 3、牛乳 5 のとき、「コーヒーが牛乳の何倍か」を表す式はどれ？</p>
+    <p style="font-size:0.9rem;color:#374151;margin-bottom:8px;">${c.step2Question}</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">${buttons}</div>
     ${feedback}
     <div style="text-align:center;margin-top:12px;">
-      <button onclick="stagedGoStep3(${cardId})" ${sel === c.formulaCorrect ? '' : 'disabled'} style="background:${sel === c.formulaCorrect ? '#16A34A' : '#D1D5DB'};color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:bold;">次へ（分数で答える）</button>
+      <button onclick="stagedGoStep3(${cardId})" ${sel === c.formulaCorrect ? '' : 'disabled'} style="background:${sel === c.formulaCorrect ? '#16A34A' : '#D1D5DB'};color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:bold;">${c.step3ButtonLabel}</button>
     </div>`
 }
 
@@ -10622,17 +10697,17 @@ function stagedGoStep3(cardId) {
   renderStagedStep(cardId)
 }
 
-// ステップ3: 抽象（分数で答え、即時に正誤。段階ヒント）
+// ステップ3: 抽象（答えを書き、即時に正誤。段階ヒント）
 function stagedStep3Html(cardId) {
   const st = window._stagedLesson
   const c = st.cfg
   const shownHints = c.hints.slice(0, st.hintLevel).map((h, i) =>
     `<li style="margin-bottom:4px;">ヒント${i + 1}：${h}</li>`).join('')
   return `
-    <p style="font-size:0.9rem;color:#374151;margin-bottom:8px;">比 3:5 の値を分数で書こう。</p>
+    <p style="font-size:0.9rem;color:#374151;margin-bottom:8px;">${c.step3Question}</p>
     <div style="display:flex;gap:8px;align-items:center;justify-content:center;">
       <input id="staged-answer-${cardId}" type="text" inputmode="text" autocomplete="off"
-             placeholder="分数で入力" style="font-size:1.25rem;padding:8px 12px;border:2px solid #C4B5FD;border-radius:10px;width:200px;text-align:center;" />
+             placeholder="${c.placeholder}" style="font-size:1.25rem;padding:8px 12px;border:2px solid #C4B5FD;border-radius:10px;width:200px;text-align:center;" />
       <button onclick="stagedCheck(${cardId})" style="background:#16A34A;color:#fff;border:none;border-radius:10px;padding:10px 16px;font-weight:bold;">答え合わせ</button>
     </div>
     <div id="staged-result-${cardId}" style="margin-top:10px;"></div>
@@ -10654,7 +10729,7 @@ function stagedCheck(cardId) {
   const ok = st.cfg.answerAccepted.some(a => stagedNormalize(a) === n)
   if (ok) {
     res.innerHTML = `
-      <p style="color:#16A34A;font-weight:bold;font-size:1.05rem;">○ せいかい！ 答えは 3/5 だよ。</p>
+      <p style="color:#16A34A;font-weight:bold;font-size:1.05rem;">${st.cfg.answerOkText}</p>
       <p style="font-size:0.85rem;color:#374151;margin-top:6px;">${st.cfg.reflectionPrompt}</p>`
     try { TactileSounds.play('correct') } catch (_) {}
     return
@@ -10674,6 +10749,8 @@ function stagedCheck(cardId) {
     if (inp) inp.focus()
   }
 }
+
+window.stagedBalance = stagedBalance
 
 window.stagedPour = stagedPour
 window.stagedNext = stagedNext
