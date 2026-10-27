@@ -10436,7 +10436,7 @@ function initTactileWidgets() {
 // 五感（触覚・体験）を残しつつ、操作結果を答えと結びつけて正誤を返す。
 // 対象は STAGED_LESSON_CARD_IDS のカードのみ。DBの問題文・答えは変更しない。
 // concrete.type: 省略時＝計量（2カップ）、'balance'＝板のつり合い
-const STAGED_LESSON_CARD_IDS = [2810, 2868]
+const STAGED_LESSON_CARD_IDS = [2810, 2857, 2867, 2868]
 
 // 段階式レッスンの設定（カードごと）
 const STAGED_LESSON_CONFIG = {
@@ -10466,6 +10466,59 @@ const STAGED_LESSON_CONFIG = {
       '板がかたむかなかった点は、作品の「重さの中心」だったね。その中心を表す言葉を書いてみよう。'
     ],
     reflectionPrompt: '自分の作品で、重心が両足の間の真上にくるように、ポーズをことばで一言書いてみよう。'
+  },
+  // 比の表し方（ID 2857、赤いえのぐ4mL・白いえのぐ5mL）
+  2857: {
+    concrete: {
+      leftLabel: '赤のえのぐ', rightLabel: '白のえのぐ',
+      leftTarget: 4, rightTarget: 5, max: 5,
+      leftColor: '#DC2626', rightColor: '#F9FAFB',
+      intro: 'ボタンで、赤いえのぐと白いえのぐを 1mL ずつ入れてみよう。目もりを見てね。'
+    },
+    step2Question: '赤いえのぐと白いえのぐの量の割合を「:」で表すと、どれ？',
+    formulaChoices: ['4 : 5', '5 : 4', '4 + 5', '4 ÷ 5'],
+    formulaCorrect: '4 : 5',
+    formulaOkText: '○ せいかい！ 赤が前、白が後ろだから「4 : 5」だね。',
+    formulaNgText: '× ちがうよ。赤を前、白を後ろにして、「:」で表そう。',
+    step3ButtonLabel: '次へ（比で答える）',
+    step3Question: '赤いえのぐと白いえのぐの量の割合を、「:」を使って書こう。',
+    placeholder: '比で入力',
+    answerAccepted: ['4:5'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 答えは 4:5 だよ。',
+    hints: [
+      '問題文では、赤いえのぐと白いえのぐのどちらが先に出てくるかな？ 先に出てくるものを前に書くよ。',
+      '比は「前の数：後ろの数」と書くよ。カップの目もりで、赤と白それぞれの数を確かめてみよう。',
+      '赤の数を左、白の数を右にして、真ん中に「:」を入れよう。'
+    ],
+    reflectionPrompt: '赤いえのぐを多くすると、ピンク色はどう変わるかことばで一言書いてみよう。'
+  },
+  // 比の表し方（ID 2867、酢40mL・油60mL のドレッシング）
+  2867: {
+    concrete: {
+      leftLabel: '酢', rightLabel: '油',
+      leftTarget: 4, rightTarget: 6, max: 6,
+      leftColor: '#FDE68A', rightColor: '#FBBF24',
+      intro: '1めもりは 10mL です。ボタンで、酢を 40mL、油を 60mL 入れてみよう。'
+    },
+    step2Question: '酢の量と油の量の割合を「:」で表すと、どれ？',
+    formulaChoices: ['40 : 60', '60 : 40', '40 + 60', '40 ÷ 60'],
+    formulaCorrect: '40 : 60',
+    formulaOkText: '○ せいかい！ 酢が前、油が後ろだから「40 : 60」だね。',
+    formulaNgText: '× ちがうよ。酢を前、油を後ろにして、「:」で表そう。',
+    step3ButtonLabel: '次へ（比で答える）',
+    step3Question: '酢と油の量の割合を、「:」を使って書こう。',
+    placeholder: '比で入力',
+    // 問いの答え（40:60）のみ。簡単にした比（2:3）は受理しない
+    answerAccepted: ['40:60'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 答えは 40:60 だよ。',
+    hints: [
+      '問題文では、酢と油のどちらが先に出てくるかな？ 先に出てくるものを前に書くよ。',
+      '比は「前の数：後ろの数」と書くよ。単位（mL）は書かないよ。',
+      '酢の mL の数を左、油の mL の数を右にして、真ん中に「:」を入れよう。'
+    ],
+    reflectionPrompt: 'ドレッシングを酸っぱくしたいとき、酢と油の比をどう変えるか一言書いてみよう。'
   },
   // 比の値を調べよう（ID 2868、コーヒー牛乳 3:5）
   2868: {
@@ -10500,6 +10553,7 @@ function stagedNormalize(s) {
     .replace(/[\s　]/g, '')
     .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
     .replace(/[／]/g, '/')
+    .replace(/[：]/g, ':')
     .replace(/[　]/g, '')
 }
 
@@ -10588,7 +10642,7 @@ function stagedStep1Html(cardId) {
         <div style="position:relative;margin:0 auto;width:90px;height:150px;">
           ${ticks}
           <div style="position:absolute;inset:0;border:3px solid #111;border-radius:6px;background:#fff;overflow:hidden;">
-            <div style="position:absolute;left:0;right:0;bottom:0;height:${pct}%;background:${key === 'left' ? '#b5651d' : '#e5e7eb'};transition:height .2s;"></div>
+            <div style="position:absolute;left:0;right:0;bottom:0;height:${pct}%;background:${key === 'left' ? (c.leftColor || '#b5651d') : (c.rightColor || '#e5e7eb')};transition:height .2s;"></div>
             ${lines}
           </div>
         </div>
@@ -10601,7 +10655,7 @@ function stagedStep1Html(cardId) {
   }
   const bothDone = st.placed.left === c.leftTarget && st.placed.right === c.rightTarget
   return `
-    <p style="font-size:0.9rem;color:#374151;margin-bottom:8px;">ボタンで量をはかってみよう。コーヒーと牛乳の目もりを見てね。<br><span style="font-size:0.8rem;color:#6B7280;">（教室では、紙のカップや計量カップで実際に同じ量を入れてみてもよい。）</span></p>
+    <p style="font-size:0.9rem;color:#374151;margin-bottom:8px;">${c.intro || 'ボタンで量をはかってみよう。コーヒーと牛乳の目もりを見てね。'}<br><span style="font-size:0.8rem;color:#6B7280;">（教室では、紙のカップや計量カップで実際に同じ量を入れてみてもよい。）</span></p>
     <div style="display:flex;gap:12px;align-items:flex-end;justify-content:center;">${cup('left', c.leftLabel)}${cup('right', c.rightLabel)}</div>
     <div style="text-align:center;margin-top:12px;">
       <button onclick="stagedNext(${cardId})" ${bothDone ? '' : 'disabled'} style="background:${bothDone ? '#16A34A' : '#D1D5DB'};color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:bold;">はかれたら次へ</button>
