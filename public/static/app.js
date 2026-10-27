@@ -10435,13 +10435,13 @@ function initTactileWidgets() {
 // ========== 段階式レッスン（具体→半具体→抽象）==========
 // 五感（触覚・体験）を残しつつ、操作結果を答えと結びつけて正誤を返す。
 // 対象は STAGED_LESSON_CARD_IDS のカードのみ。DBの問題文・答えは変更しない。
-const STAGED_LESSON_CARD_IDS = [2838]
+const STAGED_LESSON_CARD_IDS = [2868]
 
 // 段階式レッスンの設定（カードごと）
 const STAGED_LESSON_CONFIG = {
-  2838: {
-    // 具体: 計量カップに入れる量（紅茶・牛乳の液面の目盛り）
-    concrete: { leftLabel: '紅茶', rightLabel: '牛乳', leftTarget: 3, rightTarget: 5, max: 5 },
+  2868: {
+    // 具体: 計量カップに入れる量（コーヒー・牛乳の液面の目盛り）
+    concrete: { leftLabel: 'コーヒー', rightLabel: '牛乳', leftTarget: 3, rightTarget: 5, max: 5 },
     // 半具体: 式の選択肢（正解は前÷後）
     formulaChoices: ['3 ÷ 5', '5 ÷ 3', '3 + 5', '3 × 5'],
     formulaCorrect: '3 ÷ 5',
@@ -10450,12 +10450,12 @@ const STAGED_LESSON_CONFIG = {
     answerAcceptedNormalize: true,
     // 段階ヒント（不正解時に順に表示）
     hints: [
-      '「前の量が後ろの量の何倍か」を分数で表すよ。前の数（紅茶の3）を分子、後ろの数（牛乳の5）を分母にしてみよう。',
+      '「前の量が後ろの量の何倍か」を分数で表すよ。前の数（コーヒーの3）を分子、後ろの数（牛乳の5）を分母にしてみよう。',
       '比 3:5 の値は 3 ÷ 5 だよ。分数は「分子 ÷ 分母」と同じ。',
       '答えは 3 を 5 でわった分数。分子が3、分母が5だよ。'
     ],
     // 答えの後の「内省」
-    reflectionPrompt: '紅茶が牛乳の何倍かを、ことばで一言書いてみよう。'
+    reflectionPrompt: 'コーヒーが牛乳の何倍かを、ことばで一言書いてみよう。'
   }
 }
 
@@ -10559,7 +10559,7 @@ function stagedStep1Html(cardId) {
   }
   const bothDone = st.placed.left === c.leftTarget && st.placed.right === c.rightTarget
   return `
-    <p style="font-size:0.9rem;color:#374151;margin-bottom:8px;">ボタンで量をはかってみよう。紅茶と牛乳の目もりを見てね。<br><span style="font-size:0.8rem;color:#6B7280;">（教室では、紙のカップや計量カップで実際に同じ量を入れてみてもよい。）</span></p>
+    <p style="font-size:0.9rem;color:#374151;margin-bottom:8px;">ボタンで量をはかってみよう。コーヒーと牛乳の目もりを見てね。<br><span style="font-size:0.8rem;color:#6B7280;">（教室では、紙のカップや計量カップで実際に同じ量を入れてみてもよい。）</span></p>
     <div style="display:flex;gap:12px;align-items:flex-end;justify-content:center;">${cup('left', c.leftLabel)}${cup('right', c.rightLabel)}</div>
     <div style="text-align:center;margin-top:12px;">
       <button onclick="stagedNext(${cardId})" ${bothDone ? '' : 'disabled'} style="background:${bothDone ? '#16A34A' : '#D1D5DB'};color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:bold;">はかれたら次へ</button>
@@ -10599,7 +10599,7 @@ function stagedStep2Html(cardId) {
     ? `<p style="color:#16A34A;font-weight:bold;margin-top:8px;">○ せいかい！ 比 3:5 の「前÷後」は 3 ÷ 5 だね。</p>`
     : `<p style="color:#DC2626;font-weight:bold;margin-top:8px;">× ちがうよ。「前の量が後ろの量の何倍か」を表す式を選ぼう。</p>`)
   return `
-    <p style="font-size:0.9rem;color:#374151;margin-bottom:8px;">紅茶 3、牛乳 5 のとき、「紅茶が牛乳の何倍か」を表す式はどれ？</p>
+    <p style="font-size:0.9rem;color:#374151;margin-bottom:8px;">コーヒー 3、牛乳 5 のとき、「コーヒーが牛乳の何倍か」を表す式はどれ？</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">${buttons}</div>
     ${feedback}
     <div style="text-align:center;margin-top:12px;">
