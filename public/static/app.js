@@ -10413,6 +10413,11 @@ window.generateTactileIllustration = generateTactileIllustration
 function initTactileWidgets() {
   const cardData = window.currentCardData
   const card = cardData?.card || cardData
+  // 段階式レッスン（具体→半具体→抽象）: 試作対象カードのみ
+  if (card && STAGED_LESSON_CARD_IDS.includes(Number(card.card_id || card.id))) {
+    setTimeout(() => renderStagedLesson(card), 100)
+    return
+  }
   // 触覚ウィジェット
   if (card && card._tactile_activity) {
     const cardId = card.card_id || card.id || 0
@@ -10426,6 +10431,255 @@ function initTactileWidgets() {
     setTimeout(() => initVisualWidgets(), 200)
   }
 }
+
+// ========== 段階式レッスン（具体→半具体→抽象）==========
+// 五感（触覚・体験）を残しつつ、操作結果を答えと結びつけて正誤を返す。
+// 対象は STAGED_LESSON_CARD_IDS のカードのみ。DBの問題文・答えは変更しない。
+const STAGED_LESSON_CARD_IDS = [2838]
+
+// 段階式レッスンの設定（カードごと）
+const STAGED_LESSON_CONFIG = {
+  2838: {
+    // 具体: 計量カップに入れる量（紅茶・牛乳の液面の目盛り）
+    concrete: { leftLabel: '紅茶', rightLabel: '牛乳', leftTarget: 3, rightTarget: 5, max: 5 },
+    // 半具体: 式の選択肢（正解は前÷後）
+    formulaChoices: ['3 ÷ 5', '5 ÷ 3', '3 + 5', '3 × 5'],
+    formulaCorrect: '3 ÷ 5',
+    // 抽象: 分数の答え（許容表記）
+    answerAccepted: ['3/5', '3／5', '５分の３', '3分の5', '5分の3'],
+    answerAcceptedNormalize: true,
+    // 段階ヒント（不正解時に順に表示）
+    hints: [
+      '「前の量が後ろの量の何倍か」を分数で表すよ。前の数（紅茶の3）を分子、後ろの数（牛乳の5）を分母にしてみよう。',
+      '比 3:5 の値は 3 ÷ 5 だよ。分数は「分子 ÷ 分母」と同じ。',
+      '答えは 3 を 5 でわった分数。分子が3、分母が5だよ。'
+    ],
+    // 答えの後の「内省」
+    reflectionPrompt: '紅茶が牛乳の何倍かを、ことばで一言書いてみよう。'
+  }
+}
+
+function stagedNormalize(s) {
+  return (s || '')
+    .replace(/[\s　]/g, '')
+    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[／]/g, '/')
+    .replace(/[　]/g, '')
+}
+
+function renderStagedLesson(card) {
+  const cardId = Number(card.card_id || card.id)
+  const cfg = STAGED_LESSON_CONFIG[cardId]
+  if (!cfg) return
+  // 挿入先: 問題文ブロックの直後、NB2やAI図より前
+  const anchor = document.getElementById('card-image-container-' + cardId)
+    || document.getElementById('image-placeholder-' + cardId)
+    || document.querySelector('[id="textModeBtn"]')?.closest('.mt-6')
+  let host = document.getElementById('staged-lesson-' + cardId)
+  if (!host) {
+    host = document.createElement('section')
+    host.id = 'staged-lesson-' + cardId
+    host.className = 'mt-4 mb-4'
+    if (anchor && anchor.parentElement) anchor.parentElement.insertBefore(host, anchor)
+    else return
+  }
+  // 既存のAI図・ブロック操作を、この中では使わない（非表示）
+  const hide = ['visual-widget-' + cardId, 'nb2-visual-' + cardId]
+  hide.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none' })
+  const tw = document.getElementById('tactile-widget-' + cardId)
+  if (tw) tw.style.display = 'none'
+
+  const st = { step: 1, cfg, cardId, placed: { left: 0, right: 0 }, selectedFormula: null, hintLevel: 0 }
+  window._stagedLesson = st
+  host.innerHTML = `
+    <div id="staged-lesson-body-${cardId}" style="background:linear-gradient(135deg,#F5F3FF,#FDF2F8);border:2px solid #C4B5FD;border-radius:16px;padding:14px;">
+      <p style="font-size:0.85rem;font-weight:bold;color:#5B21B6;margin-bottom:8px;"><i class="fas fa-layer-group"></i> ステップで考えよう（1→2→3）</p>
+      <div id="staged-steps-${cardId}" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;"></div>
+      <div id="staged-panel-${cardId}"></div>
+    </div>`
+  renderStagedStep(cardId)
+}
+
+function renderStagedSteps(cardId) {
+  const st = window._stagedLesson
+  const labels = ['1 具体：はかる', '2 図と式：えらぶ', '3 抽象：書いて確かめる']
+  const el = document.getElementById('staged-steps-' + cardId)
+  if (!el) return
+  el.innerHTML = labels.map((l, i) => {
+    const n = i + 1
+    const on = st.step === n
+    const done = st.step > n
+    const bg = on ? '#7C3AED' : done ? '#10B981' : '#E5E7EB'
+    const fg = on || done ? '#fff' : '#6B7280'
+    return `<span style="background:${bg};color:${fg};font-size:0.75rem;font-weight:bold;padding:4px 10px;border-radius:999px;">${l}</span>`
+  }).join('')
+}
+
+function renderStagedStep(cardId) {
+  const st = window._stagedLesson
+  if (!st || st.cardId !== cardId) return
+  renderStagedSteps(cardId)
+  const panel = document.getElementById('staged-panel-' + cardId)
+  if (!panel) return
+  if (st.step === 1) panel.innerHTML = stagedStep1Html(cardId)
+  else if (st.step === 2) panel.innerHTML = stagedStep2Html(cardId)
+  else panel.innerHTML = stagedStep3Html(cardId)
+}
+
+// ステップ1: 具体（タップで量を入れる。ドラッグなし）
+function stagedStep1Html(cardId) {
+  const st = window._stagedLesson
+  const c = st.cfg.concrete
+  const cup = (key, label) => {
+    const v = st.placed[key]
+    const pct = (v / c.max) * 100
+    const target = key === 'left' ? c.leftTarget : c.rightTarget
+    const ok = v === target
+    const ticks = Array.from({ length: c.max + 1 }, (_, i) =>
+      `<div style="position:absolute;right:100%;margin-right:4px;bottom:${(i / c.max) * 100}%;font-size:0.75rem;color:#374151;transform:translateY(50%);line-height:1;">${i}</div>`
+    ).join('')
+    const lines = Array.from({ length: c.max }, (_, i) =>
+      `<div style="position:absolute;left:0;right:0;bottom:${((i + 1) / c.max) * 100}%;border-top:1px solid #111;"></div>`).join('')
+    return `
+      <div style="text-align:center;flex:1;">
+        <div style="font-size:0.85rem;font-weight:bold;color:#374151;margin-bottom:4px;">${label}</div>
+        <div style="position:relative;margin:0 auto;width:90px;height:150px;">
+          ${ticks}
+          <div style="position:absolute;inset:0;border:3px solid #111;border-radius:6px;background:#fff;overflow:hidden;">
+            <div style="position:absolute;left:0;right:0;bottom:0;height:${pct}%;background:${key === 'left' ? '#b5651d' : '#e5e7eb'};transition:height .2s;"></div>
+            ${lines}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;justify-content:center;margin-top:8px;">
+          <button onclick="stagedPour('${key}',-1,${cardId})" style="background:#e5e7eb;border:none;border-radius:8px;padding:6px 12px;font-weight:bold;">−1</button>
+          <button onclick="stagedPour('${key}',1,${cardId})" style="background:#7C3AED;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:bold;">＋1</button>
+        </div>
+        <p style="font-size:0.85rem;margin-top:6px;color:${ok ? '#16A34A' : '#374151'};font-weight:bold;">${v}（${ok ? '目標どおり' : '目標 ' + target}）</p>
+      </div>`
+  }
+  const bothDone = st.placed.left === c.leftTarget && st.placed.right === c.rightTarget
+  return `
+    <p style="font-size:0.9rem;color:#374151;margin-bottom:8px;">ボタンで量をはかってみよう。紅茶と牛乳の目もりを見てね。<br><span style="font-size:0.8rem;color:#6B7280;">（教室では、紙のカップや計量カップで実際に同じ量を入れてみてもよい。）</span></p>
+    <div style="display:flex;gap:12px;align-items:flex-end;justify-content:center;">${cup('left', c.leftLabel)}${cup('right', c.rightLabel)}</div>
+    <div style="text-align:center;margin-top:12px;">
+      <button onclick="stagedNext(${cardId})" ${bothDone ? '' : 'disabled'} style="background:${bothDone ? '#16A34A' : '#D1D5DB'};color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:bold;">はかれたら次へ</button>
+    </div>`
+}
+
+function stagedPour(key, delta, cardId) {
+  const st = window._stagedLesson
+  if (!st || st.cardId !== cardId) return
+  const max = st.cfg.concrete.max
+  st.placed[key] = Math.max(0, Math.min(max, st.placed[key] + delta))
+  try { TactileSounds.play('tap') } catch (_) {}
+  renderStagedStep(cardId)
+}
+
+function stagedNext(cardId) {
+  const st = window._stagedLesson
+  if (!st || st.cardId !== cardId) return
+  st.step = 2
+  renderStagedStep(cardId)
+}
+
+// ステップ2: 半具体（式を選ぶ。正誤を即時表示）
+function stagedStep2Html(cardId) {
+  const st = window._stagedLesson
+  const c = st.cfg
+  const sel = st.selectedFormula
+  const buttons = c.formulaChoices.map(f => {
+    const isSel = sel === f
+    const ok = isSel && f === c.formulaCorrect
+    const ng = isSel && f !== c.formulaCorrect
+    const bg = ok ? '#DCFCE7' : ng ? '#FEE2E2' : '#fff'
+    const bd = ok ? '#16A34A' : ng ? '#DC2626' : '#C4B5FD'
+    return `<button onclick="stagedPickFormula('${f}',${cardId})" style="background:${bg};border:2px solid ${bd};border-radius:10px;padding:10px 14px;font-size:1.1rem;font-weight:bold;">${f}</button>`
+  }).join('')
+  const feedback = sel === null ? '' : (sel === c.formulaCorrect
+    ? `<p style="color:#16A34A;font-weight:bold;margin-top:8px;">○ せいかい！ 比 3:5 の「前÷後」は 3 ÷ 5 だね。</p>`
+    : `<p style="color:#DC2626;font-weight:bold;margin-top:8px;">× ちがうよ。「前の量が後ろの量の何倍か」を表す式を選ぼう。</p>`)
+  return `
+    <p style="font-size:0.9rem;color:#374151;margin-bottom:8px;">紅茶 3、牛乳 5 のとき、「紅茶が牛乳の何倍か」を表す式はどれ？</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">${buttons}</div>
+    ${feedback}
+    <div style="text-align:center;margin-top:12px;">
+      <button onclick="stagedGoStep3(${cardId})" ${sel === c.formulaCorrect ? '' : 'disabled'} style="background:${sel === c.formulaCorrect ? '#16A34A' : '#D1D5DB'};color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:bold;">次へ（分数で答える）</button>
+    </div>`
+}
+
+function stagedPickFormula(f, cardId) {
+  const st = window._stagedLesson
+  if (!st || st.cardId !== cardId) return
+  st.selectedFormula = f
+  renderStagedStep(cardId)
+}
+
+function stagedGoStep3(cardId) {
+  const st = window._stagedLesson
+  if (!st || st.cardId !== cardId) return
+  st.step = 3
+  st.hintLevel = 0
+  renderStagedStep(cardId)
+}
+
+// ステップ3: 抽象（分数で答え、即時に正誤。段階ヒント）
+function stagedStep3Html(cardId) {
+  const st = window._stagedLesson
+  const c = st.cfg
+  const shownHints = c.hints.slice(0, st.hintLevel).map((h, i) =>
+    `<li style="margin-bottom:4px;">ヒント${i + 1}：${h}</li>`).join('')
+  return `
+    <p style="font-size:0.9rem;color:#374151;margin-bottom:8px;">比 3:5 の値を分数で書こう。</p>
+    <div style="display:flex;gap:8px;align-items:center;justify-content:center;">
+      <input id="staged-answer-${cardId}" type="text" inputmode="text" autocomplete="off"
+             placeholder="例：3/5" style="font-size:1.25rem;padding:8px 12px;border:2px solid #C4B5FD;border-radius:10px;width:200px;text-align:center;" />
+      <button onclick="stagedCheck(${cardId})" style="background:#16A34A;color:#fff;border:none;border-radius:10px;padding:10px 16px;font-weight:bold;">答え合わせ</button>
+    </div>
+    <div id="staged-result-${cardId}" style="margin-top:10px;"></div>
+    ${shownHints ? `<ul style="font-size:0.85rem;color:#4B5563;margin-top:8px;padding-left:4px;list-style:none;">${shownHints}</ul>` : ''}`
+}
+
+function stagedCheck(cardId) {
+  const st = window._stagedLesson
+  if (!st || st.cardId !== cardId) return
+  const input = document.getElementById('staged-answer-' + cardId)
+  const res = document.getElementById('staged-result-' + cardId)
+  if (!input || !res) return
+  const raw = input.value
+  if (!raw.trim()) {
+    res.innerHTML = '<p style="color:#6B7280;">答えを入れてから「答え合わせ」を押してね。</p>'
+    return
+  }
+  const n = stagedNormalize(raw)
+  const ok = st.cfg.answerAccepted.some(a => stagedNormalize(a) === n)
+  if (ok) {
+    res.innerHTML = `
+      <p style="color:#16A34A;font-weight:bold;font-size:1.05rem;">○ せいかい！ 答えは 3/5 だよ。</p>
+      <p style="font-size:0.85rem;color:#374151;margin-top:6px;">${st.cfg.reflectionPrompt}</p>`
+    try { TactileSounds.play('correct') } catch (_) {}
+    return
+  }
+  // 不正解: ヒントを1段階増やす
+  st.hintLevel = Math.min(st.cfg.hints.length, st.hintLevel + 1)
+  res.innerHTML = `<p style="color:#DC2626;font-weight:bold;">× まだちがうよ。もう一度考えてみよう。</p>`
+  const panel = document.getElementById('staged-panel-' + cardId)
+  if (panel) {
+    const keep = document.getElementById('staged-answer-' + cardId)
+    const keepVal = keep ? keep.value : ''
+    panel.innerHTML = stagedStep3Html(cardId)
+    const inp = document.getElementById('staged-answer-' + cardId)
+    if (inp) inp.value = keepVal
+    const res2 = document.getElementById('staged-result-' + cardId)
+    if (res2) res2.innerHTML = `<p style="color:#DC2626;font-weight:bold;">× まだちがうよ。もう一度考えてみよう。</p>`
+    if (inp) inp.focus()
+  }
+}
+
+window.stagedPour = stagedPour
+window.stagedNext = stagedNext
+window.stagedPickFormula = stagedPickFormula
+window.stagedGoStep3 = stagedGoStep3
+window.stagedCheck = stagedCheck
 window.initTactileWidgets = initTactileWidgets
 window.renderTactileWidget = renderTactileWidget
 window.TactileSounds = TactileSounds
