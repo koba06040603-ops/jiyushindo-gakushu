@@ -6055,6 +6055,8 @@ async function showIntegratedPrintPreview(curriculumId) {
   try {
     const response = await axios.get(`/api/curriculum/${curriculumId}`)
     const { curriculum, courses } = response.data
+    // 標準コース（個別最適化コースを除く）。「コースの選び方」欄で使用
+    const standardCourses = courses.filter(c => c.course_level !== 'personalized')
     
     // メタデータ取得
     let courseSelectionProblems = []
