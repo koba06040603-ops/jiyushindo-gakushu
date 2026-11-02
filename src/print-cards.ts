@@ -247,6 +247,60 @@ function editorScript(): string {
 </script>`
 }
 
+/**
+ * 文字の編集と Word 保存（すべての印刷ページで使う。印刷には出ない）。
+ * 「文字を直す」で紙の文字を画面上で直せる。「Word で保存」は編集後の内容を .doc で保存する
+ * （Word・WPS で開いて編集・印刷できる。図は画像として入る）。
+ */
+function textEditorScript(): string {
+  return `<script>
+(function(){
+  var SEL = '.p-unit,.p-meta,.p-sheet-title,.p-sheet-note,.p-card-title,.p-problem,.p-passage-body,' +
+    '.p-example-q,.p-example-s,.p-example-a,.p-hint > span:last-child,.p-expl,.p-answer-inline div,' +
+    '.p-ans-head,.p-ans-val,.p-ans-expl,.p-check-note,.p-opt-title,.p-answer-key,.p-part-title,' +
+    '.p-guide-unit,.p-guide-meta,.p-guide-body,.p-guide-box-title,.p-guide-course-name,' +
+    '.p-guide-course-label,.p-guide-selection-title,.p-guide-selection-body,.p-guide-heading';
+  window.pTogglePrintEdit = function(btn){
+    var on = btn.getAttribute('data-on') !== '1';
+    var els = document.querySelectorAll(SEL);
+    for (var i = 0; i < els.length; i++) els[i].setAttribute('contenteditable', on ? 'true' : 'false');
+    btn.setAttribute('data-on', on ? '1' : '0');
+    btn.textContent = on ? '✔ 直し終えた（点線を消す）' : '✏ 文字を直す';
+  };
+  window.pExportWord = function(){
+    var src = document.querySelector('.p-sheet');
+    if (!src) return;
+    var sheet = src.cloneNode(true);
+    var rm = sheet.querySelectorAll('.no-print,.p-edit-bar,.p-edit-msg');
+    for (var i = 0; i < rm.length; i++) rm[i].parentNode.removeChild(rm[i]);
+    var ed = sheet.querySelectorAll('[contenteditable]');
+    for (i = 0; i < ed.length; i++) ed[i].removeAttribute('contenteditable');
+    var imgs = sheet.querySelectorAll('img');
+    for (i = 0; i < imgs.length; i++) imgs[i].setAttribute('src', imgs[i].src);
+    var cards = sheet.querySelectorAll('.p-card');
+    for (i = 0; i < cards.length; i++) {
+      cards[i].classList.remove('p-break');
+      if (i > 0) cards[i].setAttribute('style', 'page-break-before: always;');
+    }
+    var title = (document.title || '学習カード').replace(/\s*｜.*$/, '');
+    var css = document.querySelector('style') ? document.querySelector('style').textContent : '';
+    var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
+      'xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">' +
+      '<head><meta charset="utf-8"><title>' + title + '</title><style>' + css + '</style></head>' +
+      '<body>' + sheet.outerHTML + '</body></html>';
+    var blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+    var name = title.replace(/[\\/:*?"<>|]/g, '_') + '.doc';
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  };
+})();
+</script>`
+}
+
 /** 紙の枠（ツールバー・見出し・氏名欄）で本体を包む */
 export function wrapPrintDocument(title: string, meta: PrintMeta, bodyHTML: string, editable = false): string {
   return `<!DOCTYPE html>
@@ -397,9 +451,18 @@ export function wrapPrintDocument(title: string, meta: PrintMeta, bodyHTML: stri
   .p-part { break-before: page; page-break-before: always; }
   .p-header + .p-part { break-before: auto; page-break-before: auto; }
 
+  /* 画面での改ページ位置（印刷には出ない）。1枚ずつ別の紙になることを画面でも分かるようにする */
+  .p-card.p-break { border-bottom: 1px dashed #b5b5b5; padding-bottom: 4mm; margin-bottom: 8mm; }
+  .p-card.p-break::after { content: "── ここで改ページ（この下は次の1枚）──"; display: block; text-align: center; font-size: 8.5pt; color: #888; margin-top: 3mm; }
+
+  /* 文字の編集（画面のみ）。「文字を直す」を押した部分だけ点線で囲む */
+  .p-sheet [contenteditable="true"] { outline: 1px dashed #4F46E5; outline-offset: 2px; background: #FFFBEB; cursor: text; }
+  .p-toolbar button.sub { background:#fff; color:#4F46E5; }
+
   /* ===== 印刷時 ===== */
   @media print {
     @page { size: A4 portrait; margin: 10mm; }
+    [contenteditable] { outline: none !important; background: none !important; }
     body { background:#fff; font-size: 10pt; }
     .p-card { font-size: 10pt; line-height: 1.5; }
     .p-hints { margin-top: 2mm; padding: 2mm 3mm; }
@@ -410,6 +473,8 @@ export function wrapPrintDocument(title: string, meta: PrintMeta, bodyHTML: stri
     .no-print { display: none !important; }
     .p-card { page-break-inside: avoid; break-inside: avoid; margin-bottom: 0; }
     .p-break { page-break-after: always; break-after: page; }
+    .p-card.p-break { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+    .p-card.p-break::after { display: none; }
     .p-card:last-child, .p-answersheet { page-break-after: auto; break-after: auto; }
     .p-answersheet { page-break-before: always; break-before: page; }
     .p-passage, .p-figure, .p-hints, .p-answer-box, .p-example {
@@ -427,7 +492,9 @@ export function wrapPrintDocument(title: string, meta: PrintMeta, bodyHTML: stri
     <a class="sub" href="?answers=append">答えを別紙に</a>
     <a class="sub" href="?answers=inline">答えを各問の下に</a>
     <a class="sub" href="?hints=0">ヒントなし</a>
-    <span class="hint">A4・たて｜カード1枚につき1ページで出ます</span>
+    <button type="button" class="sub" data-on="0" onclick="pTogglePrintEdit(this)">✏ 文字を直す</button>
+    <button type="button" class="sub" onclick="pExportWord()">📄 Word（.doc）で保存</button>
+    <span class="hint">A4・たて｜カード1枚につき1ページで出ます（画面の点線が改ページ位置）</span>
   </div>
 
   <div class="p-sheet">
@@ -443,6 +510,7 @@ export function wrapPrintDocument(title: string, meta: PrintMeta, bodyHTML: stri
     ${bodyHTML}
   </div>
 ${editable ? editorScript() : ''}
+${textEditorScript()}
 </body>
 </html>`
 }
