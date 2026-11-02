@@ -390,6 +390,64 @@ function textEditorScript(): string {
     a.click();
     setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   };
+  /* PDF 保存：html2pdf.js を必要になった時だけ読み込む（通常の印刷では読まない） */
+  function pLoadHtml2Pdf(cb){
+    if (window.html2pdf) { cb(null); return; }
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+    s.onload = function(){ cb(window.html2pdf ? null : new Error('html2pdf')); };
+    s.onerror = function(){ cb(new Error('load')); };
+    document.head.appendChild(s);
+  }
+  window.pExportPdf = function(btn){
+    var src = document.querySelector('.p-sheet');
+    if (!src) return;
+    var title = (document.title || '学習カード').replace(/\s*｜.*$/, '');
+    var css = document.querySelector('style') ? document.querySelector('style').textContent : '';
+    var sheet = src.cloneNode(true);
+    var rm = sheet.querySelectorAll('.no-print,.p-edit-bar,.p-edit-msg');
+    for (var i = 0; i < rm.length; i++) rm[i].parentNode.removeChild(rm[i]);
+    var ed = sheet.querySelectorAll('[contenteditable]');
+    for (i = 0; i < ed.length; i++) ed[i].removeAttribute('contenteditable');
+    var imgs = sheet.querySelectorAll('img');
+    for (i = 0; i < imgs.length; i++) imgs[i].setAttribute('src', imgs[i].src);
+    var cards = sheet.querySelectorAll('.p-card');
+    for (i = 0; i < cards.length; i++) {
+      cards[i].classList.remove('p-break');
+      if (i > 0) cards[i].setAttribute('style', 'page-break-before: always;');
+    }
+    /* 画面用の min-height(297mm) や余白を外す。外すと A4 を超えて白紙ページが出るため */
+    sheet.setAttribute('style', 'width:194mm;min-height:0;margin:0;padding:0;box-shadow:none;background:#fff;');
+    var wrap = document.createElement('div');
+    /* fixed 配置だと html2canvas が描画できないため、通常フローで置く（直後に除去） */
+    wrap.setAttribute('style', 'width:210mm;background:#fff;');
+    var st = document.createElement('style');
+    st.textContent = css;
+    wrap.appendChild(st);
+    wrap.appendChild(sheet);
+    document.body.appendChild(wrap);
+    var label = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'PDF を作成中…'; }
+    function done(){
+      if (btn) { btn.disabled = false; btn.textContent = label; }
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+    }
+    pLoadHtml2Pdf(function(err){
+      if (err) { done(); alert('PDF の部品を読み込めませんでした。通信状態を確認するか、「印刷する」から「PDF に保存」を選んでください。'); return; }
+      var name = title.replace(/[\\/:*?"<>|]/g, '_') + '.pdf';
+      window.html2pdf().set({
+        margin: [10, 8, 10, 8],
+        filename: name,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'] }
+      }).from(wrap).save().then(done, function(){
+        done();
+        alert('PDF の作成に失敗しました。「印刷する」から「PDF に保存」を選んでください。');
+      });
+    });
+  };
 })();
 </script>`
 }
@@ -611,6 +669,7 @@ export function wrapPrintDocument(
     ${bar.links || ''}
     <button type="button" class="sub" data-on="0" onclick="pTogglePrintEdit(this)">✏ 文字を直す</button>
     <button type="button" class="sub" onclick="pExportWord()">📄 Word（.doc）で保存</button>
+    <button type="button" class="sub" onclick="pExportPdf(this)">📑 PDF で保存</button>
     <span class="hint">${esc(bar.note || 'A4・たて｜カード1枚につき1ページで出ます（画面の点線が改ページ位置）')}</span>
   </div>
 
