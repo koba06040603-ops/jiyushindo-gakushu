@@ -23,6 +23,8 @@ export interface PrintCardRow {
   problem_text?: string
   problem_content?: string
   problem_image_url?: string | null
+  tactile_image_url?: string | null
+  tactile_activity?: string
   answer?: string
   correct_answer?: string
   answer_explanation?: string
@@ -46,8 +48,26 @@ function escMultiline(s: any): string {
 }
 
 /** 問題文として使うテキストを、列名のゆれを吸収して1つ選ぶ */
+/** problem_content が {"content":..., "multimedia":...} のJSONなら、本文と「やってみよう」だけを取り出す */
+function parseProblemJSON(raw: string): { content: string; tactile: string } {
+  const s = raw.trim()
+  if (!s.startsWith('{')) return { content: raw, tactile: '' }
+  try {
+    const p = JSON.parse(s)
+    return { content: String(p?.content ?? ''), tactile: String(p?.multimedia?.tactile_activity ?? '') }
+  } catch {
+    return { content: raw, tactile: '' }
+  }
+}
+
 function pickProblem(card: PrintCardRow): string {
-  return String(card.problem_description || card.problem_text || card.problem_content || '')
+  const raw = String(card.problem_description || card.problem_text || card.problem_content || '')
+  return parseProblemJSON(raw).content
+}
+
+/** 「やってみよう」の文（画面と同じ）。problem_content のJSONから取り出す */
+function pickTactileText(card: PrintCardRow): string {
+  return String(card.tactile_activity || parseProblemJSON(String(card.problem_content || '')).tactile || '')
 }
 
 function pickAnswer(card: PrintCardRow): string {
@@ -137,6 +157,17 @@ export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOption
       : ''
 
     const cardId = (card as any).card_id ?? (card as any).id
+    // 「やってみよう」: 保存済みイラストがあるカードだけ、画面と同じ文・同じ画像を紙にも出す
+    const tactileImg = card.tactile_image_url || ''
+    const tactileText = pickTactileText(card)
+    const tactileBlock = tactileImg
+      ? `<div class="p-tactile">
+           <div class="p-label">やってみよう</div>
+           ${tactileText ? `<div class="p-tactile-text">${escMultiline(tactileText)}</div>` : ''}
+           <div class="p-figure p-tactile-fig"><img src="${esc(tactileImg)}" alt=""></div>
+         </div>`
+      : ''
+
     const figureTools = (opts.editable && cardId)
       ? `<div class="p-edit-bar no-print">
            <span>図：</span>
@@ -167,6 +198,7 @@ export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOption
           <div class="p-problem">${escMultiline(problem)}</div>
           ${figureTools}
           ${figureHTML(card.problem_image_url)}
+          ${tactileBlock}
           <div class="p-answer-box" style="min-height:${answerBoxHeight(answer)}">
             <div class="p-answer-label">じぶんの こたえ</div>
           </div>
@@ -431,6 +463,9 @@ export function wrapPrintDocument(
 
   .p-figure { margin: 3mm 0; text-align:center; }
   .p-figure img { max-width: 100%; height: auto; }
+  .p-tactile { margin: 2mm 0 3mm; }
+  .p-tactile-text { font-size: 10pt; margin-bottom: 1.5mm; }
+  .p-tactile-fig img { max-height: 55mm; width: auto; }
 
   /* 例題 */
   .p-example { border-left: 3px solid var(--line); padding: 2mm 0 2mm 4mm; margin: 3mm 0; font-size: 10.5pt; }

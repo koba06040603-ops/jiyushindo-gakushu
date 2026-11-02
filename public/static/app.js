@@ -7502,8 +7502,8 @@ async function loadCardPage(cardId) {
                     '<button onclick="try{if(typeof window.speakNB2NarrationAI===\'function\'){window.speakNB2NarrationAI(' + cardIdVal + ')}else if(typeof window.speakNB2Explanation===\'function\'){window.speakNB2Explanation(' + cardIdVal + ')}else{alert(\'音声機能を読み込み中です\')}}catch(e){alert(\'音声エラー:\'+e.message)}" id="nb2-speak-btn-' + cardIdVal + '" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-volume-up mr-1"></i>🔊 音声解説</button>' +
                     '<button onclick="window.bookmarkNB2Image&&window.bookmarkNB2Image(' + cardIdVal + ')" id="nb2-bookmark-btn-' + cardIdVal + '" class="bg-gradient-to-r from-yellow-500 to-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-star mr-1"></i>⭐ 保存</button>' +
                   '</div>' +
-                  '<div id="tactile-ai-illust-card-' + cardIdVal + '" class="flex items-center justify-center mb-2 min-h-[80px]"><span class="text-4xl" id="tactile-illust-' + cardIdVal + '"></span></div>' +
-                  '<button onclick="generateTactileIllustration(\'tactile-ai-illust-card-' + cardIdVal + '\', \'' + (tactile||'').replace(/'/g, "\\'").substring(0,120) + '\', \'' + (card.subject||'').replace(/'/g, "\\'") + '\', \'' + (card.grade||'').replace(/'/g, "\\'") + '\')" class="inline-flex items-center gap-1 bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition mb-2"><i class="fas fa-image"></i>AIにイラストを描いてもらう</button>' +
+                  (card.tactile_image_url ? '' : '<div id="tactile-ai-illust-card-' + cardIdVal + '" class="flex items-center justify-center mb-2 min-h-[80px]"><span class="text-4xl" id="tactile-illust-' + cardIdVal + '"></span></div>') +
+                  (card.tactile_image_url ? '' : '<button onclick="generateTactileIllustration(\'tactile-ai-illust-card-' + cardIdVal + '\', \'' + (tactile||'').replace(/'/g, "\\'").substring(0,120) + '\', \'' + (card.subject||'').replace(/'/g, "\\'") + '\', \'' + (card.grade||'').replace(/'/g, "\\'") + '\')" class="inline-flex items-center gap-1 bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition mb-2"><i class="fas fa-image"></i>AIにイラストを描いてもらう</button>') +
                   '<div id="' + widgetContainerId + '" class="bg-white rounded-lg border border-gray-200 overflow-hidden min-h-[200px] relative"></div>' +
                   '<p class="text-xs text-gray-500 mt-2 text-center"><i class="fas fa-hand-pointer mr-1"></i>画面をタッチ・ドラッグして操作してみよう</p>' +
                   '<script>try{var _ti=document.getElementById("tactile-illust-' + cardIdVal + '");if(_ti&&typeof getTactileIllustration==="function"){_ti.textContent=getTactileIllustration("' + (tactile||'').replace(/"/g,'\\"').replace(/\n/g,' ').substring(0,100) + '",window.currentCardData?.card).icons}}catch(e){}</script>' +
@@ -9638,6 +9638,17 @@ function renderTactileWidget(containerId, tactileText, cardData) {
   const container = document.getElementById(containerId)
   if (!container) return
 
+  // 保存済みの「やってみよう」画像があれば表示する（Gemini を呼ばない／印刷と同じ画像）
+  if (cardData?.tactile_image_url) {
+    const safeText = String(tactileText || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    container.innerHTML = '<div class="p-4 text-center">' +
+      '<p class="text-sm text-orange-800 font-bold mb-2"><i class="fas fa-hand-sparkles mr-1"></i>やってみよう！</p>' +
+      '<img src="' + cardData.tactile_image_url + '" alt="やってみよう イラスト" class="w-full max-w-[600px] h-auto mx-auto rounded-2xl border-3 border-orange-200 shadow-lg">' +
+      '<p class="text-sm text-gray-700 mt-2">' + safeText + '</p>' +
+      '</div>'
+    return
+  }
+
   const type = detectWidgetType(tactileText, cardData)
   console.log('🎮 触覚ウィジェット描画:', type, containerId)
 
@@ -10406,6 +10417,7 @@ async function generateTactileIllustration(containerId, tactileText, subject, gr
     }, { timeout: 60000 })
     const d = res.data
     if (d.success && d.image_url) {
+      saveTactileImage(containerId, d.image_url)
       el.innerHTML = '<img src="' + d.image_url + '" onclick="window._expandSongImage && window._expandSongImage(this.src)" class="w-full max-w-[600px] h-auto mx-auto rounded-2xl border-3 border-orange-200 shadow-lg animate-fadeIn cursor-pointer hover:scale-[1.02] transition-transform" alt="やってみよう イラスト"><p class="text-[10px] text-gray-400 mt-1">' + (d.model || 'AI') + '</p><button onclick="generateTactileIllustration(\'' + containerId + '\', \'' + tactileText.replace(/'/g, "\\\\'") + '\', \'' + (subject || '').replace(/'/g, "\\\\'") + '\', \'' + (grade || '').replace(/'/g, "\\\\'") + '\')" class="text-[10px] text-orange-500 underline mt-1 block">🔄 別のイラストにする</button>'
     } else {
       el.innerHTML = '<p class="text-xs text-red-500 py-2">イラスト生成に失敗しました</p><div class="text-4xl">' + getTactileIllustration(tactileText).icons + '</div>'
@@ -10413,6 +10425,18 @@ async function generateTactileIllustration(containerId, tactileText, subject, gr
   } catch (e) {
     console.error('Tactile illustration error:', e)
     el.innerHTML = '<p class="text-xs text-red-500 py-2">通信エラー: ' + (e.message || '') + '</p><div class="text-4xl">' + getTactileIllustration(tactileText).icons + '</div>'
+  }
+}
+// 生成したやってみよう画像をカードに保存する（画面と印刷が同じ画像を使うため）
+// containerId の末尾が card_id（例: tactile-ai-illust-card-2797）
+async function saveTactileImage(containerId, imageUrl) {
+  const m = String(containerId || '').match(/(\d+)$/)
+  const cardId = m ? Number(m[1]) : 0
+  if (!cardId) return
+  try {
+    await axios.put('/api/card/' + cardId + '/tactile-image', { image_url: imageUrl }, { timeout: 60000 })
+  } catch (e) {
+    console.warn('やってみよう画像の保存に失敗:', e?.response?.status || e.message)
   }
 }
 window.generateTactileIllustration = generateTactileIllustration
@@ -13235,6 +13259,8 @@ function initVisualWidgets() {
   const cardData = window.currentCardData
   const card = cardData?.card || cardData
   if (!card) return
+  // 保存済みの「やってみよう」画像があるカードは、NB2 の自動生成を行わない（Gemini を呼ばない）
+  if (card.tactile_image_url) return
   
   const cardId = card.card_id || card.id || 0
   const containerId = 'visual-widget-' + cardId

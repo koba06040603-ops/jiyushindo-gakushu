@@ -2032,6 +2032,11 @@ const PUBLIC_API_PATHS = [
 
 app.use('/api/*', async (c, next) => {
   const path = c.req.path
+
+  // 「やってみよう」イラストの配信（<img> は Bearer を送れないため）。GET のみ認証を外す。PUT は認証必須のまま。
+  if (c.req.method === 'GET' && /^\/api\/card\/\d+\/tactile-image$/.test(path)) {
+    return next()
+  }
   
   // ホワイトリストに含まれるパスは認証スキップ
   for (const publicPath of PUBLIC_API_PATHS) {
@@ -6349,9 +6354,9 @@ app.get('/api/cards/:cardId', async (c) => {
   const cardId = c.req.param('cardId')
   
   try {
-    const card = await env.DB.prepare(`
+    const card = withTactileRef(await env.DB.prepare(`
       SELECT * FROM learning_cards WHERE card_id = ?
-    `).bind(cardId).first()
+    `).bind(cardId).first())
     
     const hints = await hintQuery(env.DB, (s) => hintSelectSQL(s), [cardId])
 
@@ -10765,6 +10770,9 @@ app.get('/guide/:curriculumId', async (c) => {
       if (personalizedOptionalProblems.length > 0) optionalProblems = personalizedOptionalProblems
     }
     
+    // data URL は配信 URL に置き換えてから HTML に埋め込む
+    cards = (cards as any[]).map(withTactileRef)
+
     // コースごとにカードをグループ化
     const courseCards: Record<string, any[]> = {}
     if (isPersonalized) {
@@ -15785,6 +15793,12 @@ app.get('/guide/:curriculumId', async (c) => {
     var container = document.getElementById(containerId);
     if (!container) return;
     
+    // 保存済みの「やってみよう」画像があれば表示し、Gemini を呼ばない（印刷と同じ画像）
+    var savedTactileImg = (card && card.tactile_image_url) || '';
+    if (savedTactileImg) {
+      container.innerHTML = '<div style="text-align:center;"><img src="' + savedTactileImg + '" alt="やってみよう イラスト" style="max-width:100%;height:auto;border-radius:14px;border:2px solid #FDBA74;"></div>';
+      return;
+    }
     // === Nano Banana 2 動的ウィジェット生成 ===
     // 問題内容に応じてNB2がインタラクティブHTML/SVGを動的に設計
     var mm = card._mm || {};
@@ -16666,7 +16680,16 @@ function parsePrintOptions(c: any) {
 }
 
 /** カード行に hints を付けて返す（ヒントは別テーブル） */
+// 「やってみよう」イラストの data URL を配信 URL に置き換える（HTML/JSON の肥大化を防ぐ）
+function withTactileRef<T>(row: T): T {
+  const r: any = row
+  if (!r || !r.tactile_image_url || !String(r.tactile_image_url).startsWith('data:')) return row
+  const id = r.card_id ?? r.id
+  return { ...r, tactile_image_url: `/api/card/${id}/tactile-image` } as T
+}
+
 async function attachHintsForPrint(db: D1Database, cards: any[]): Promise<any[]> {
+  cards = cards.map(withTactileRef)
   const out: any[] = []
   for (const card of cards) {
     const id = card.card_id ?? card.id
@@ -23879,6 +23902,67 @@ app.post('/api/curriculum/:id/check-test/problem', async (c) => {
 // ============================================================
 
 // APIルート：学習カードの更新（学習スタイル対応）
+// 「やってみよう」の保存イラスト（learning_cards.tactile_image_url）
+//   画面と印刷は同じ列を参照する。data URL（jpeg/png/webp）のみ、1MB 以下。
+app.put('/api/card/:cardId/tactile-image', async (c) => {
+  const { env } = c
+  const cardId = Number(c.req.param('cardId'))
+  if (!Number.isInteger(cardId) || cardId <= 0) return c.json({ error: 'card_id が不正です' }, 400)
+  const body: any = await c.req.json().catch(() => ({}))
+  const imageUrl = typeof body?.image_url === 'string' ? body.image_url : ''
+  if (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(imageUrl)) {
+    return c.json({ error: 'image_url は data:image/(jpeg|png|webp);base64 形式で指定してください' }, 400)
+  }
+  if (imageUrl.length > 1000000) return c.json({ error: '画像が大きすぎます（1MB以下にしてください）' }, 413)
+  const exists = await env.DB.prepare('SELECT card_id FROM learning_cards WHERE card_id = ?').bind(cardId).first()
+  if (!exists) return c.json({ error: 'カードが見つかりません' }, 404)
+  await env.DB.prepare('UPDATE learning_cards SET tactile_image_url = ? WHERE card_id = ?').bind(imageUrl, cardId).run()
+  return c.json({ success: true, card_id: cardId, length: imageUrl.length })
+})
+
+// 「やってみよう」イラストの配信：画面（<img src>）と印刷が同じ URL を参照する。認証は不要（GET のみ、上の認証ミドルウェアで除外）
+app.get('/api/card/:cardId/tactile-image', async (c) => {
+  const { env } = c
+  const cardId = Number(c.req.param('cardId'))
+  if (!Number.isInteger(cardId) || cardId <= 0) return c.text('bad request', 400)
+  const row = await env.DB.prepare('SELECT tactile_image_url FROM learning_cards WHERE card_id = ?').bind(cardId).first() as any
+  const dataUrl: string = row?.tactile_image_url || ''
+  const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl)
+  if (!m) return c.text('not found', 404)
+  const bin = Uint8Array.from(atob(m[2]), (ch) => ch.charCodeAt(0))
+  return new Response(bin, {
+    headers: {
+      'Content-Type': m[1],
+      'Cache-Control': 'public, max-age=300',
+    },
+  })
+})
+
+// 一致確認（診断）：保存済みイラストの有無・長さ・ハッシュと、やってみようの本文があるかを返す。Gemini は呼ばない
+app.get('/api/card/:cardId/tactile-check', async (c) => {
+  const { env } = c
+  const cardId = Number(c.req.param('cardId'))
+  if (!Number.isInteger(cardId) || cardId <= 0) return c.json({ error: 'card_id が不正です' }, 400)
+  const row = await env.DB.prepare('SELECT card_id, tactile_image_url, problem_content FROM learning_cards WHERE card_id = ?').bind(cardId).first() as any
+  if (!row) return c.json({ error: 'カードが見つかりません' }, 404)
+  const img: string = row.tactile_image_url || ''
+  let activity = ''
+  try { activity = String(JSON.parse(String(row.problem_content || ''))?.multimedia?.tactile_activity || '') } catch { /* JSON でなければ本文なし */ }
+  let sha16 = ''
+  if (img) {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(img))
+    sha16 = Array.from(new Uint8Array(digest)).slice(0, 8).map((b) => b.toString(16).padStart(2, '0')).join('')
+  }
+  return c.json({
+    card_id: cardId,
+    has_tactile_image: !!img,
+    image_length: img.length,
+    image_sha256_16: sha16,
+    has_tactile_activity: !!activity,
+    source: 'learning_cards.tactile_image_url（画面・印刷が同じ列を参照）',
+  })
+})
+
 app.put('/api/card/:cardId', async (c) => {
   const { env } = c
   const cardId = c.req.param('cardId')
