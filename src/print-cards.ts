@@ -756,7 +756,7 @@ export function renderCheckTestForPrint(title: string, problems: CheckProblemRow
           <span class="p-card-no">${no}</span>
           <h2 class="p-card-title">もんだい ${no}</h2>
         </div>
-        <div class="p-problem">${escMultiline(p.problem_text || '')}</div>
+        <div class="p-problem">${escMultiline(stripPictographs(p.problem_text))}</div>
         ${figureHTML(p.problem_image_url)}
         <div class="p-check-answer-box"><div class="p-answer-label">じぶんの こたえ</div></div>
         ${showAnswers && p.answer ? `<div class="p-answer-key">こたえ（先生用）: ${escMultiline(p.answer)}</div>` : ''}
@@ -787,9 +787,9 @@ export function renderOptionalForPrint(items: OptionalRow[], showAnswers = false
       <section class="p-check-q">
         <div class="p-card-head">
           <span class="p-card-no">${i + 1}</span>
-          <h2 class="p-card-title">${esc(p.problem_title || 'もんだい ' + (i + 1))}</h2>
+          <h2 class="p-card-title">${esc(stripPictographs(p.problem_title) || 'もんだい ' + (i + 1))}</h2>
         </div>
-        <div class="p-problem">${escMultiline(p.problem_content || '')}</div>
+        <div class="p-problem">${escMultiline(stripPictographs(p.problem_content))}</div>
         ${figureHTML(p.problem_image_url)}
         <div class="p-check-answer-box"><div class="p-answer-label">じぶんの こたえ</div></div>
         ${showAnswers && p.answer ? `<div class="p-answer-key">こたえ（先生用）: ${escMultiline(p.answer)}</div>` : ''}
