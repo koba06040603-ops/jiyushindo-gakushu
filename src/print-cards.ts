@@ -417,7 +417,8 @@ function textEditorScript(): string {
       cards[i].classList.remove('p-break');
     }
     /* 画面と同じ幅（210mm）と余白のまま使う。最小高さ（297mm）だけ外して、末尾の白紙ページを防ぐ */
-    sheet.setAttribute('style', 'width:210mm;min-height:0;margin:0;box-shadow:none;background:#fff;');
+    /* 下の余白（14mm）が次のページに残って白紙ページになるのを防ぐため、PDF では下余白を 0 にする */
+    sheet.setAttribute('style', 'width:210mm;min-height:0;margin:0;padding-bottom:0;box-shadow:none;background:#fff;');
     var wrap = document.createElement('div');
     /* fixed 配置だと html2canvas が描画できないため、通常フローで置く（直後に除去） */
     wrap.setAttribute('style', 'width:210mm;background:#fff;');
