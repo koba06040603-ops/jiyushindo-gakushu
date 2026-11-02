@@ -6245,6 +6245,13 @@ async function showIntegratedPrintPreview(curriculumId) {
           <p class="text-sm text-gray-700">
             ヒントカードは${allHints.length}枚あります。必要に応じて別途印刷してください。
           </p>
+          <div class="flex flex-wrap gap-2 mt-3">
+            ${courses.filter(c => allHints.some(h => h.courseName === c.course_name)).map(c => `
+            <button onclick="printHintCards(${c.id})"
+                    class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg font-bold text-sm transition">
+              <i class="fas fa-lightbulb mr-1"></i>${c.course_name}のヒントカードを開く（別紙・答えなし）
+            </button>`).join('')}
+          </div>
         </div>
         ` : ''}
       </div>
