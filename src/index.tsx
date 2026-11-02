@@ -36259,9 +36259,10 @@ app.post('/api/ai/generate-image', async (c) => {
     const answerVariants: string[] = []
     let resolvedAnswerText = (answer_text || '').trim()
     // answer_text が空の場合、card_id からDBで答えを取得（安全策）
-    if (!resolvedAnswerText && card_id && typeof card_id === 'number' && card_id > 0) {
+    const numericCardId = Number(card_id)
+    if (!resolvedAnswerText && Number.isInteger(numericCardId) && numericCardId > 0) {
       try {
-        const row = await env.DB.prepare('SELECT correct_answer, answer FROM learning_cards WHERE id = ?').bind(card_id).first() as any
+        const row = await env.DB.prepare('SELECT correct_answer, answer FROM learning_cards WHERE card_id = ?').bind(numericCardId).first() as any
         resolvedAnswerText = (row?.correct_answer || row?.answer || '').trim()
       } catch (e) { /* ignore */ }
     }
