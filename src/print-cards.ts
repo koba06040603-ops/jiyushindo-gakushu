@@ -413,11 +413,11 @@ function textEditorScript(): string {
     for (i = 0; i < imgs.length; i++) imgs[i].setAttribute('src', imgs[i].src);
     var cards = sheet.querySelectorAll('.p-card');
     for (i = 0; i < cards.length; i++) {
+      /* 画面と同じ流れで続けて配置する。強制改ページはしない */
       cards[i].classList.remove('p-break');
-      if (i > 0) cards[i].setAttribute('style', 'page-break-before: always;');
     }
-    /* 画面用の min-height(297mm) や余白を外す。外すと A4 を超えて白紙ページが出るため */
-    sheet.setAttribute('style', 'width:194mm;min-height:0;margin:0;padding:0;box-shadow:none;background:#fff;');
+    /* 画面と同じ幅（210mm）と余白のまま使う。最小高さ（297mm）だけ外して、末尾の白紙ページを防ぐ */
+    sheet.setAttribute('style', 'width:210mm;min-height:0;margin:0;box-shadow:none;background:#fff;');
     var wrap = document.createElement('div');
     /* fixed 配置だと html2canvas が描画できないため、通常フローで置く（直後に除去） */
     wrap.setAttribute('style', 'width:210mm;background:#fff;');
@@ -426,6 +426,16 @@ function textEditorScript(): string {
     wrap.appendChild(st);
     wrap.appendChild(sheet);
     document.body.appendChild(wrap);
+    /* 1ページに収まるカードは途中で分割しない。画像などで1ページを超えるカードは分割を許可する
+       （分割禁止のまま送ると、1ページ目が見出しだけの空白ページになるため） */
+    var maxKeepPx = 220 * 3.7795; /* 約220mm（A4の印字可能高さ277mm以内） */
+    var placed = wrap.querySelectorAll('.p-card');
+    for (i = 0; i < placed.length; i++) {
+      if (placed[i].offsetHeight <= maxKeepPx) {
+        placed[i].style.pageBreakInside = 'avoid';
+        placed[i].style.breakInside = 'avoid';
+      }
+    }
     var label = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.textContent = 'PDF を作成中…'; }
     function done(){
@@ -436,7 +446,8 @@ function textEditorScript(): string {
       if (err) { done(); alert('PDF の部品を読み込めませんでした。通信状態を確認するか、「印刷する」から「PDF に保存」を選んでください。'); return; }
       var name = title.replace(/[\\/:*?"<>|]/g, '_') + '.pdf';
       var worker = window.html2pdf().set({
-        margin: [10, 8, 10, 8],
+        /* 左右は紙（210mm）の内側の余白で取るため0。上下だけ html2pdf の余白を使う（右端の切れ防止） */
+        margin: [10, 0, 10, 0],
         filename: name,
         image: { type: 'jpeg', quality: 0.95 },
         html2canvas: { scale: 2, useCORS: true, letterRendering: true },
