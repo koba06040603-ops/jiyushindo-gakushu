@@ -110,7 +110,8 @@ export interface PrintOptions {
 /** 学習カードの本体（カード列＋答えの別紙）だけを返す。枠（HTML/ヘッダー）は含まない */
 export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOptions = {}): string {
   const answersMode = opts.answers || 'append'
-  const showHints = opts.hints !== false
+  // 答えなし（児童用）ではヒントを印刷しない。ヒントは掲示用のヒントカード（/print/hints/course/:id）で別に出す
+  const showHints = opts.hints !== false && answersMode !== 'none'
   const showExamples = opts.examples !== false
   const onePerPage = opts.onePerPage !== false
 
