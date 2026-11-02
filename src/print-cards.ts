@@ -671,6 +671,7 @@ export function wrapPrintDocument(
     <button type="button" class="sub" onclick="pExportWord()">📄 Word（.doc）で保存</button>
     <button type="button" class="sub" onclick="pExportPdf(this)">📑 PDF で保存</button>
     <span class="hint">${esc(bar.note || 'A4・たて｜カード1枚につき1ページで出ます（画面の点線が改ページ位置）')}</span>
+    <span class="hint p-word-caution">※Word（.doc）は文字の編集用です。レイアウトが崩れることがあります。画面と同じ見た目で保存したい場合は「PDF で保存」をお使いください。</span>
   </div>
 
   <div class="p-sheet">
