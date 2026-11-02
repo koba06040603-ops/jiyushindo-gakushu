@@ -771,6 +771,11 @@ export function renderOptionalForPrint(items: OptionalRow[], showAnswers = false
 //   単元のもくひょう → こころのせいちょう・じゅぎょうじかん → コースをえらぼう（3コース）
 //   学習カード・問題本文は含めない。
 // ============================================================
+/** 紙面では絵文字が環境によって □ に化けるため、印刷・PDF からは取り除く（DB の文言は変えない） */
+function stripPictographs(s: any): string {
+  return String(s ?? '').replace(/\p{Extended_Pictographic}\uFE0F?\s*/gu, '').trim()
+}
+
 export interface GuideCourseRow {
   course_name?: string
   course_label?: string | null
@@ -804,7 +809,7 @@ export function renderGuideForPrint(unit: GuideUnitRow, courses: GuideCourseRow[
           <div class="p-guide-course-label">${esc(co.course_label || co.description || '')}</div>
           ${co.selection_title || co.selection_content ? `
             <div class="p-guide-selection">
-              <div class="p-guide-selection-title">✨ ${esc(co.selection_title || '')}</div>
+              <div class="p-guide-selection-title">✨ ${esc(stripPictographs(co.selection_title || ''))}</div>
               <div class="p-guide-selection-body">${escMultiline(co.selection_content || '')}</div>
             </div>` : ''}
         </section>`).join('')}</div>`
