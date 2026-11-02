@@ -435,19 +435,45 @@ function textEditorScript(): string {
     pLoadHtml2Pdf(function(err){
       if (err) { done(); alert('PDF の部品を読み込めませんでした。通信状態を確認するか、「印刷する」から「PDF に保存」を選んでください。'); return; }
       var name = title.replace(/[\\/:*?"<>|]/g, '_') + '.pdf';
-      window.html2pdf().set({
+      var worker = window.html2pdf().set({
         margin: [10, 8, 10, 8],
         filename: name,
         image: { type: 'jpeg', quality: 0.95 },
         html2canvas: { scale: 2, useCORS: true, letterRendering: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['css', 'legacy'] }
-      }).from(wrap).save().then(done, function(){
+      }).from(wrap).toCanvas();
+      /* 描画結果が白紙のまま PDF にすると 16KB 程度の白い PDF になるため、保存前に確かめる */
+      worker.get('canvas').then(function(canvas){
+        if (pIsBlankCanvas(canvas)) throw new Error('blank');
+        return worker.toPdf().save(name);
+      }).then(done, function(err){
         done();
+        if (err && err.message === 'blank') {
+          alert('画面の内容を PDF に描画できませんでした（白紙になるため保存していません）。\\n続けて印刷画面を開きます。送信先で「PDF に保存」を選び、「背景のグラフィック」をオンにしてください。');
+          window.print();
+          return;
+        }
         alert('PDF の作成に失敗しました。「印刷する」から「PDF に保存」を選んでください。');
       });
     });
   };
+  /* キャンバスの一部を見て、白一色（描画されていない）かを判定する */
+  function pIsBlankCanvas(c){
+    try {
+      var w = c.width, h = c.height;
+      if (!w || !h) return true;
+      var d = c.getContext('2d').getImageData(0, 0, w, h).data;
+      var stride = 4 * Math.max(1, Math.floor((w * h) / 20000));
+      for (var i = 0; i < d.length; i += stride) {
+        if (d[i + 3] > 0 && (d[i] < 245 || d[i + 1] < 245 || d[i + 2] < 245)) return false;
+      }
+      return true;
+    } catch (e) {
+      /* 読み取れない場合（外部画像で汚染など）は白紙とみなさず、通常の保存を試す */
+      return false;
+    }
+  }
 })();
 </script>`
 }
