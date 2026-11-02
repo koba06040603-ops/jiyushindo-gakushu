@@ -16002,7 +16002,7 @@ async function generateExampleDiagramApp(cardId, cardTitle, exampleProblem, exam
       '条件：教科書のイラスト風。児童にわかりやすい色使い。文字は大きく日本語で。幾何の図形は正確に描く。ラベル（頂点名ABCD等）を明確に。白い背景。'
     const res = await axios.post('/api/ai/generate-image', {
       prompt: prompt,
-      card_id: cardId, card_title: cardTitle,
+      card_title: cardTitle,
       problem_text: exampleProblem, prefer_image: true,
       // 禁止ワードをサーバーに送信
       forbidden_answer: forbiddenWords.join(', ')
@@ -16081,7 +16081,6 @@ async function executeEditExampleDiagram(cardId) {
     
     const res = await axios.post('/api/ai/generate-image', {
       prompt: promptText,
-      card_id: cardId,
       prefer_image: true,
       forbidden_answer: forbiddenWords2.join(', ')
     })

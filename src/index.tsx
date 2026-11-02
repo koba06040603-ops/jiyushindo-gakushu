@@ -23977,7 +23977,7 @@ app.put('/api/card/:cardId', async (c) => {
   
   try {
     // Base64画像がR2対応サイズを超える場合はR2にアップロード
-    const imageFields = ['problem_image_url', 'answer_image_url']
+    const imageFields = ['problem_image_url', 'answer_image_url', 'example_image_url']
     for (const field of imageFields) {
       if (updates[field] && typeof updates[field] === 'string' && updates[field].startsWith('data:')) {
         const base64Data = updates[field]
@@ -24022,6 +24022,7 @@ app.put('/api/card/:cardId', async (c) => {
       'answer',
       'problem_image_url',
       'answer_image_url',
+      'example_image_url',
       'solution_video_url',
       'visual_support',
       'auditory_support',
