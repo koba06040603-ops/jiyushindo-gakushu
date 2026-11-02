@@ -8157,6 +8157,7 @@ async function loadCardPage(cardId) {
                 </h3>
                 <div class="bg-yellow-50 rounded-lg p-4 mb-4">
                   <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans font-bold">${formatText(newProblem)}</pre>
+                  ${keepExampleImg ? `<div class="text-center mt-2"><img src="${keepExampleImg}" alt="例題の図" onclick="window._expandSongImage && window._expandSongImage(this.src)" class="w-full max-w-[600px] h-auto rounded-2xl border-3 border-purple-200 shadow-lg mx-auto cursor-pointer"></div>` : ''}
                 </div>
                 ${newSolution ? `
                   <div class="bg-green-50 rounded-lg p-4">
@@ -8220,6 +8221,7 @@ async function loadCardPage(cardId) {
         }
       }
       
+      const keepExampleImg = card.example_image_url || ''
       setTimeout(() => tryFixExample(0), 500)
     }
 
@@ -16010,7 +16012,13 @@ async function generateExampleDiagramApp(cardId, cardTitle, exampleProblem, exam
     const d = res.data
     if (d.success && d.image_url) {
       // 例題画像をカードに保存
-      try { await axios.put('/api/card/' + cardId, { example_image_url: d.image_url }) } catch(e) {}
+      try {
+        const saveRes = await axios.put('/api/card/' + cardId, { example_image_url: d.image_url })
+        if (!saveRes.data || saveRes.data.success === false) throw new Error(saveRes.data?.error || '保存に失敗しました')
+      } catch (saveErr) {
+        console.error('例題の図の保存に失敗:', saveErr)
+        alert('例題の図は生成できましたが、保存に失敗しました（カードを移動すると消えます）。もう一度お試しください。\n' + (saveErr.response?.data?.error || saveErr.message))
+      }
       area.innerHTML = '<div class="text-center mt-2" id="example-img-wrapper-' + cardId + '">' +
         '<img src="' + d.image_url + '" alt="例題の図" onclick="window._expandSongImage && window._expandSongImage(this.src)" class="w-full max-w-[600px] h-auto rounded-2xl border-3 border-purple-200 shadow-lg mx-auto cursor-pointer hover:scale-[1.02] transition-transform">' +
         '<div class="flex justify-center items-center gap-2 mt-1 flex-wrap">' +
@@ -16086,7 +16094,13 @@ async function executeEditExampleDiagram(cardId) {
     })
     const d = res.data
     if (d.success && d.image_url) {
-      try { await axios.put('/api/card/' + cardId, { example_image_url: d.image_url }) } catch(e) {}
+      try {
+        const saveRes = await axios.put('/api/card/' + cardId, { example_image_url: d.image_url })
+        if (!saveRes.data || saveRes.data.success === false) throw new Error(saveRes.data?.error || '保存に失敗しました')
+      } catch (saveErr) {
+        console.error('例題の図の保存に失敗:', saveErr)
+        alert('例題の図は生成できましたが、保存に失敗しました（カードを移動すると消えます）。もう一度お試しください。\n' + (saveErr.response?.data?.error || saveErr.message))
+      }
       const rawCd = window.currentCardData || {}
       const cd = rawCd.card || rawCd || {}
       const ct = (cd.card_title || '').replace(/'/g, '')
