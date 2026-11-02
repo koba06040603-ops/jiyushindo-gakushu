@@ -83,6 +83,8 @@ export interface PrintOptions {
   onePerPage?: boolean
   /** 画面上で図の差し替え・削除ボタンを出すか（印刷では非表示） */
   editable?: boolean
+  /** 1枚の紙の面数。1 = 表だけ（問題・図・解答欄）/ 2 = 表裏（裏にれい・ヒント）。既定 2 */
+  sides?: 1 | 2
 }
 
 /** 学習カードの本体（カード列＋答えの別紙）だけを返す。枠（HTML/ヘッダー）は含まない */
@@ -144,22 +146,33 @@ export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOption
          </div>`
       : ''
 
+    // 表だけ（1面）: 問題・図・解答欄のみ。れい・ヒントは「ヒントカード」として別に印刷する
+    // 表裏（2面）: 表＝問題・図・解答欄 ／ 裏＝れい・ヒント（＋答えを各問の下にする場合）
+    // 表だけ（1面）でも、れい（やりかた）は表の解答欄の下に短く載せる（裏が使えない環境向け）
+    const sides = opts.sides === 1 ? 1 : 2
+    const showExampleNow = sides === 2 ? exampleBlock : ''
+    const showHintNow = sides === 2 ? hintBlock : ''
+    const frontAnswerInline = sides === 1 ? `${exampleBlock}${answerInline}` : ''
+    const backInner = sides === 2 ? `${showExampleNow}${showHintNow}${answerInline}` : ''
+    const hasBack = backInner.trim() !== ''
+
     return `
-      <section class="p-card${onePerPage ? ' p-break' : ''}" data-card-id="${cardId ?? ''}">
-        <div class="p-card-head">
-          <span class="p-card-no">${no}</span>
-          <h2 class="p-card-title">${esc(card.card_title || '')}</h2>
+      <section class="p-card${onePerPage ? ' p-break' : ''}${hasBack ? ' p-two' : ''}" data-card-id="${cardId ?? ''}">
+        <div class="p-front">
+          <div class="p-card-head">
+            <span class="p-card-no">${no}</span>
+            <h2 class="p-card-title">${esc(card.card_title || '')}</h2>
+          </div>
+          ${passageBlock}
+          <div class="p-problem">${escMultiline(problem)}</div>
+          ${figureTools}
+          ${figureHTML(card.problem_image_url)}
+          <div class="p-answer-box" style="min-height:${answerBoxHeight(answer)}">
+            <div class="p-answer-label">じぶんの こたえ</div>
+          </div>
+          ${frontAnswerInline}
         </div>
-        ${passageBlock}
-        <div class="p-problem">${escMultiline(problem)}</div>
-        ${figureTools}
-        ${figureHTML(card.problem_image_url)}
-        ${exampleBlock}
-        <div class="p-answer-box" style="min-height:${answerBoxHeight(answer)}">
-          <div class="p-answer-label">じぶんの こたえ</div>
-        </div>
-        ${hintBlock}
-        ${answerInline}
+        ${hasBack ? `<div class="p-back"><div class="p-back-label">うら</div>${backInner}</div>` : ''}
       </section>`
   }).join('')
 
@@ -193,7 +206,54 @@ export function renderCardsPrintPage(
   const title = `${meta.unitName || '学習カード'}${meta.courseName ? '（' + meta.courseName + '）' : ''}`
   return wrapPrintDocument(title, {
     unitName: meta.unitName, grade: meta.grade, subject: meta.subject, courseName: meta.courseName,
-  }, renderCardsBodyForPrint(cards, opts), !!opts.editable)
+  }, renderCardsBodyForPrint(cards, opts), !!opts.editable, {
+    links: `<a class="sub${opts.sides === 1 ? ' on' : ''}" href="?sides=1">表だけ（A4 1面）</a>
+      <a class="sub${opts.sides === 1 ? '' : ' on'}" href="?sides=2">表裏（A4 2面）</a>`,
+    note: opts.sides === 1
+      ? 'A4・1面｜問題と解答欄だけを1枚ずつ印刷します（れい・ヒントはヒントカードで）'
+      : 'A4・2面｜表＝問題と解答欄、裏＝れい・ヒント。1枚ずつ別の紙になります',
+  })
+}
+
+/** ヒントカード（掲示用）の本体。学習カード1枚につきA4 1ページ。答えは入れない */
+export function renderHintCardsBodyForPrint(cards: PrintCardRow[]): string {
+  const body = cards.map((card, i) => {
+    const no = card.card_number ?? i + 1
+    const cardId = (card as any).card_id ?? (card as any).id
+    const hints = Array.isArray(card.hints) ? card.hints : []
+    const hintHTML = hints.length
+      ? hints.map((h, hi) => `
+          <div class="p-hc-hint">
+            <span class="p-hc-no">${esc(h.hint_level ?? hi + 1)}</span>
+            <span class="p-hc-text">${escMultiline(h.hint_text)}</span>
+          </div>`).join('')
+      : '<p class="p-hc-empty">この問題のヒントはまだ登録されていません。</p>'
+    return `
+      <section class="p-card p-break p-hintcard" data-card-id="${cardId ?? ''}">
+        <div class="p-card-head">
+          <span class="p-card-no">${no}</span>
+          <h2 class="p-card-title">${esc(card.card_title || '')}</h2>
+        </div>
+        <div class="p-hc-problem">${escMultiline(pickProblem(card))}</div>
+        <div class="p-hc-label">ヒント（こまったときに 見よう）</div>
+        ${hintHTML}
+      </section>`
+  }).join('')
+  return body || '<p>印刷できるカードがありません。</p>'
+}
+
+/** ヒントカードの印刷ページ（掲示用）。ヒントだけを1枚ずつ別の紙にする */
+export function renderHintCardsPage(
+  meta: { unitName?: string; grade?: string; courseName?: string; subject?: string },
+  cards: PrintCardRow[]
+): string {
+  const title = `${meta.unitName || 'ヒントカード'}${meta.courseName ? '（' + meta.courseName + '）' : ''}・ヒントカード`
+  return wrapPrintDocument(title, {
+    unitName: meta.unitName, grade: meta.grade, subject: meta.subject, courseName: meta.courseName,
+  }, renderHintCardsBodyForPrint(cards), false, {
+    answerLinks: false,
+    note: 'ヒントカード｜学習カード1枚につきA4 1ページ。掲示用（答えは入りません）',
+  })
 }
 
 export interface PrintMeta {
@@ -259,7 +319,8 @@ function textEditorScript(): string {
     '.p-example-q,.p-example-s,.p-example-a,.p-hint > span:last-child,.p-expl,.p-answer-inline div,' +
     '.p-ans-head,.p-ans-val,.p-ans-expl,.p-check-note,.p-opt-title,.p-answer-key,.p-part-title,' +
     '.p-guide-unit,.p-guide-meta,.p-guide-body,.p-guide-box-title,.p-guide-course-name,' +
-    '.p-guide-course-label,.p-guide-selection-title,.p-guide-selection-body,.p-guide-heading';
+    '.p-guide-course-label,.p-guide-selection-title,.p-guide-selection-body,.p-guide-heading,' +
+    '.p-hc-problem,.p-hc-label,.p-hc-text,.p-hc-empty';
   window.pTogglePrintEdit = function(btn){
     var on = btn.getAttribute('data-on') !== '1';
     var els = document.querySelectorAll(SEL);
@@ -302,7 +363,10 @@ function textEditorScript(): string {
 }
 
 /** 紙の枠（ツールバー・見出し・氏名欄）で本体を包む */
-export function wrapPrintDocument(title: string, meta: PrintMeta, bodyHTML: string, editable = false): string {
+export function wrapPrintDocument(
+  title: string, meta: PrintMeta, bodyHTML: string, editable = false,
+  bar: { note?: string; links?: string; answerLinks?: boolean } = {}
+): string {
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -451,6 +515,19 @@ export function wrapPrintDocument(title: string, meta: PrintMeta, bodyHTML: stri
   .p-part { break-before: page; page-break-before: always; }
   .p-header + .p-part { break-before: auto; page-break-before: auto; }
 
+  /* 表裏（2面）：裏は必ず新しい面から始める。画面では裏の始まりを点線で示す */
+  .p-back { border-top: 1px dashed #b5b5b5; margin-top: 6mm; padding-top: 3mm; }
+  .p-back-label { font-size: 9pt; font-weight: 700; color:#555; margin-bottom: 2mm; }
+  .p-toolbar a.sub.on { background:#4F46E5; color:#fff; }
+
+  /* ヒントカード（掲示用）：1枚につきA4 1ページ。答えは入れない */
+  .p-hc-problem { font-size: 12pt; background: var(--soft); border-radius: 2mm; padding: 3mm 4mm; margin-bottom: 4mm; }
+  .p-hc-label { font-size: 14pt; font-weight: 700; border-left: 5px solid var(--ink); padding: 1mm 3mm; margin: 4mm 0; }
+  .p-hc-hint { display: flex; gap: 4mm; align-items: flex-start; border: 1.5px solid var(--ink); border-radius: 4mm; padding: 4mm; margin-bottom: 5mm; }
+  .p-hc-no { flex: none; width: 12mm; height: 12mm; border-radius: 50%; background: var(--ink); color: #fff; font-size: 16pt; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .p-hc-text { font-size: 17pt; line-height: 1.7; }
+  .p-hc-empty { color: #555; font-size: 11pt; }
+
   /* 画面での改ページ位置（印刷には出ない）。1枚ずつ別の紙になることを画面でも分かるようにする */
   .p-card.p-break { border-bottom: 1px dashed #b5b5b5; padding-bottom: 4mm; margin-bottom: 8mm; }
   .p-card.p-break::after { content: "── ここで改ページ（この下は次の1枚）──"; display: block; text-align: center; font-size: 8.5pt; color: #888; margin-top: 3mm; }
@@ -472,6 +549,10 @@ export function wrapPrintDocument(title: string, meta: PrintMeta, bodyHTML: stri
     .p-toolbar { display: none !important; }
     .no-print { display: none !important; }
     .p-card { page-break-inside: avoid; break-inside: avoid; margin-bottom: 0; }
+    .p-card.p-two { page-break-inside: auto; break-inside: auto; }
+    .p-back { break-before: page; page-break-before: always; border-top: none; margin-top: 0; padding-top: 0; }
+    .p-back-label { margin-bottom: 1mm; }
+    .p-hc-hint { page-break-inside: avoid; break-inside: avoid; }
     .p-break { page-break-after: always; break-after: page; }
     .p-card.p-break { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
     .p-card.p-break::after { display: none; }
@@ -488,13 +569,14 @@ export function wrapPrintDocument(title: string, meta: PrintMeta, bodyHTML: stri
 <body>
   <div class="p-toolbar no-print">
     <button onclick="window.print()">🖨 印刷する</button>
-    <a class="sub" href="?answers=none">答えなし</a>
+    ${bar.answerLinks === false ? '' : `<a class="sub" href="?answers=none">答えなし</a>
     <a class="sub" href="?answers=append">答えを別紙に</a>
     <a class="sub" href="?answers=inline">答えを各問の下に</a>
-    <a class="sub" href="?hints=0">ヒントなし</a>
+    <a class="sub" href="?hints=0">ヒントなし</a>`}
+    ${bar.links || ''}
     <button type="button" class="sub" data-on="0" onclick="pTogglePrintEdit(this)">✏ 文字を直す</button>
     <button type="button" class="sub" onclick="pExportWord()">📄 Word（.doc）で保存</button>
-    <span class="hint">A4・たて｜カード1枚につき1ページで出ます（画面の点線が改ページ位置）</span>
+    <span class="hint">${esc(bar.note || 'A4・たて｜カード1枚につき1ページで出ます（画面の点線が改ページ位置）')}</span>
   </div>
 
   <div class="p-sheet">

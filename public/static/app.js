@@ -4695,6 +4695,14 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                           class="text-xs bg-white hover:bg-gray-100 text-gray-700 border border-gray-400 px-3 py-1.5 rounded-lg font-bold transition">
                           答え入り（先生用）
                         </button>
+                        <button onclick="printCourseCards(${cid}, 'none', 1)"
+                          class="text-xs bg-white hover:bg-gray-100 text-indigo-700 border border-indigo-400 px-3 py-1.5 rounded-lg font-bold transition">
+                          表だけ（A4 1面）
+                        </button>
+                        <button onclick="printHintCards(${cid})"
+                          class="text-xs bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg font-bold transition">
+                          <i class="fas fa-lightbulb mr-1"></i>ヒントカード（掲示用）
+                        </button>
                       </div>`
                   }).join('')}
                 </div>
@@ -30337,13 +30345,22 @@ function printGuide() {
  * サーバー側で紙に必要な要素だけを組んだページ（/print/course/:id）を使う。
  *   mode: 'append'(答えは別紙) / 'none'(答えなし・児童用) / 'inline'(答え入り・先生用)
  */
-function printCourseCards(courseId, mode = 'append') {
+function printCourseCards(courseId, mode = 'append', sides = 2) {
   if (!courseId) {
     alert('コースが特定できませんでした')
     return
   }
-  const url = `/print/course/${courseId}?answers=${encodeURIComponent(mode)}`
+  const url = `/print/course/${courseId}?answers=${encodeURIComponent(mode)}&sides=${sides === 1 ? 1 : 2}`
   window.open(url, '_blank', 'noopener')
+}
+
+/** ヒントカード（掲示用）を、コース単位で1枚ずつ別の紙として開く */
+function printHintCards(courseId) {
+  if (!courseId) {
+    alert('コースが特定できませんでした')
+    return
+  }
+  window.open(`/print/hints/course/${courseId}`, '_blank', 'noopener')
 }
 
 /**

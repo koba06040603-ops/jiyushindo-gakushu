@@ -63,7 +63,7 @@ import { AdaptiveLearningEngine } from './adaptive-learning'
 import { SchoolManagementSystem } from './school-management'
 import { AIContentGenerator } from './ai-content-generator'
 import { buildQualityRules, buildQualityChecklist, buildReviseCardsPrompt } from './quality-rules'
-import { renderCardsPrintPage, renderCardsBodyForPrint, renderCheckTestForPrint, renderOptionalForPrint, renderGuideForPrint, wrapPrintDocument } from './print-cards'
+import { renderCardsPrintPage, renderCardsBodyForPrint, renderCheckTestForPrint, renderOptionalForPrint, renderGuideForPrint, wrapPrintDocument, renderHintCardsPage } from './print-cards'
 import { 
   addToMistakeNotebook, 
   getMistakeNotebook, 
@@ -16661,6 +16661,7 @@ function parsePrintOptions(c: any) {
     examples: q('examples') !== '0',
     onePerPage: q('compact') !== '1',
     editable: q('edit') === '1',
+    sides: (q('sides') === '1' ? 1 : 2) as 1 | 2,
   }
 }
 
@@ -16678,6 +16679,43 @@ async function attachHintsForPrint(db: D1Database, cards: any[]): Promise<any[]>
   }
   return out
 }
+
+// 🪧 ヒントカード（掲示用）：コース内の全カードのヒントを、1枚ずつA4 1ページで印刷
+//   /print/hints/course/:courseId  答えは入らない。掲示して児童が見られるようにする
+app.get('/print/hints/course/:courseId', async (c) => {
+  const { env } = c
+  const courseId = c.req.param('courseId')
+  try {
+    const course = await env.DB.prepare(`
+      SELECT c.id, c.course_name, cu.unit_name AS unit_name, cu.grade AS grade, cu.subject AS subject
+      FROM courses c LEFT JOIN curriculum cu ON cu.id = c.curriculum_id
+      WHERE c.id = ?
+    `).bind(courseId).first() as any
+    const res = await env.DB.prepare(`
+      SELECT * FROM learning_cards
+      WHERE course_id = ? AND (is_active IS NULL OR is_active = 1)
+      ORDER BY card_number
+    `).bind(courseId).all()
+    const rows = (res.results || []) as any[]
+    if (rows.length === 0) {
+      return c.html('<h1>印刷できるカードがありません</h1><p>このコースにはまだ学習カードが登録されていません。</p>', 404)
+    }
+    const cards = await attachHintsForPrint(env.DB, rows)
+    const first = rows[0] || {}
+    return c.html(renderHintCardsPage(
+      {
+        unitName: course?.unit_name || first.unit_name || 'ヒントカード',
+        grade: course?.grade || first.grade_level || '',
+        subject: course?.subject || first.subject || '',
+        courseName: course?.course_name || '',
+      },
+      cards
+    ))
+  } catch (error: any) {
+    console.error('ヒントカード印刷エラー:', error)
+    return c.html('<h1>印刷ページを作れませんでした</h1><p>' + escapeHTML(error?.message || '') + '</p>', 500)
+  }
+})
 
 app.get('/print/course/:courseId', async (c) => {
   const { env } = c
