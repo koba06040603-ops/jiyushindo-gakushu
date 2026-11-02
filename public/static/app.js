@@ -9638,30 +9638,39 @@ function renderTactileWidget(containerId, tactileText, cardData) {
   const container = document.getElementById(containerId)
   if (!container) return
 
-  // 保存済みの「やってみよう」画像があれば表示する（Gemini を呼ばない／印刷と同じ画像）
+  // 保存済みの「やってみよう」画像は常に表示する（印刷と同じ画像）。Gemini は自動で呼ばない。
+  // 画像の下に、PC 版の操作教材（ローカル描画・Gemini 不使用）を従来どおり出す。
+  let target = container
   if (cardData?.tactile_image_url) {
     const safeText = String(tactileText || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const cid = String(cardData.card_id || cardData.id || 0)
     container.innerHTML = '<div class="p-4 text-center">' +
       '<p class="text-sm text-orange-800 font-bold mb-2"><i class="fas fa-hand-sparkles mr-1"></i>やってみよう！</p>' +
       '<img src="' + cardData.tactile_image_url + '" alt="やってみよう イラスト" class="w-full max-w-[600px] h-auto mx-auto rounded-2xl border-3 border-orange-200 shadow-lg">' +
       '<p class="text-sm text-gray-700 mt-2">' + safeText + '</p>' +
-      '</div>'
-    return
+      '<div class="flex flex-wrap gap-2 justify-center mt-2">' +
+      '<button onclick="window.speakNB2NarrationAI && window.speakNB2NarrationAI(' + cid + ')" id="nb2-speak-btn-' + cid + '" class="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow">🔊 音声解説</button>' +
+      '<button onclick="window.bookmarkNB2Image && window.bookmarkNB2Image(' + cid + ')" id="nb2-bookmark-btn-' + cid + '" class="bg-gradient-to-r from-yellow-500 to-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow">⭐ 保存</button>' +
+      '</div>' +
+      '<div class="mt-3"><button onclick="initVisualWidgets(true)" class="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow">🧠 問題連動の図解を作る（押したときだけAIを呼びます）</button></div>' +
+      '</div>' +
+      '<div id="tactile-local-widget-' + cid + '"></div>'
+    target = document.getElementById('tactile-local-widget-' + cid) || container
   }
 
   const type = detectWidgetType(tactileText, cardData)
   console.log('🎮 触覚ウィジェット描画:', type, containerId)
 
   switch(type) {
-    case 'numberline': renderNumberLine(container, cardData); break
-    case 'thermometer': renderThermometer(container, cardData); break
-    case 'blocks': renderBlocks(container, cardData); break
-    case 'walk': renderWalkGame(container, cardData); break
-    case 'scorecard': renderScoreCard(container, cardData); break
-    case 'clock': renderClock(container, cardData); break
-    case 'counter': renderCounter(container, cardData); break
-    case 'dice': renderDice(container, cardData); break
-    default: renderGenericTactile(container, tactileText, cardData); break
+    case 'numberline': renderNumberLine(target, cardData); break
+    case 'thermometer': renderThermometer(target, cardData); break
+    case 'blocks': renderBlocks(target, cardData); break
+    case 'walk': renderWalkGame(target, cardData); break
+    case 'scorecard': renderScoreCard(target, cardData); break
+    case 'clock': renderClock(target, cardData); break
+    case 'counter': renderCounter(target, cardData); break
+    case 'dice': renderDice(target, cardData); break
+    default: renderGenericTactile(target, tactileText, cardData); break
   }
 }
 
@@ -10360,6 +10369,15 @@ function getTactileIllustration(text, cardData) {
 }
 
 function renderGenericTactile(container, tactileText, cardData) {
+  // 保存済みの「やってみよう」画像がある場合は AI 生成ボタンを出さない（Gemini を呼ばない方針）
+  if (cardData?.tactile_image_url) {
+    container.innerHTML = '<div class="p-4 text-center">' +
+      '<div class="flex gap-2 justify-center flex-wrap">' +
+      '<button onclick="this.classList.toggle(\'bg-green-500\'); this.classList.toggle(\'bg-gray-300\'); this.classList.toggle(\'text-white\'); TactileSounds.play(\'correct\')" class="bg-gray-300 px-4 py-2 rounded-full text-sm font-bold transition-all hover:scale-105 shadow"><i class="fas fa-check mr-1"></i>やってみた！</button>' +
+      '<button onclick="this.textContent = parseInt(this.textContent||0) + 1 + \'回やったよ！\'; this.classList.add(\'bg-yellow-400\'); TactileSounds.play(\'tap\')" class="bg-yellow-300 px-4 py-2 rounded-full text-sm font-bold transition-all hover:scale-105 shadow">0回やったよ！</button>' +
+      '</div></div>'
+    return
+  }
   const illust = getTactileIllustration(tactileText, cardData)
   const cardId = cardData?.card_id || cardData?.id || window.currentCardData?.card?.card_id || 0
   const illustContainerId = 'tactile-ai-illust-' + cardId
@@ -13255,12 +13273,13 @@ function renderAreaVisual(container, card) {
 }
 
 // ========== 視覚ウィジェット自動挿入 ==========
-function initVisualWidgets() {
+function initVisualWidgets(force) {
   const cardData = window.currentCardData
   const card = cardData?.card || cardData
   if (!card) return
-  // 保存済みの「やってみよう」画像があるカードは、NB2 の自動生成を行わない（Gemini を呼ばない）
-  if (card.tactile_image_url) return
+  // 保存済みの「やってみよう」画像があるカードは、自動では NB2 を呼ばない（Gemini を呼ばない）。
+  // 利用者が押したとき（force=true）だけ生成する。
+  if (card.tactile_image_url && force !== true) return
   
   const cardId = card.card_id || card.id || 0
   const containerId = 'visual-widget-' + cardId
@@ -13733,7 +13752,7 @@ window.regenerateVisualWidget = function(cardId) {
   const cardData = window.currentCardData
   const card = cardData?.card || cardData
   if (!card) return
-  initVisualWidgets() // 再度呼び出して再生成
+  initVisualWidgets(true) // 利用者が押したときだけ再生成（画像があっても生成する）
 }
 
 // === NB2 図解ウィジェット: 修正指示 ===
@@ -44152,6 +44171,23 @@ window.bookmarkNB2Image = async function(page) {
     }
   }
   
+  // 保存済み「やってみよう」イラストの分岐（nb2-widget-body が無い）用のフォールバック
+  if (!imageUrl) {
+    const savedImg = document.querySelector('#tactile-guide-' + page + ' img') ||
+      document.querySelector('#tactile-widget-' + page + ' img') ||
+      document.querySelector('#tactile-local-widget-' + page + ' img')
+    if (savedImg && savedImg.getAttribute('src')) {
+      imageUrl = new URL(savedImg.getAttribute('src'), location.origin).href
+      imageType = 'tactile_saved'
+    } else {
+      const cdFb = window.currentCardData || {}
+      const cardFb = cdFb.card || cdFb || {}
+      if (cardFb.tactile_image_url) {
+        imageUrl = new URL(String(cardFb.tactile_image_url), location.origin).href
+        imageType = 'tactile_saved'
+      }
+    }
+  }
   // SVG の場合はスクリーンショットを保存できないがURLとして保存
   if (!imageUrl && widgetBody) {
     const svgs = widgetBody.querySelectorAll('svg')

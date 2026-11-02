@@ -15788,15 +15788,22 @@ app.get('/guide/:curriculumId', async (c) => {
   })();
 
   // === さわってまなぼうウィジェット ===
-  function initGuideWidget(page, tactileText, card) {
+  function initGuideWidget(page, tactileText, card, allowGenerate) {
     var containerId = 'tactile-guide-' + page;
     var container = document.getElementById(containerId);
     if (!container) return;
     
-    // 保存済みの「やってみよう」画像があれば表示し、Gemini を呼ばない（印刷と同じ画像）
+    // 保存済みの「やってみよう」画像は常に表示する（印刷と同じ画像）。
+    // 画像があるカードは自動で Gemini を呼ばず、利用者がボタンを押したときだけ NB2 教材を作る。
     var savedTactileImg = (card && card.tactile_image_url) || '';
-    if (savedTactileImg) {
-      container.innerHTML = '<div style="text-align:center;"><img src="' + savedTactileImg + '" alt="やってみよう イラスト" style="max-width:100%;height:auto;border-radius:14px;border:2px solid #FDBA74;"></div>';
+    if (savedTactileImg && !allowGenerate) {
+      // 音声解説（押したときだけ読み上げ API を呼ぶ）と保存（DB 保存）は常時表示する
+      container.innerHTML = '<div style="text-align:center;"><img src="' + savedTactileImg + '" alt="やってみよう イラスト" style="max-width:100%;height:auto;border-radius:14px;border:2px solid #FDBA74;"></div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px;">' +
+        '<button onclick="(window.speakNB2NarrationAI||window.speakNB2Explanation)(' + page + ')" id="nb2-speak-btn-' + page + '" style="background:linear-gradient(135deg,#10B981,#059669);color:white;border:none;padding:8px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.8rem;box-shadow:0 2px 6px rgba(16,185,129,0.3);"><i class="fas fa-volume-up" style="margin-right:4px;"></i>🔊 音声解説</button>' +
+        '<button onclick="window.bookmarkNB2Image&&window.bookmarkNB2Image(' + page + ')" id="nb2-bookmark-btn-' + page + '" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:8px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.8rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-star" style="margin-right:4px;"></i>⭐ 保存</button>' +
+        '</div>' +
+        '<div style="text-align:center;margin-top:8px;"><button onclick="regenerateTactileWidget(' + page + ')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:8px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.8rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);">🧠 操作できる教材を作る（PC版・押したときだけAIを呼びます）</button></div>';
       return;
     }
     // === Nano Banana 2 動的ウィジェット生成 ===
@@ -15975,7 +15982,7 @@ app.get('/guide/:curriculumId', async (c) => {
     if (!card) return;
     var mm = card._mm || {};
     var tactile = mm.tactile_activity || '';
-    initGuideWidget(page, tactile, card);
+    initGuideWidget(page, tactile, card, true);
   }
   
   // === NB2 ウィジェット修正指示 ===
