@@ -192,10 +192,10 @@ export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOption
     // 表裏（2面）: 表＝問題・図・解答欄 ／ 裏＝れい・ヒント（＋答えを各問の下にする場合）
     // 表だけ（1面）でも、れい（やりかた）は表の解答欄の下に短く載せる（裏が使えない環境向け）
     const sides = opts.sides === 1 ? 1 : 2
-    const showExampleNow = sides === 2 ? exampleBlock : ''
+    // れいは「れい → 問題」の順にするため、表・裏どちらでも表面（問題より前）に出す
     const showHintNow = sides === 2 ? hintBlock : ''
-    const frontAnswerInline = sides === 1 ? `${exampleBlock}${answerInline}` : ''
-    const backInner = sides === 2 ? `${showExampleNow}${showHintNow}${answerInline}` : ''
+    const frontAnswerInline = sides === 1 ? answerInline : ''
+    const backInner = sides === 2 ? `${showHintNow}${answerInline}` : ''
     const hasBack = backInner.trim() !== ''
 
     return `
@@ -206,6 +206,7 @@ export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOption
             <span class="p-card-no">${no}</span>
             <h2 class="p-card-title">${esc(card.card_title || '')}</h2>
           </div>
+          ${exampleBlock}
           ${passageBlock}
           <div class="p-problem">${escMultiline(problem)}</div>
           ${figureTools}
