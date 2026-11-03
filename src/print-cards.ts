@@ -84,6 +84,16 @@ function figureHTML(url?: string | null): string {
   return `<div class="p-figure"><img src="${esc(url)}" alt=""></div>`
 }
 
+/** カードごとの「年・組・番号・氏名」欄（紙がばらけても誰のものか分かるように） */
+function studentLineHTML(): string {
+  return `<div class="p-student-line">
+            <span>年</span><span class="p-student-blank"></span>
+            <span>組</span><span class="p-student-blank"></span>
+            <span>番号</span><span class="p-student-blank"></span>
+            <span>氏名</span><span class="p-student-blank p-student-name"></span>
+          </div>`
+}
+
 /** 解答欄の行数を、答えの長さから推定する（紙に書くスペースを確保） */
 function answerBoxHeight(answer: string): string {
   const len = answer.length
@@ -191,6 +201,7 @@ export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOption
     return `
       <section class="p-card${onePerPage ? ' p-break' : ''}${hasBack ? ' p-two' : ''}" data-card-id="${cardId ?? ''}">
         <div class="p-front">
+          ${studentLineHTML()}
           <div class="p-card-head">
             <span class="p-card-no">${no}</span>
             <h2 class="p-card-title">${esc(card.card_title || '')}</h2>
@@ -212,6 +223,7 @@ export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOption
   // 答え合わせ用の別紙（児童が自分で丸つけできるようにする）
   const answerSheet = (answersMode === 'append')
     ? `<section class="p-card p-answersheet">
+         ${studentLineHTML()}
          <h2 class="p-sheet-title">こたえ・とき方</h2>
          <p class="p-sheet-note">じぶんで といてから 見ましょう。</p>
          ${cards.map((card, i) => {
@@ -537,6 +549,10 @@ export function wrapPrintDocument(
   /* カード */
   .p-card { margin-bottom: 8mm; }
   .p-card-head { display:flex; align-items:center; gap: 3mm; margin-bottom: 3mm; }
+  .p-student-line { display:flex; gap: 2mm; align-items:flex-end; font-size: 9.5pt; margin-bottom: 3mm; }
+  .p-student-line span { white-space: nowrap; }
+  .p-student-line .p-student-blank { display:inline-block; border-bottom: 1px solid var(--ink); width: 14mm; }
+  .p-student-line .p-student-name { width: 44mm; }
   .p-card-no {
     display:inline-flex; align-items:center; justify-content:center;
     width: 9mm; height: 9mm; border: 2px solid var(--ink); border-radius: 50%;
