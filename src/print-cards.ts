@@ -252,6 +252,7 @@ export function renderCardsPrintPage(
   return wrapPrintDocument(title, {
     unitName: meta.unitName, grade: meta.grade, subject: meta.subject, courseName: meta.courseName,
   }, renderCardsBodyForPrint(cards, opts), !!opts.editable, {
+    nameplate: false,
     links: `<a class="sub${opts.sides === 1 ? ' on' : ''}" href="?sides=1">表だけ（A4 1面）</a>
       <a class="sub${opts.sides === 1 ? '' : ' on'}" href="?sides=2">表裏（A4 2面）</a>`,
     note: opts.sides === 1
@@ -506,7 +507,7 @@ function textEditorScript(): string {
 /** 紙の枠（ツールバー・見出し・氏名欄）で本体を包む */
 export function wrapPrintDocument(
   title: string, meta: PrintMeta, bodyHTML: string, editable = false,
-  bar: { note?: string; links?: string; answerLinks?: boolean } = {}
+  bar: { note?: string; links?: string; answerLinks?: boolean; nameplate?: boolean } = {}
 ): string {
   return `<!DOCTYPE html>
 <html lang="ja">
@@ -735,9 +736,9 @@ export function wrapPrintDocument(
       <div class="p-meta">
         ${esc(meta.grade || '')}${meta.subject ? '　' + esc(meta.subject) : ''}${meta.textbook ? '　' + esc(meta.textbook) : ''}${meta.courseName ? '　' + esc(meta.courseName) : ''}
       </div>
-      <div class="p-nameplate">
+      ${bar.nameplate === false ? '' : `<div class="p-nameplate">
         <span>組：</span><span>番号：</span><span>名前：</span>
-      </div>
+      </div>`}
     </div>
     ${bodyHTML}
   </div>
