@@ -120,8 +120,7 @@ export interface PrintOptions {
 /** 学習カードの本体（カード列＋答えの別紙）だけを返す。枠（HTML/ヘッダー）は含まない */
 export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOptions = {}): string {
   const answersMode = opts.answers || 'append'
-  // 答えなし（児童用）ではヒントを印刷しない。ヒントは掲示用のヒントカード（/print/hints/course/:id）で別に出す
-  const showHints = opts.hints !== false && answersMode !== 'none'
+  // 学習カードにはヒントを出さない。ヒントは掲示用のヒントカード（/print/hints/course/:id）で別に印刷する
   const showExamples = opts.examples !== false
   const onePerPage = opts.onePerPage !== false
 
@@ -148,16 +147,6 @@ export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOption
          </div>`
       : ''
 
-    const hintBlock = (showHints && hints.length)
-      ? `<div class="p-hints">
-           <div class="p-label">ヒント（こまったときだけ 見よう）</div>
-           ${hints.map((h, hi) => `
-             <div class="p-hint">
-               <span class="p-hint-no">${(h.hint_level ?? hi + 1)}</span>
-               <span>${escMultiline(h.hint_text)}</span>
-             </div>`).join('')}
-         </div>`
-      : ''
 
     const answerInline = (answersMode === 'inline')
       ? `<div class="p-answer-inline">
@@ -193,9 +182,8 @@ export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOption
     // 表だけ（1面）でも、れい（やりかた）は表の解答欄の下に短く載せる（裏が使えない環境向け）
     const sides = opts.sides === 1 ? 1 : 2
     // れいは「れい → 問題」の順にするため、表・裏どちらでも表面（問題より前）に出す
-    const showHintNow = sides === 2 ? hintBlock : ''
     const frontAnswerInline = sides === 1 ? answerInline : ''
-    const backInner = sides === 2 ? `${showHintNow}${answerInline}` : ''
+    const backInner = sides === 2 ? answerInline : ''
     const hasBack = backInner.trim() !== ''
 
     return `
@@ -722,7 +710,7 @@ export function wrapPrintDocument(
     ${bar.answerLinks === false ? '' : `<a class="sub" href="?answers=none">答えなし</a>
     <a class="sub" href="?answers=append">答えを別紙に</a>
     <a class="sub" href="?answers=inline">答えを各問の下に</a>
-    <a class="sub" href="?hints=0">ヒントなし</a>`}
+    `}
     ${bar.links || ''}
     <button type="button" class="sub" data-on="0" onclick="pTogglePrintEdit(this)">✏ 文字を直す</button>
     <button type="button" class="sub" onclick="pExportWord()">📄 Word（.doc）で保存</button>
