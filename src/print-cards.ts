@@ -84,6 +84,13 @@ function figureHTML(url?: string | null): string {
   return `<div class="p-figure"><img src="${esc(url)}" alt=""></div>`
 }
 
+/** 紙の最上部に出す「どのコースか」の表示（例: 比「小学6年　算数　じっくりコース」） */
+export function courseLabelText(meta: { unitName?: string; grade?: string; subject?: string; courseName?: string }): string {
+  const inner = [meta.grade, meta.subject, meta.courseName].filter(Boolean).join('　')
+  const unit = meta.unitName || '学習カード'
+  return inner ? `${unit}「${inner}」` : unit
+}
+
 /** カードごとの「年・組・番号・氏名」欄（紙がばらけても誰のものか分かるように） */
 function studentLineHTML(): string {
   return `<div class="p-student-line">
@@ -113,6 +120,8 @@ export interface PrintOptions {
   onePerPage?: boolean
   /** 画面上で図の差し替え・削除ボタンを出すか（印刷では非表示） */
   editable?: boolean
+  /** 紙の最上部に出すコース名（例: 比「小学6年　算数　じっくりコース」）。各ページの先頭に入る */
+  courseLabel?: string
   /** 1枚の紙の面数。1 = 表だけ（問題・図・解答欄）/ 2 = 表裏（裏にれい・ヒント）。既定 2 */
   sides?: 1 | 2
 }
@@ -189,6 +198,7 @@ export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOption
     return `
       <section class="p-card${onePerPage ? ' p-break' : ''}${hasBack ? ' p-two' : ''}" data-card-id="${cardId ?? ''}">
         <div class="p-front">
+          ${opts.courseLabel ? `<div class="p-course-label">${esc(opts.courseLabel)}</div>` : ''}
           ${studentLineHTML()}
           <div class="p-card-head">
             <span class="p-card-no">${no}</span>
@@ -214,6 +224,7 @@ export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOption
   // 答え合わせ用の別紙（児童が自分で丸つけできるようにする）
   const answerSheet = (answersMode === 'append')
     ? `<section class="p-card p-answersheet">
+         ${opts.courseLabel ? `<div class="p-course-label">${esc(opts.courseLabel)}</div>` : ''}
          ${studentLineHTML()}
          <h2 class="p-sheet-title">こたえ・とき方</h2>
          <p class="p-sheet-note">じぶんで といてから 見ましょう。</p>
@@ -240,10 +251,12 @@ export function renderCardsPrintPage(
   opts: PrintOptions = {}
 ): string {
   const title = `${meta.unitName || '学習カード'}${meta.courseName ? '（' + meta.courseName + '）' : ''}`
+  const courseLabel = courseLabelText(meta)
   return wrapPrintDocument(title, {
     unitName: meta.unitName, grade: meta.grade, subject: meta.subject, courseName: meta.courseName,
-  }, renderCardsBodyForPrint(cards, opts), !!opts.editable, {
+  }, renderCardsBodyForPrint(cards, { ...opts, courseLabel }), !!opts.editable, {
     nameplate: false,
+    header: false,
     links: `<a class="sub${opts.sides === 1 ? ' on' : ''}" href="?sides=1">表だけ（A4 1面）</a>
       <a class="sub${opts.sides === 1 ? '' : ' on'}" href="?sides=2">表裏（A4 2面）</a>`,
     note: opts.sides === 1
@@ -253,7 +266,8 @@ export function renderCardsPrintPage(
 }
 
 /** ヒントカード（掲示用）の本体。学習カード1枚につきA4 1ページ。答えは入れない */
-export function renderHintCardsBodyForPrint(cards: PrintCardRow[]): string {
+export function renderHintCardsBodyForPrint(cards: PrintCardRow[], courseLabel = ''): string {
+  const label = courseLabel ? `<div class="p-course-label">${esc(courseLabel)}</div>` : ''
   const body = cards.map((card, i) => {
     const no = card.card_number ?? i + 1
     const cardId = (card as any).card_id ?? (card as any).id
@@ -267,6 +281,7 @@ export function renderHintCardsBodyForPrint(cards: PrintCardRow[]): string {
       : '<p class="p-hc-empty">この問題のヒントはまだ登録されていません。</p>'
     return `
       <section class="p-card p-break p-hintcard" data-card-id="${cardId ?? ''}">
+        ${label}
         <div class="p-card-head">
           <span class="p-card-no">${no}</span>
           <h2 class="p-card-title">${esc(card.card_title || '')}</h2>
@@ -287,8 +302,9 @@ export function renderHintCardsPage(
   const title = `${meta.unitName || 'ヒントカード'}${meta.courseName ? '（' + meta.courseName + '）' : ''}・ヒントカード`
   return wrapPrintDocument(title, {
     unitName: meta.unitName, grade: meta.grade, subject: meta.subject, courseName: meta.courseName,
-  }, renderHintCardsBodyForPrint(cards), false, {
+  }, renderHintCardsBodyForPrint(cards, courseLabelText(meta)), false, {
     answerLinks: false,
+    header: false,
     note: 'ヒントカード｜学習カード1枚につきA4 1ページ。掲示用（答えは入りません）',
   })
 }
@@ -498,7 +514,7 @@ function textEditorScript(): string {
 /** 紙の枠（ツールバー・見出し・氏名欄）で本体を包む */
 export function wrapPrintDocument(
   title: string, meta: PrintMeta, bodyHTML: string, editable = false,
-  bar: { note?: string; links?: string; answerLinks?: boolean; nameplate?: boolean } = {}
+  bar: { note?: string; links?: string; answerLinks?: boolean; nameplate?: boolean; header?: boolean } = {}
 ): string {
   return `<!DOCTYPE html>
 <html lang="ja">
@@ -568,6 +584,10 @@ export function wrapPrintDocument(
 
   .p-figure { margin: 3mm 0; text-align:center; }
   .p-figure img { max-width: 100%; height: auto; }
+  /* 紙の最上部のコース名（どのコースの紙か分かるように。各カードの1ページ目に入る） */
+  .p-course-label { font-size: 9.5pt; font-weight: 700; color:#222; border-bottom: 1.5px solid var(--ink); padding: 0 0 1mm; margin-bottom: 2.5mm; }
+  /* 例題の図は1枚が1面に収まる大きさに抑える（大きすぎると表が2ページにまたがる） */
+  .p-example .p-figure img { max-height: 48mm; width: auto; }
   .p-tactile { margin: 2mm 0 3mm; }
   .p-tactile-text { font-size: 10pt; margin-bottom: 1.5mm; }
   .p-tactile-fig img { max-height: 55mm; width: auto; }
@@ -725,7 +745,7 @@ export function wrapPrintDocument(
   </div>
 
   <div class="p-sheet">
-    <div class="p-header">
+    ${bar.header === false ? '' : `<div class="p-header">
       <h1 class="p-unit">${esc(meta.unitName || '学習カード')}</h1>
       <div class="p-meta">
         ${esc(meta.grade || '')}${meta.subject ? '　' + esc(meta.subject) : ''}${meta.textbook ? '　' + esc(meta.textbook) : ''}${meta.courseName ? '　' + esc(meta.courseName) : ''}
@@ -733,7 +753,7 @@ export function wrapPrintDocument(
       ${bar.nameplate === false ? '' : `<div class="p-nameplate">
         <span>組：</span><span>番号：</span><span>名前：</span>
       </div>`}
-    </div>
+    </div>`}
     ${bodyHTML}
   </div>
 ${editable ? editorScript() : ''}
