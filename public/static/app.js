@@ -7429,7 +7429,7 @@ async function loadCardPage(cardId) {
                               class="group relative flex items-center justify-center gap-3 bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 hover:from-purple-600 hover:via-pink-600 hover:to-rose-600 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 hover:-translate-y-0.5"
                               style="animation: pulse 2s infinite;">
                         <i class="fas fa-wand-magic-sparkles text-xl group-hover:animate-spin"></i>
-                        <span>AIで図を自動生成</span>
+                        <span>AIでヒントの図を自動生成</span>
                         <i class="fas fa-arrow-right text-sm opacity-70 group-hover:translate-x-1 transition-transform"></i>
                       </button>
                       
@@ -7462,7 +7462,7 @@ async function loadCardPage(cardId) {
                     <div class="bg-white bg-opacity-70 rounded-xl p-3 text-left max-w-sm mx-auto">
                       <p class="text-xs text-gray-600 flex items-start gap-2">
                         <i class="fas fa-robot text-purple-500 mt-0.5 flex-shrink-0"></i>
-                        <span><strong>AI自動生成：</strong>ボタンを押すと「<em class="text-purple-700">${aiDesc.substring(0, 40)}</em>」の図をAIが自動で描きます</span>
+                        <span><strong>AI自動生成：</strong>ボタンを押すと「<em class="text-purple-700">${aiDesc.substring(0, 40)}</em>」のヒントの図をAIが描きます（答え・計算結果・変形の過程は描きません）</span>
                       </p>
                       <p class="text-xs text-gray-600 flex items-start gap-2 mt-1">
                         <i class="fas fa-file-image text-orange-500 mt-0.5 flex-shrink-0"></i>
@@ -9146,7 +9146,11 @@ function openPromptImageGenerate(cardId, mode) {
   const cardTitle = cd.card_title || cd.title || ''
   const answerExplanation = cd.answer_explanation || cd.explanation || answerObj.explanation || ''
   
-  const defaultPrompt = `${cardTitle}\n${problemText.substring(0, 300)}${answerText ? '\n\n【正解の数値・解答データ】\n' + answerText : ''}${answerExplanation ? '\n【解説】' + answerExplanation.substring(0, 200) : ''}`
+  // ヒント図のルール（じっくりコースの例題図と同じ）。答えは入れない（禁止ワードはサーバーが別途処理する）
+  const hintRules = '【ヒント図のルール】\n- 答え・計算結果・比の値・まとめの式は図に書かない（「？」や空欄にする）\n- 選択肢に書かれた比や数値は図に写さない\n- 矢印（→）や×・+などの変形操作と、変形後の結果は描かない\n- 問題の条件（もとになる比・数量など）だけを示し、正解が分かる情報は入れない'
+  const defaultPrompt = mode === 'replace'
+    ? `${cardTitle}\n${problemText.substring(0, 300)}\n\n${hintRules}`
+    : `${cardTitle}\n${problemText.substring(0, 300)}${answerText ? '\n\n【正解の数値・解答データ】\n' + answerText : ''}${answerExplanation ? '\n【解説】' + answerExplanation.substring(0, 200) : ''}`
   
   const modeLabel = mode === 'nb_pro' ? '⭐ AI高精度画像' : mode === 'jsxgraph' ? '📊 JSXGraphグラフ再生成' : '🔄 AI画像で差し替え'
   const modeColor = mode === 'nb_pro' ? 'pink' : mode === 'jsxgraph' ? 'blue' : 'purple'
@@ -9173,8 +9177,10 @@ function openPromptImageGenerate(cardId, mode) {
       <div class="bg-green-50 border border-green-200 rounded-xl p-3 mb-3">
         <p class="text-xs font-bold text-green-800 mb-1"><i class="fas fa-check-circle mr-1"></i>この問題の解答データ（自動取得済）:</p>
         <p class="text-xs text-green-700 whitespace-pre-wrap">${answerText.substring(0, 300)}</p>
-        <button onclick="document.getElementById('prompt-gen-text').value += '\\n\\n' + document.querySelector('.answer-data-copy').textContent" class="text-xs text-green-600 underline mt-1"><i class="fas fa-copy mr-1"></i>プロンプトに追加</button>
-        <span class="answer-data-copy hidden">${answerText.substring(0, 300)}</span>
+        ${mode === 'replace'
+          ? '<p class="text-xs text-green-700 mt-1">※ 答えは図に描かれないよう自動で禁止されます（プロンプトには入れません）</p>'
+          : `<button onclick="document.getElementById('prompt-gen-text').value += '\\n\\n' + document.querySelector('.answer-data-copy').textContent" class="text-xs text-green-600 underline mt-1"><i class="fas fa-copy mr-1"></i>プロンプトに追加</button>
+        <span class="answer-data-copy hidden">${answerText.substring(0, 300)}</span>`}
       </div>` : `
       <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-3">
         <p class="text-xs font-bold text-yellow-800"><i class="fas fa-exclamation-triangle mr-1"></i>解答データが未設定です</p>

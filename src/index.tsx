@@ -36410,6 +36410,10 @@ app.post('/api/ai/generate-image', async (c) => {
       // 禁止指示をコンテキストの先頭に配置（最も目立つ位置）
       contextParts.unshift(`【絶対禁止】以下の単語・フレーズを図の中に文字として絶対に描かないでください。「？」や空欄に置き換えること: ${answerVariants.map(v => `「${v.substring(0, 40)}」`).join(', ')}`)
     }
+    // ★ ヒント図の約束（じっくりコースの例題図と同じ）: 学習カードの問題図では答え・変形過程を描かない
+    if (Number.isInteger(numericCardId) && numericCardId > 0) {
+      contextParts.unshift('【ヒント図の約束】\n- 答え・計算結果・比の値・まとめの式は図に書かない（「？」や空欄にする）\n- 選択肢に書かれた比や数値は図に写さない\n- 矢印（→）や×・+などの変形操作と、変形後の結果は描かない\n- 問題の条件（もとになる比・数量など）だけを示し、正解が分かる情報は入れない')
+    }
     // ユーザーが手動で指定したプロンプト（最優先）
     if (custom_prompt && custom_prompt.length > 1) {
       contextParts.push(`\n【ユーザー追加指示】\n${custom_prompt.substring(0, 500)}`)
