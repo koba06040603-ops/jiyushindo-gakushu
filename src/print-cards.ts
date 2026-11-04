@@ -196,12 +196,14 @@ export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOption
           </div>
           ${exampleBlock}
           ${passageBlock}
+          <div class="p-main">
           <div class="p-problem">${escMultiline(problem)}</div>
           ${figureTools}
           ${figureHTML(card.problem_image_url)}
           ${tactileBlock}
           <div class="p-answer-box" style="min-height:${answerBoxHeight(answer)}">
             <div class="p-answer-label">じぶんの こたえ</div>
+          </div>
           </div>
           ${frontAnswerInline}
         </div>
@@ -687,7 +689,10 @@ export function wrapPrintDocument(
     .p-toolbar { display: none !important; }
     .no-print { display: none !important; }
     .p-card { page-break-inside: avoid; break-inside: avoid; margin-bottom: 0; }
+    /* 表（問題・図・解答欄）は1ページの中に収める。表と裏の境界（.p-back の改ページ）だけで分ける */
     .p-card.p-two { page-break-inside: auto; break-inside: auto; }
+    .p-front { page-break-inside: avoid; break-inside: avoid; }
+    .p-main { page-break-inside: avoid; break-inside: avoid; }
     .p-back { break-before: page; page-break-before: always; border-top: none; margin-top: 0; padding-top: 0; }
     .p-back-label { margin-bottom: 1mm; }
     .p-hc-hint { page-break-inside: avoid; break-inside: avoid; }
