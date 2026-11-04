@@ -581,14 +581,14 @@ export function wrapPrintDocument(
   .p-passage-body { line-height: 2.0; }
 
   /* 問題文は紙で目立つように、大きく・太く・枠で囲む */
-  .p-problem { font-size: 14pt; font-weight: 700; line-height: 1.6; border: 2px solid var(--ink); border-radius: 2mm; padding: 2.5mm 3.5mm; margin: 2mm 0 3mm; }
+  .p-problem { font-size: 13pt; font-weight: 700; line-height: 1.55; border: 2px solid var(--ink); border-radius: 2mm; padding: 2mm 3.5mm; margin: 2mm 0 2.5mm; }
 
   .p-figure { margin: 3mm 0; text-align:center; }
   .p-figure img { max-width: 100%; height: auto; }
   /* 紙の最上部のコース名（どのコースの紙か分かるように。各カードの1ページ目に入る） */
   .p-course-label { font-size: 9.5pt; font-weight: 700; color:#222; border-bottom: 1.5px solid var(--ink); padding: 0 0 1mm; margin-bottom: 2.5mm; }
   /* 例題の図は1枚が1面に収まる大きさに抑える（大きすぎると表が2ページにまたがる） */
-  .p-example .p-figure img { max-height: 40mm; width: auto; }
+  .p-example .p-figure img { max-height: 34mm; width: auto; }
   .p-tactile { margin: 2mm 0 3mm; }
   .p-tactile-text { font-size: 10pt; margin-bottom: 1.5mm; }
   .p-tactile-fig img { max-height: 55mm; width: auto; }
