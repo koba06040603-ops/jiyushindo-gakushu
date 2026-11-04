@@ -15979,6 +15979,44 @@ async function groupPlaySong(btn, encodedLyrics) {
 }
 window.groupPlaySong = groupPlaySong
 
+// 例題の図を D1 に直接保存できるサイズ（約700KB以下）まで縮小する。
+// 750KB を超えると R2 に入り、/api/media/... は認証が必要で <img> に表示できないため。
+async function shrinkImageDataUrlForSave(dataUrl) {
+  const maxChars = 700 * 1024
+  try {
+    if (!dataUrl || !/^data:image\/(png|jpeg|jpg|webp);base64,/.test(dataUrl)) return dataUrl
+    if (dataUrl.length <= maxChars) return dataUrl
+    const img = await new Promise((resolve, reject) => {
+      const im = new Image()
+      im.onload = () => resolve(im)
+      im.onerror = () => reject(new Error('画像を読み込めませんでした'))
+      im.src = dataUrl
+    })
+    if (!img.naturalWidth || !img.naturalHeight) return dataUrl
+    let scale = 1
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const w = Math.max(1, Math.round(img.naturalWidth * scale))
+      const h = Math.max(1, Math.round(img.naturalHeight * scale))
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')
+      ctx.fillStyle = '#fff'
+      ctx.fillRect(0, 0, w, h)
+      ctx.drawImage(img, 0, 0, w, h)
+      for (const q of [0.85, 0.7, 0.55]) {
+        const out = canvas.toDataURL('image/jpeg', q)
+        if (out.length <= maxChars) return out
+      }
+      scale *= 0.8
+    }
+    throw new Error('画像を十分に小さくできませんでした')
+  } catch (e) {
+    console.error('例題の図の縮小に失敗:', e)
+    return dataUrl
+  }
+}
+
 // ★ 例題の図解をAI生成（app.js側）
 async function generateExampleDiagramApp(cardId, cardTitle, exampleProblem, exampleSolution) {
   const area = document.getElementById('example-diagram-card-' + cardId)
@@ -16011,16 +16049,17 @@ async function generateExampleDiagramApp(cardId, cardTitle, exampleProblem, exam
     })
     const d = res.data
     if (d.success && d.image_url) {
+      const imgUrl = await shrinkImageDataUrlForSave(d.image_url)
       // 例題画像をカードに保存
       try {
-        const saveRes = await axios.put('/api/card/' + cardId, { example_image_url: d.image_url })
+        const saveRes = await axios.put('/api/card/' + cardId, { example_image_url: imgUrl })
         if (!saveRes.data || saveRes.data.success === false) throw new Error(saveRes.data?.error || '保存に失敗しました')
       } catch (saveErr) {
         console.error('例題の図の保存に失敗:', saveErr)
         alert('例題の図は生成できましたが、保存に失敗しました（カードを移動すると消えます）。もう一度お試しください。\n' + (saveErr.response?.data?.error || saveErr.message))
       }
       area.innerHTML = '<div class="text-center mt-2" id="example-img-wrapper-' + cardId + '">' +
-        '<img src="' + d.image_url + '" alt="例題の図" onclick="window._expandSongImage && window._expandSongImage(this.src)" class="w-full max-w-[600px] h-auto rounded-2xl border-3 border-purple-200 shadow-lg mx-auto cursor-pointer hover:scale-[1.02] transition-transform">' +
+        '<img src="' + imgUrl + '" alt="例題の図" onclick="window._expandSongImage && window._expandSongImage(this.src)" class="w-full max-w-[600px] h-auto rounded-2xl border-3 border-purple-200 shadow-lg mx-auto cursor-pointer hover:scale-[1.02] transition-transform">' +
         '<div class="flex justify-center items-center gap-2 mt-1 flex-wrap">' +
         '<span class="text-[10px] text-gray-400">' + (d.model || 'AI') + ' / ' + Math.round((d.generation_time_ms || 0) / 1000) + '秒</span>' +
         '<button onclick="generateExampleDiagramApp(\'' + cardId + '\',\'' + cardTitle.replace(/'/g, '') + '\',\'' + exampleProblem.replace(/'/g, '').substring(0, 80) + '\',\'' + (exampleSolution || '').replace(/'/g, '').substring(0, 80) + '\')" class="text-[10px] text-yellow-600 underline">🖼 再生成</button>' +
@@ -16094,8 +16133,9 @@ async function executeEditExampleDiagram(cardId) {
     })
     const d = res.data
     if (d.success && d.image_url) {
+      const imgUrl = await shrinkImageDataUrlForSave(d.image_url)
       try {
-        const saveRes = await axios.put('/api/card/' + cardId, { example_image_url: d.image_url })
+        const saveRes = await axios.put('/api/card/' + cardId, { example_image_url: imgUrl })
         if (!saveRes.data || saveRes.data.success === false) throw new Error(saveRes.data?.error || '保存に失敗しました')
       } catch (saveErr) {
         console.error('例題の図の保存に失敗:', saveErr)
@@ -16107,7 +16147,7 @@ async function executeEditExampleDiagram(cardId) {
       const ep = (cd.example_problem || '').replace(/'/g, '').substring(0, 80)
       const es = (cd.example_solution || '').replace(/'/g, '').substring(0, 80)
       area.innerHTML = '<div class="text-center mt-2" id="example-img-wrapper-' + cardId + '">' +
-        '<img src="' + d.image_url + '" alt="例題の図" onclick="window._expandSongImage && window._expandSongImage(this.src)" class="w-full max-w-[600px] h-auto rounded-2xl border-3 border-purple-200 shadow-lg mx-auto cursor-pointer hover:scale-[1.02] transition-transform">' +
+        '<img src="' + imgUrl + '" alt="例題の図" onclick="window._expandSongImage && window._expandSongImage(this.src)" class="w-full max-w-[600px] h-auto rounded-2xl border-3 border-purple-200 shadow-lg mx-auto cursor-pointer hover:scale-[1.02] transition-transform">' +
         '<div class="flex justify-center items-center gap-2 mt-1 flex-wrap">' +
         '<span class="text-[10px] text-gray-400">' + (d.model || 'AI') + ' / ' + Math.round((d.generation_time_ms || 0) / 1000) + '秒</span>' +
         '<button onclick="generateExampleDiagramApp(\'' + cardId + '\',\'' + ct + '\',\'' + ep + '\',\'' + es + '\')" class="text-[10px] text-yellow-600 underline">🖼 再生成</button>' +
