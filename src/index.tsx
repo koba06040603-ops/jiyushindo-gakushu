@@ -2037,6 +2037,11 @@ app.use('/api/*', async (c, next) => {
   if (c.req.method === 'GET' && /^\/api\/card\/\d+\/tactile-image$/.test(path)) {
     return next()
   }
+
+  // 問題図（R2）の配信も <img> から直接読むため GET のみ認証を外す。images/ と videos/ に限定し、backups/ は認証必須のまま。
+  if (c.req.method === 'GET' && /^\/api\/media\/(images|videos)\/[^?]+$/.test(path) && !path.includes('..')) {
+    return next()
+  }
   
   // ホワイトリストに含まれるパスは認証スキップ
   for (const publicPath of PUBLIC_API_PATHS) {

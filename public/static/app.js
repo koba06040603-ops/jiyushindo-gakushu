@@ -8857,7 +8857,7 @@ async function generateImageForCardAsImage(cardId, description) {
     }
   } catch (err) {
     if (placeholder) {
-      placeholder.innerHTML = `<div class="p-4 text-center text-red-600"><i class="fas fa-exclamation-triangle mr-1"></i>画像生成に失敗: ${err.message || 'エラー'}<br><button onclick="generateImageForCard(${cardId})" class="mt-2 text-sm text-blue-500 underline">HTML図解で再試行</button></div>`
+      placeholder.innerHTML = `<div class="p-4 text-center text-red-600"><i class="fas fa-exclamation-triangle mr-1"></i>画像生成に失敗: ${escapeHtmlSafe(err.response?.data?.error || err.message || 'エラー')}<br><button onclick="generateImageForCard(${cardId})" class="mt-2 text-sm text-blue-500 underline">HTML図解で再試行</button></div>`
     }
   }
 }
@@ -8923,7 +8923,7 @@ async function generateImageForCardNBPro(cardId, description) {
     }
   } catch (err) {
     if (placeholder) {
-      placeholder.innerHTML = `<div class="p-4 text-center text-red-600"><i class="fas fa-exclamation-triangle mr-1"></i>高精度画像生成に失敗: ${err.message || 'エラー'}<br>
+      placeholder.innerHTML = `<div class="p-4 text-center text-red-600"><i class="fas fa-exclamation-triangle mr-1"></i>高精度画像生成に失敗: ${escapeHtmlSafe(err.response?.data?.error || err.message || 'エラー')}<br>
         <button onclick="generateImageForCard(${cardId})" class="mt-2 text-sm text-blue-500 underline">グラフ・図解で再試行</button>
         <button onclick="generateImageForCardAsImage(${cardId}, '')" class="mt-2 ml-2 text-sm text-purple-500 underline">通常AI画像で試す</button></div>`
     }
