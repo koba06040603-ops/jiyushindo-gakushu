@@ -751,12 +751,10 @@ export function wrapPrintDocument(
     .p-passage, .p-figure, .p-hints, .p-answer-box, .p-example {
       page-break-inside: avoid; break-inside: avoid;
     }
-    /* 裏面は1枚の紙に収める。図・制作タイム・解答欄の余白を詰め、解答欄だけが次ページに溢れないようにする（カード5・6・9・10で発生していた） */
-    .p-back .p-figure { margin: 1.5mm 0; }
+    /* 問題図（表面の問題の図）は高さを抑え、問題・制作タイム・解答欄が1ページに収まるようにする。
+       図が高すぎると（約129mm）解答欄が次ページに溢れ、解答欄だけの空白ページが出ていた */
+    .p-main > .p-figure img { max-height: 90mm; width: auto; }
     .p-back .p-figure img { max-height: 50mm; width: auto; }
-    .p-back .p-problem { margin: 1.5mm 0 2mm; }
-    .p-back .p-task { margin: 0 0 2mm; padding: 2mm 2.5mm; }
-    .p-back .p-answer-box { margin: 2mm 0 0; padding: 2mm 3mm; }
     h1,h2 { page-break-after: avoid; break-after: avoid; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
