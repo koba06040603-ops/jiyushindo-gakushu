@@ -7235,15 +7235,15 @@ async function loadCardPage(cardId) {
                       <img src="${card.example_image_url}" alt="例題の図" onclick="window._expandSongImage && window._expandSongImage(this.src)" class="w-full max-w-[600px] h-auto rounded-2xl border-3 border-purple-200 shadow-lg mx-auto cursor-pointer hover:scale-[1.02] transition-transform">
                       <div class="flex justify-center items-center gap-2 mt-1 flex-wrap">
                         <span class="text-[10px] text-gray-400">例題の図</span>
-                        <button onclick="generateExampleDiagramApp('${(card.card_id || card.id || 0)}', '${(card.card_title||'').replace(/'/g,'')}', '${(card.example_problem||'').replace(/'/g,'').substring(0,100)}', '${(card.example_solution||'').replace(/'/g,'').substring(0,100)}')" class="text-[10px] text-yellow-600 underline">🖼 再生成</button>
-                        <button onclick="editExampleDiagramPrompt('${(card.card_id || card.id || 0)}', '${(card.card_title||'').replace(/'/g,'')}', '${(card.example_problem||'').replace(/'/g,'').substring(0,100)}', '${(card.example_solution||'').replace(/'/g,'').substring(0,100)}')" class="text-[10px] text-blue-600 underline">✏️ プロンプト修正</button>
+                        <button onclick="generateExampleDiagramApp('${(card.card_id || card.id || 0)}', '${(card.card_title||'').replace(/[\x27\\\r\n"]/g, '')}', '${(card.example_problem||'').replace(/[\x27\\\r\n"]/g, '').substring(0,100)}', '${(card.example_solution||'').replace(/[\x27\\\r\n"]/g, '').substring(0,100)}')" class="text-[10px] text-yellow-600 underline">🖼 再生成</button>
+                        <button onclick="editExampleDiagramPrompt('${(card.card_id || card.id || 0)}', '${(card.card_title||'').replace(/[\x27\\\r\n"]/g, '')}', '${(card.example_problem||'').replace(/[\x27\\\r\n"]/g, '').substring(0,100)}', '${(card.example_solution||'').replace(/[\x27\\\r\n"]/g, '').substring(0,100)}')" class="text-[10px] text-blue-600 underline">✏️ プロンプト修正</button>
                         <button onclick="hideExampleDiagram('${card.card_id || card.id || 0}')" class="text-[10px] text-gray-400 underline">✕ 非表示</button>
                       </div>
                     </div>` : `
                     <div class="flex items-center gap-2 mt-2 p-2 bg-yellow-100 rounded-lg">
                       <i class="fas fa-image text-yellow-600"></i>
                       <span class="text-xs text-yellow-800 font-bold">この例題は図があるとわかりやすい</span>
-                      <button onclick="generateExampleDiagramApp('${(card.card_id || card.id || 0)}', '${(card.card_title||'').replace(/'/g,'')}', '${(card.example_problem||'').replace(/'/g,'').substring(0,100)}', '${(card.example_solution||'').replace(/'/g,'').substring(0,100)}')" class="ml-auto bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-3 py-1 rounded-lg text-xs font-bold shadow hover:shadow-md transition">
+                      <button onclick="generateExampleDiagramApp('${(card.card_id || card.id || 0)}', '${(card.card_title||'').replace(/[\x27\\\r\n"]/g, '')}', '${(card.example_problem||'').replace(/[\x27\\\r\n"]/g, '').substring(0,100)}', '${(card.example_solution||'').replace(/[\x27\\\r\n"]/g, '').substring(0,100)}')" class="ml-auto bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-3 py-1 rounded-lg text-xs font-bold shadow hover:shadow-md transition">
                         <i class="fas fa-wand-magic-sparkles mr-1"></i>AIに図をかいてもらう
                       </button>
                     </div>`}
@@ -16034,7 +16034,7 @@ async function generateExampleDiagramApp(cardId, cardTitle, exampleProblem, exam
     
     const prompt = '日本の小学校の教科書に載る例題の図解を描いてください。\n' +
       '【カード】' + cardTitle + '\n' +
-      '【例題】' + exampleProblem + '\n' +
+      '【例題】' + ((cd.example_problem || exampleProblem || '')) + '\n' +
       '★★★重要ルール★★★\n' +
       '- 答え・解答・正解の文字を図の中に絶対に書かないこと\n' +
       '- 答えの数値や単語を図に表示せず、代わりに「？」や空欄にする\n' +
@@ -16064,12 +16064,12 @@ async function generateExampleDiagramApp(cardId, cardTitle, exampleProblem, exam
         '<img src="' + imgUrl + '" alt="例題の図" onclick="window._expandSongImage && window._expandSongImage(this.src)" class="w-full max-w-[600px] h-auto rounded-2xl border-3 border-purple-200 shadow-lg mx-auto cursor-pointer hover:scale-[1.02] transition-transform">' +
         '<div class="flex justify-center items-center gap-2 mt-1 flex-wrap">' +
         '<span class="text-[10px] text-gray-400">' + (d.model || 'AI') + ' / ' + Math.round((d.generation_time_ms || 0) / 1000) + '秒</span>' +
-        '<button onclick="generateExampleDiagramApp(\'' + cardId + '\',\'' + cardTitle.replace(/'/g, '') + '\',\'' + exampleProblem.replace(/'/g, '').substring(0, 80) + '\',\'' + (exampleSolution || '').replace(/'/g, '').substring(0, 80) + '\')" class="text-[10px] text-yellow-600 underline">🖼 再生成</button>' +
-        '<button onclick="editExampleDiagramPrompt(\'' + cardId + '\',\'' + cardTitle.replace(/'/g, '') + '\',\'' + exampleProblem.replace(/'/g, '').substring(0, 80) + '\',\'' + (exampleSolution || '').replace(/'/g, '').substring(0, 80) + '\')" class="text-[10px] text-blue-600 underline">✏️ プロンプト修正</button>' +
+        '<button onclick="generateExampleDiagramApp(\'' + cardId + '\',\'' + cardTitle.replace(/[\x27\\\r\n"]/g, '') + '\',\'' + exampleProblem.replace(/[\x27\\\r\n"]/g, '').substring(0, 80) + '\',\'' + (exampleSolution || '').replace(/[\x27\\\r\n"]/g, '').substring(0, 80) + '\')" class="text-[10px] text-yellow-600 underline">🖼 再生成</button>' +
+        '<button onclick="editExampleDiagramPrompt(\'' + cardId + '\',\'' + cardTitle.replace(/[\x27\\\r\n"]/g, '') + '\',\'' + exampleProblem.replace(/[\x27\\\r\n"]/g, '').substring(0, 80) + '\',\'' + (exampleSolution || '').replace(/[\x27\\\r\n"]/g, '').substring(0, 80) + '\')" class="text-[10px] text-blue-600 underline">✏️ プロンプト修正</button>' +
         '<button onclick="hideExampleDiagram(\'' + cardId + '\')" class="text-[10px] text-gray-400 underline">✕ 非表示</button>' +
         '</div></div>'
     } else {
-      area.innerHTML = '<p class="text-xs text-red-500 mt-1">図の生成に失敗 <button onclick="generateExampleDiagramApp(\'' + cardId + '\',\'' + cardTitle.replace(/'/g, '') + '\',\'' + exampleProblem.replace(/'/g, '').substring(0, 80) + '\',\'' + (exampleSolution || '').replace(/'/g, '').substring(0, 80) + '\')" class="text-yellow-600 underline">再試行</button></p>'
+      area.innerHTML = '<p class="text-xs text-red-500 mt-1">図の生成に失敗 <button onclick="generateExampleDiagramApp(\'' + cardId + '\',\'' + cardTitle.replace(/[\x27\\\r\n"]/g, '') + '\',\'' + exampleProblem.replace(/[\x27\\\r\n"]/g, '').substring(0, 80) + '\',\'' + (exampleSolution || '').replace(/[\x27\\\r\n"]/g, '').substring(0, 80) + '\')" class="text-yellow-600 underline">再試行</button></p>'
     }
   } catch (e) {
     area.innerHTML = '<p class="text-xs text-red-500 mt-1">通信エラー: ' + e.message + '</p>'
@@ -16146,8 +16146,8 @@ async function executeEditExampleDiagram(cardId) {
       const rawCd = window.currentCardData || {}
       const cd = rawCd.card || rawCd || {}
       const ct = (cd.card_title || '').replace(/'/g, '')
-      const ep = (cd.example_problem || '').replace(/'/g, '').substring(0, 80)
-      const es = (cd.example_solution || '').replace(/'/g, '').substring(0, 80)
+      const ep = (cd.example_problem || '').replace(/[\x27\\\r\n"]/g, '').substring(0, 80)
+      const es = (cd.example_solution || '').replace(/[\x27\\\r\n"]/g, '').substring(0, 80)
       area.innerHTML = '<div class="text-center mt-2" id="example-img-wrapper-' + cardId + '">' +
         '<img src="' + imgUrl + '" alt="例題の図" onclick="window._expandSongImage && window._expandSongImage(this.src)" class="w-full max-w-[600px] h-auto rounded-2xl border-3 border-purple-200 shadow-lg mx-auto cursor-pointer hover:scale-[1.02] transition-transform">' +
         '<div class="flex justify-center items-center gap-2 mt-1 flex-wrap">' +
