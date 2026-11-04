@@ -16038,7 +16038,9 @@ async function generateExampleDiagramApp(cardId, cardTitle, exampleProblem, exam
       '★★★重要ルール★★★\n' +
       '- 答え・解答・正解の文字を図の中に絶対に書かないこと\n' +
       '- 答えの数値や単語を図に表示せず、代わりに「？」や空欄にする\n' +
-      (forbiddenWords.length > 0 ? '- 以下の単語は禁止（図に表示不可）: ' + forbiddenWords.join(', ') + '\n' : '') +
+      '- 解き方の説明図にしないこと。計算の結果・比の値・分数の答え・まとめの式（例: 2÷7＝2/7）は一切書かない\n' +
+      '- 問いの答えになる数・記号・分数は図のどこにも書かず、「？」の枠にする\n' +
+      (forbiddenWords.length > 0 ? '- 以下の単語・数字は図に絶対に書かない（禁止）: ' + forbiddenWords.join(', ') + '\n' : '') +
       '条件：教科書のイラスト風。児童にわかりやすい色使い。文字は大きく日本語で。幾何の図形は正確に描く。ラベル（頂点名ABCD等）を明確に。白い背景。'
     const res = await axios.post('/api/ai/generate-image', {
       prompt: prompt,
