@@ -748,6 +748,9 @@ export function wrapPrintDocument(
     .p-card.p-break::after { display: none; }
     .p-card:last-child, .p-answersheet { page-break-after: auto; break-after: auto; }
     .p-answersheet { page-break-before: always; break-before: page; }
+    /* 解答は1件ずつ（見出し・こたえ・解説を一まとまりに）。ページをまたいで分かれないようにする */
+    .p-ans-row { page-break-inside: avoid; break-inside: avoid; }
+    .p-ans-head, .p-ans-val { page-break-after: avoid; break-after: avoid; }
     .p-passage, .p-figure, .p-hints, .p-answer-box, .p-example {
       page-break-inside: avoid; break-inside: avoid;
     }
