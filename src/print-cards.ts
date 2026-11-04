@@ -74,8 +74,19 @@ function pickAnswer(card: PrintCardRow): string {
   return String(card.answer || card.correct_answer || '')
 }
 
+/** 解説（理由）の部分。「【制作タイム】」より前。解答別紙・裏面に出す */
 function pickExplanation(card: PrintCardRow): string {
-  return String(card.answer_explanation || card.explanation || '')
+  const raw = String(card.answer_explanation || card.explanation || '')
+  const i = raw.indexOf('【制作タイム】')
+  return (i >= 0 ? raw.slice(0, i) : raw).trim()
+}
+
+/** 制作タイム（「【制作タイム】」より後）。表面の「制作タイム」欄に出す */
+function pickTask(card: PrintCardRow): string {
+  const raw = String(card.answer_explanation || '')
+  const mark = '【制作タイム】'
+  const i = raw.indexOf(mark)
+  return i >= 0 ? raw.slice(i + mark.length).trim() : ''
 }
 
 /** 図（SVGのdata URL または 画像URL）を紙面用に出す */
@@ -195,6 +206,15 @@ export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOption
     const backInner = sides === 2 ? answerInline : ''
     const hasBack = backInner.trim() !== ''
 
+    // 制作タイム欄（表面・解答欄の直前）。何をどれくらいの時間でするかを児童に促す
+    const taskText = pickTask(card)
+    const taskBlock = taskText
+      ? `<div class="p-task">
+           <div class="p-task-label">制作タイム</div>
+           <div class="p-task-body">${escMultiline(taskText)}</div>
+         </div>`
+      : ''
+
     return `
       <section class="p-card${onePerPage ? ' p-break' : ''}${hasBack ? ' p-two' : ''}" data-card-id="${cardId ?? ''}">
         <div class="p-front">
@@ -211,6 +231,7 @@ export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOption
           ${figureTools}
           ${figureHTML(card.problem_image_url)}
           ${tactileBlock}
+          ${taskBlock}
           <div class="p-answer-box" style="min-height:${answerBoxHeight(answer)}">
             <div class="p-answer-label">じぶんの こたえ</div>
           </div>
@@ -373,7 +394,7 @@ function textEditorScript(): string {
     '.p-ans-head,.p-ans-val,.p-ans-expl,.p-check-note,.p-opt-title,.p-answer-key,.p-part-title,' +
     '.p-guide-unit,.p-guide-meta,.p-guide-body,.p-guide-box-title,.p-guide-course-name,' +
     '.p-guide-course-label,.p-guide-selection-title,.p-guide-selection-body,.p-guide-heading,' +
-    '.p-hc-problem,.p-hc-label,.p-hc-text,.p-hc-empty';
+    '.p-hc-problem,.p-hc-label,.p-hc-text,.p-hc-empty,.p-task-body';
   window.pTogglePrintEdit = function(btn){
     var on = btn.getAttribute('data-on') !== '1';
     var els = document.querySelectorAll(SEL);
@@ -601,6 +622,11 @@ export function wrapPrintDocument(
   /* 解答欄（紙の主役） */
   .p-answer-box { border: 1.5px solid var(--ink); padding: 3mm; margin: 4mm 0; position: relative; }
   .p-answer-label { font-size: 8.5pt; color:#555; }
+
+  /* 制作タイム欄（表面）: 作る手順と時間の目安を促す */
+  .p-task { border: 1.5px dashed var(--ink); padding: 2.5mm 3mm; margin: 0 0 3mm; background: var(--soft); }
+  .p-task-label { font-size: 9.5pt; font-weight: 700; margin-bottom: 1mm; }
+  .p-task-body { font-size: 11pt; line-height: 1.6; }
 
   /* ヒント */
   .p-hints { border: 1px dashed var(--line); padding: 3mm; margin-top: 3mm; font-size: 10pt; }
