@@ -63,7 +63,7 @@ import { AdaptiveLearningEngine } from './adaptive-learning'
 import { SchoolManagementSystem } from './school-management'
 import { AIContentGenerator } from './ai-content-generator'
 import { buildQualityRules, buildQualityChecklist, buildReviseCardsPrompt } from './quality-rules'
-import { renderCardsPrintPage, renderCardsBodyForPrint, renderCheckTestForPrint, renderOptionalForPrint, renderGuideForPrint, wrapPrintDocument, renderHintCardsPage } from './print-cards'
+import { renderCardsPrintPage, renderCardsBodyForPrint, renderCheckTestForPrint, renderOptionalForPrint, renderGuideForPrint, wrapPrintDocument, renderHintCardsPage, GUIDE_COURSE_BLURB } from './print-cards'
 import { 
   addToMistakeNotebook, 
   getMistakeNotebook, 
@@ -16837,7 +16837,7 @@ app.get('/print/unit/:curriculumId', async (c) => {
       const selList: any[] = Array.isArray(meta.course_selection_problems) ? meta.course_selection_problems : []
       const guideCourses = ((courseRows.results || []) as any[]).map((co, i) => ({
         course_name: co.course_name,
-        course_label: co.course_label,
+        course_label: GUIDE_COURSE_BLURB[Number(co.id)] ?? co.course_label,
         description: co.description,
         selection_title: selList[i]?.problem_title || '',
         selection_content: selList[i]?.problem_content || selList[i]?.problem_description || '',

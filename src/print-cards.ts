@@ -877,6 +877,13 @@ function stripPictographs(s: any): string {
   return String(s ?? '').replace(/\p{Extended_Pictographic}\uFE0F?\s*/gu, '').trim()
 }
 
+/** 学習のてびきに出す、コース名の下の文章（図工 curriculum 12320 のみ。D1 の description / course_label は変更しない） */
+export const GUIDE_COURSE_BLURB: Record<number, string> = {
+  468: '見て形と手順をたしかめながら、ていねいに作りたい人向けです。',
+  469: '数値や比率、角度、重心を手がかりに形を決めたい人向けです。',
+  470: '観点を決めて形・色・台座を比べ、どう見せると思いが伝わるかを考えて作りたい人向けです。',
+}
+
 export interface GuideCourseRow {
   course_name?: string
   course_label?: string | null

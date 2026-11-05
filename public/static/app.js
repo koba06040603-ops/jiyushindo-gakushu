@@ -431,6 +431,13 @@
 })();
 
 // 生徒別のデモデータ定義
+// 学習のてびきに出す、コース名の下の文章（図工 curriculum 12320 のみ。D1 の description / course_label は変更しない）
+const GUIDE_COURSE_BLURB = {
+  468: '見て形と手順をたしかめながら、ていねいに作りたい人向けです。',
+  469: '数値や比率、角度、重心を手がかりに形を決めたい人向けです。',
+  470: '観点を決めて形・色・台座を比べ、どう見せると思いが伝わるかを考えて作りたい人向けです。',
+}
+
 const STUDENT_DEMO_DATA = {
   // 山田太郎（studentId: 3）
   3: {
@@ -4953,7 +4960,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                           ${index + 1}
                         </div>
                         <h4 class="text-xl font-bold text-gray-800">${course.course_name}</h4>
-                        <p class="text-sm text-gray-600 font-medium">${course.course_label || course.description}</p>
+                        <p class="text-sm text-gray-600 font-medium">${GUIDE_COURSE_BLURB[course.id] || course.course_label || course.description}</p>
                       </div>
                       
                       <!-- コース選択問題 -->
@@ -6137,7 +6144,7 @@ async function showIntegratedPrintPreview(curriculumId) {
                       </div>
                       <h4 class="font-bold text-sm text-${colorClass}-900">${course.course_name}</h4>
                     </div>
-                    <p class="text-xs text-gray-800 mb-2 font-medium leading-snug">${course.description}</p>
+                    <p class="text-xs text-gray-800 mb-2 font-medium leading-snug">${GUIDE_COURSE_BLURB[course.id] || course.description}</p>
                     
                     ${problem ? `
                       <div class="bg-white rounded p-2 border-2 border-${colorClass}-300">
