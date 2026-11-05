@@ -177,16 +177,7 @@ export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOption
       : ''
 
     const cardId = (card as any).card_id ?? (card as any).id
-    // 「やってみよう」: 保存済みイラストがあるカードだけ、画面と同じ文・同じ画像を紙にも出す
-    const tactileImg = card.tactile_image_url || ''
-    const tactileText = pickTactileText(card)
-    const tactileBlock = tactileImg
-      ? `<div class="p-tactile">
-           <div class="p-label">やってみよう</div>
-           ${tactileText ? `<div class="p-tactile-text">${escMultiline(tactileText)}</div>` : ''}
-           <div class="p-figure p-tactile-fig"><img src="${esc(tactileImg)}" alt=""></div>
-         </div>`
-      : ''
+    // 「やってみよう」は紙に出さない（3コース共通）
 
     const figureTools = (opts.editable && cardId)
       ? `<div class="p-edit-bar no-print">
@@ -230,7 +221,6 @@ export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOption
           <div class="p-problem">${escMultiline(problem)}</div>
           ${figureTools}
           ${figureHTML(card.problem_image_url)}
-          ${tactileBlock}
           ${taskBlock}
           <div class="p-answer-box" style="min-height:${answerBoxHeight(answer)}">
             <div class="p-answer-label">じぶんの こたえ</div>
@@ -609,7 +599,7 @@ export function wrapPrintDocument(
   /* 紙の最上部のコース名（どのコースの紙か分かるように。各カードの1ページ目に入る） */
   .p-course-label { font-size: 9.5pt; font-weight: 700; color:#222; border-bottom: 1.5px solid var(--ink); padding: 0 0 1mm; margin-bottom: 2.5mm; }
   /* 例題の図は1枚が1面に収まる大きさに抑える（大きすぎると表が2ページにまたがる） */
-  .p-example .p-figure img { max-height: 34mm; width: auto; }
+  .p-example .p-figure img { max-height: 40mm; width: auto; }
   .p-tactile { margin: 2mm 0 3mm; }
   .p-tactile-text { font-size: 10pt; margin-bottom: 1.5mm; }
   .p-tactile-fig img { max-height: 55mm; width: auto; }
@@ -756,7 +746,7 @@ export function wrapPrintDocument(
     }
     /* 問題図（表面の問題の図）は高さを抑え、問題・制作タイム・解答欄が1ページに収まるようにする。
        図が高すぎると（約129mm）解答欄が次ページに溢れ、解答欄だけの空白ページが出ていた */
-    .p-main > .p-figure img { max-height: 90mm; width: auto; }
+    .p-main > .p-figure img { max-height: 95mm; width: auto; }
     .p-back .p-figure img { max-height: 50mm; width: auto; }
     h1,h2 { page-break-after: avoid; break-after: avoid; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
