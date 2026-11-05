@@ -135,6 +135,8 @@ export interface PrintOptions {
   courseLabel?: string
   /** 1枚の紙の面数。1 = 表だけ（問題・図・解答欄）/ 2 = 表裏（裏にれい・ヒント）。既定 2 */
   sides?: 1 | 2
+  /** れい（例題）を詰めて1枚をA4 1枚に収める（例題図 25mm・例題文 9pt・問題図 85mm）。例→問題の順は変えない */
+  compactExample?: boolean
 }
 
 /** 学習カードの本体（カード列＋答えの別紙）だけを返す。枠（HTML/ヘッダー）は含まない */
@@ -207,7 +209,7 @@ export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOption
       : ''
 
     return `
-      <section class="p-card${onePerPage ? ' p-break' : ''}${hasBack ? ' p-two' : ''}" data-card-id="${cardId ?? ''}">
+      <section class="p-card${onePerPage ? ' p-break' : ''}${hasBack ? ' p-two' : ''}${opts.compactExample ? ' p-compact' : ''}" data-card-id="${cardId ?? ''}">
         <div class="p-front">
           ${opts.courseLabel ? `<div class="p-course-label">${esc(opts.courseLabel)}</div>` : ''}
           ${studentLineHTML()}
@@ -748,6 +750,10 @@ export function wrapPrintDocument(
        図が高すぎると（約129mm）解答欄が次ページに溢れ、解答欄だけの空白ページが出ていた */
     .p-main > .p-figure img { max-height: 95mm; width: auto; }
     .p-back .p-figure img { max-height: 50mm; width: auto; }
+    /* 例題を詰めるモード（コース468）。例→問題の順は保ったまま1枚をA4 1枚に収める */
+    .p-compact .p-example .p-figure img { max-height: 25mm; width: auto; }
+    .p-compact .p-example-q, .p-compact .p-example-s, .p-compact .p-example-a { font-size: 9pt; line-height: 1.35; }
+    .p-compact .p-main > .p-figure img { max-height: 85mm; width: auto; }
     h1,h2 { page-break-after: avoid; break-after: avoid; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
