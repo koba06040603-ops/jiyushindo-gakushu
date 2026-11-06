@@ -16781,6 +16781,8 @@ app.get('/print/course/:courseId', async (c) => {
     const first = rows[0] || {}
     // 例題の分量が多いコースは、例→問題の順を保ったまま例題を詰めて A4 1枚に収める（468 じっくり）
     const COMPACT_EXAMPLE_COURSE_IDS = ['468']
+    // 例題図を大きく、問題図を少し小さく（例→問題の順は維持、1枚A4 1枚）。469 しっかり
+    const BALANCED_FIGURE_COURSE_IDS = ['469']
     return c.html(renderCardsPrintPage(
       {
         unitName: course?.unit_name || first.unit_name || '学習カード',
@@ -16789,7 +16791,11 @@ app.get('/print/course/:courseId', async (c) => {
         courseName: course?.course_name || '',
       },
       cards,
-      { ...parsePrintOptions(c), compactExample: COMPACT_EXAMPLE_COURSE_IDS.includes(String(courseId)) }
+      {
+        ...parsePrintOptions(c),
+        compactExample: COMPACT_EXAMPLE_COURSE_IDS.includes(String(courseId)),
+        balancedFigures: BALANCED_FIGURE_COURSE_IDS.includes(String(courseId)),
+      }
     ))
   } catch (error: any) {
     console.error('印刷ページ生成エラー:', error)

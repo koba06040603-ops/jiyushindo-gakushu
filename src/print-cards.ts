@@ -751,9 +751,12 @@ export function wrapPrintDocument(
     .p-main > .p-figure img { max-height: 95mm; width: auto; }
     .p-back .p-figure img { max-height: 50mm; width: auto; }
     /* 例題を詰めるモード（コース468）。例→問題の順は保ったまま1枚をA4 1枚に収める */
-    .p-compact .p-example .p-figure img { max-height: 25mm; width: auto; }
+    .p-compact .p-example .p-figure img { max-height: 45mm; width: auto; }
     .p-compact .p-example-q, .p-compact .p-example-s, .p-compact .p-example-a { font-size: 9pt; line-height: 1.35; }
-    .p-compact .p-main > .p-figure img { max-height: 85mm; width: auto; }
+    .p-compact .p-main > .p-figure img { max-height: 72mm; width: auto; }
+    /* 例題図を大きく、問題図を少し小さく（469 しっかり）。例→問題の順は変えない */
+    .p-balanced .p-example .p-figure img { max-height: 45mm; width: auto; }
+    .p-balanced .p-main > .p-figure img { max-height: 80mm; width: auto; }
     h1,h2 { page-break-after: avoid; break-after: avoid; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
