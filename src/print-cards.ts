@@ -209,7 +209,7 @@ export function renderCardsBodyForPrint(cards: PrintCardRow[], opts: PrintOption
       : ''
 
     return `
-      <section class="p-card${onePerPage ? ' p-break' : ''}${hasBack ? ' p-two' : ''}${opts.compactExample ? ' p-compact' : ''}" data-card-id="${cardId ?? ''}">
+      <section class="p-card${onePerPage ? ' p-break' : ''}${hasBack ? ' p-two' : ''}${opts.compactExample ? ' p-compact' : ''}${opts.balancedFigures ? ' p-balanced' : ''}" data-card-id="${cardId ?? ''}">
         <div class="p-front">
           ${opts.courseLabel ? `<div class="p-course-label">${esc(opts.courseLabel)}</div>` : ''}
           ${studentLineHTML()}
