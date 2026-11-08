@@ -45480,7 +45480,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
    - 全部 "easy" は絶対に禁止。最低でも1枚は "hard" を含めること
 3. estimated_time_minutes はカードごとに5分〜15分で適切に変えること（全部同じにしない）
 4. 各カードに関連するYouTube動画・参考URL・画像があれば multimedia フィールドに含めること
-5. 【★視覚支援必須★】全カードの multimedia に image_description, audio_instruction, tactile_activity を必ず含めること
+5. 【★視覚支援必須★】全カードの multimedia に image_description, audio_instruction を必ず含めること（体験活動は作成しない）
    - 教科書を使わずカードだけで理解できるよう、教科書の挿絵以上に詳細な図解説明を記述
    - 分数→ピザ図・バー図の説明、正負の数→数直線の説明、図形→寸法付き図形の説明
    - 社会科→地図・写真・資料の説明、理科→実験器具・観察記録の図の説明
@@ -45525,8 +45525,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
         "youtube_url": "関連するYouTube動画のURL（NHK for School等の教育動画推奨。見つからない場合は空文字）",
         "youtube_title": "動画タイトル",
         "image_description": "【必須】この問題に必要な図解・イラストの詳細説明。教科書の挿絵以上に具体的に記述すること。例：『数直線上に-5から+5まで目盛りを付け、0を赤い三角で示し、-2と+3の位置に青と赤の丸印を付けた図』。分数なら円グラフやバー図の説明、図形なら寸法付き図の説明、社会科なら地図や写真の説明を含める",
-        "audio_instruction": "【必須】問題文の読み上げテキスト。問題の意図や取り組み方のガイドを児童目線で優しく説明する文を含める",
-        "tactile_activity": "【必須】手を使う具体的な体験活動の説明。算数：おはじき、ブロック、折り紙、数直線カード等。社会：地図に色を塗る、年表カード並べ等。理科：実験観察の手順等。国語：漢字の空書き、文カード並べ替え等。全教科で必ず1つ以上の具体的活動を提案する"
+        "audio_instruction": "【必須】問題文の読み上げテキスト。問題の意図や取り組み方のガイドを児童目線で優しく説明する文を含める"
       },
       "media_suggestions": {
         "needs_illustration": ${template.media_type === 'illustrated' || template.media_type === 'manipulative'},
@@ -45601,7 +45600,6 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
   - hints: 全カード必須。3段階のヒントをhint_level, hint_text, thinking_tool_suggestionの構造で記述すること
 ※ multimediaフィールドでは、教育動画を可能な限り提案すること。youtube_urlにはYouTube動画の実在URLのみを入力し、NHK for Schoolの場合はyoutube_titleに「NHK for School」と明記した上でyoutube_urlには https://www.youtube.com/results?search_query=NHK+for+School+{検索キーワード} 形式のYouTube検索URLを使用すること（NHKの直接URLは使用不可）
 ※ 【★最重要★】image_description は全カード必須。教科書を使わず学習カードだけで児童が個別学習できるレベルの詳細な図解説明を書くこと
-※ tactile_activity は全カード必須。具体物操作（おはじき、ブロック、折り紙、カード等）の活動を最低1つ提案すること
 ※ audio_instruction は全カード必須。問題文の読み上げと取り組み方のガイダンスを優しい言葉で記述すること
 ※ 【★★★ 多感覚AI提案必須 ★★★】multimedia_ai_content を全カードに含めること
   - short_music: 30秒覚え歌のプロンプトと歌詞（全カード recommended:true。概念を覚え歌にする）※歌詞内の改行は \\n で表現すること（生の改行文字は使わない）
