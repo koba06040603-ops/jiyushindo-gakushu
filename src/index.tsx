@@ -9270,24 +9270,24 @@ app.post('/api/environment/design/generate/:curriculumId', async (c) => {
     if (!apiKey) return c.json({ error: 'API key not configured' }, 500)
 
     const prompt = `あなたは小学校教師のための学習環境デザインの専門家です。
-以下の単元情報をもとに、6つの学習環境デザイン観点について具体的な活動を提案してください。
+以下の単元情報をもとに、子どもが手に取りたくなり、やってみたくなる6つの学習環境を提案してください。
 
 【単元情報】
 - 教科: ${curriculum.subject}
 - 学年: ${curriculum.grade}
 - 単元名: ${curriculum.unit_name}
 - 単元目標: ${curriculum.unit_goal || ''}
-${getMikataKangaekata(curriculum.subject) ? `\n【この教科の「見方・考え方」】\n${getMikataKangaekata(curriculum.subject)}\n→ 各活動提案にこの教科固有の「見方・考え方」を反映させてください。\n` : ''}
-【6つの観点】各観点について、この単元に合った具体的な活動を1〜2文で提案してください。
+${getMikataKangaekata(curriculum.subject) ? `\n【この教科の「見方・考え方」】\n${getMikataKangaekata(curriculum.subject)}\n→ 各環境の提案にこの教科固有の「見方・考え方」を反映させてください。\n` : ''}
+【6つの環境】各環境について、この単元に具体的に関係する操作を含めて提案してください。各値は、1行目に児童向け一文、2行目に「具体操作：」、3行目に「先生向け説明：」を改行で区切って書いてください。
 
 以下のJSON形式で回答してください:
 {
-  "expression_creative": "表現・クリエイティブ活動の具体的な提案",
-  "research_fieldwork": "調査・フィールドワーク活動の具体的な提案",
-  "critical_thinking": "多角的考察・クリティカルシンキング活動の具体的な提案",
-  "social_contribution": "社会貢献・デザイン思考活動の具体的な提案",
-  "metacognition_reflection": "メタ認知・振り返り活動の具体的な提案",
-  "question_generation": "問いの生成活動の具体的な提案"
+  "expression_creative": "1. 身近なところで見つけよう（生活の掲示）の提案",
+  "research_fieldwork": "2. さわって確かめよう（体感コーナー）の提案",
+  "critical_thinking": "3. 「なんだろう？」を置こう（問いの触媒コーナー）の提案",
+  "social_contribution": "4. 材料をえらぼう（素材・廃材ストック）の提案",
+  "metacognition_reflection": "5. あつめるとつながる（完成作品の集合・発展問題への入口）の提案",
+  "question_generation": "6. 失敗メニューを直そう（失敗作と注意の棚）の提案"
 }
 
 JSON配列ではなくオブジェクトのみ返してください。`

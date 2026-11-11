@@ -5193,60 +5193,60 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
             <div class="mb-6">
               <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-gray-300">
                 <i class="fas fa-palette mr-2 text-teal-600"></i>
-                学習環境デザイン（学びを深める6つの活動）
+                学習環境デザイン（学びの理解の深まりや意欲を高める6つの環境）
               </h3>
               <p class="text-center text-gray-600 mb-4 text-sm">
                 <i class="fas fa-seedling mr-1 text-green-500"></i>
-                授業の中で取り入れられる、子どもたちの学びを広げる活動のアイデアです。
+                学びの理解の深まりや意欲を高める、教室の環境のアイデアです。
               </p>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 ${environmentDesign.expression_creative ? `
                 <div class="border-2 border-pink-200 bg-gradient-to-br from-pink-50 to-white rounded-xl p-4 hover:shadow-lg transition">
                   <div class="flex items-center mb-2">
                     <div class="w-10 h-10 rounded-full bg-pink-500 text-white flex items-center justify-center text-lg mr-3">🎨</div>
-                    <h4 class="font-bold text-gray-800">表現・創作活動</h4>
+                    <h4 class="font-bold text-gray-800">1. 身近なところで見つけよう（生活の掲示）</h4>
                   </div>
-                  <p class="text-sm text-gray-700 leading-relaxed">${environmentDesign.expression_creative}</p>
+                  ${formatEnvironmentItem(environmentDesign.expression_creative)}
                 </div>` : ''}
                 ${environmentDesign.research_fieldwork ? `
                 <div class="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white rounded-xl p-4 hover:shadow-lg transition">
                   <div class="flex items-center mb-2">
                     <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center text-lg mr-3">🔍</div>
-                    <h4 class="font-bold text-gray-800">調査・フィールドワーク</h4>
+                    <h4 class="font-bold text-gray-800">2. さわって確かめよう（体感コーナー）</h4>
                   </div>
-                  <p class="text-sm text-gray-700 leading-relaxed">${environmentDesign.research_fieldwork}</p>
+                  ${formatEnvironmentItem(environmentDesign.research_fieldwork)}
                 </div>` : ''}
                 ${environmentDesign.critical_thinking ? `
                 <div class="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-white rounded-xl p-4 hover:shadow-lg transition">
                   <div class="flex items-center mb-2">
                     <div class="w-10 h-10 rounded-full bg-purple-500 text-white flex items-center justify-center text-lg mr-3">💡</div>
-                    <h4 class="font-bold text-gray-800">批判的思考・比較活動</h4>
+                    <h4 class="font-bold text-gray-800">3. 「なんだろう？」を置こう（問いの触媒コーナー）</h4>
                   </div>
-                  <p class="text-sm text-gray-700 leading-relaxed">${environmentDesign.critical_thinking}</p>
+                  ${formatEnvironmentItem(environmentDesign.critical_thinking)}
                 </div>` : ''}
                 ${environmentDesign.social_contribution ? `
                 <div class="border-2 border-green-200 bg-gradient-to-br from-green-50 to-white rounded-xl p-4 hover:shadow-lg transition">
                   <div class="flex items-center mb-2">
                     <div class="w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center text-lg mr-3">🤝</div>
-                    <h4 class="font-bold text-gray-800">社会貢献・地域連携</h4>
+                    <h4 class="font-bold text-gray-800">4. 材料をえらぼう（素材・廃材ストック）</h4>
                   </div>
-                  <p class="text-sm text-gray-700 leading-relaxed">${environmentDesign.social_contribution}</p>
+                  ${formatEnvironmentItem(environmentDesign.social_contribution)}
                 </div>` : ''}
                 ${environmentDesign.metacognition_reflection ? `
                 <div class="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-white rounded-xl p-4 hover:shadow-lg transition">
                   <div class="flex items-center mb-2">
                     <div class="w-10 h-10 rounded-full bg-yellow-500 text-white flex items-center justify-center text-lg mr-3">🪞</div>
-                    <h4 class="font-bold text-gray-800">メタ認知・振り返り</h4>
+                    <h4 class="font-bold text-gray-800">5. あつめるとつながる（完成作品の集合・発展問題への入口）</h4>
                   </div>
-                  <p class="text-sm text-gray-700 leading-relaxed">${environmentDesign.metacognition_reflection}</p>
+                  ${formatEnvironmentItem(environmentDesign.metacognition_reflection)}
                 </div>` : ''}
                 ${environmentDesign.question_generation ? `
                 <div class="border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-white rounded-xl p-4 hover:shadow-lg transition">
                   <div class="flex items-center mb-2">
                     <div class="w-10 h-10 rounded-full bg-orange-500 text-white flex items-center justify-center text-lg mr-3">❓</div>
-                    <h4 class="font-bold text-gray-800">問い生成・探究活動</h4>
+                    <h4 class="font-bold text-gray-800">6. 失敗メニューを直そう（失敗作と注意の棚）</h4>
                   </div>
-                  <p class="text-sm text-gray-700 leading-relaxed">${environmentDesign.question_generation}</p>
+                  ${formatEnvironmentItem(environmentDesign.question_generation)}
                 </div>` : ''}
               </div>
             </div>
@@ -20285,25 +20285,25 @@ async function loadEnvironmentDesignPage(curriculumId) {
         <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
           <p class="text-blue-800">
             <i class="fas fa-info-circle mr-2"></i>
-            <strong>学習環境デザイン</strong>とは、子どもたちの学びを深め、広げるための様々な活動です。
-            チェックを入れた活動が、学習のてびきや学習カードに反映されます。
+            <strong>学習環境デザイン</strong>とは、学びの理解の深まりや意欲を高めるための、教室の環境のデザインです。
+            チェックを入れた環境が、学習のてびきや学習カードに反映されます。
           </p>
         </div>
 
         <form id="envDesignForm">
           <!-- 6観点 -->
-          ${renderEnvironmentCategory('表現・クリエイティブ', 'expression_creative', design, 
-            '自分の考えを絵・図・作品で表現する活動')}
-          ${renderEnvironmentCategory('調査・フィールドワーク', 'research_fieldwork', design,
-            '身の回りや地域を調べる活動')}
-          ${renderEnvironmentCategory('多角的考察・クリティカルシンキング', 'critical_thinking', design,
-            '多面的に考え、批判的に検討する活動')}
-          ${renderEnvironmentCategory('社会貢献・デザイン思考', 'social_contribution', design,
-            '他者のために役立つものを考える活動')}
-          ${renderEnvironmentCategory('メタ認知・振り返り', 'metacognition_reflection', design,
-            '自分の学び方を振り返る活動')}
-          ${renderEnvironmentCategory('問いの生成', 'question_generation', design,
-            '次の学びへの問いを作る活動')}
+          ${renderEnvironmentCategory('1. 身近なところで見つけよう（生活の掲示）', 'expression_creative', design, 
+            '単元に関係するものを身近な場所で見つける環境')}
+          ${renderEnvironmentCategory('2. さわって確かめよう（体感コーナー）', 'research_fieldwork', design,
+            '実際に手で操作して確かめる環境')}
+          ${renderEnvironmentCategory('3. 「なんだろう？」を置こう（問いの触媒コーナー）', 'critical_thinking', design,
+            '問いを置き、予想してから確かめる環境')}
+          ${renderEnvironmentCategory('4. 材料をえらぼう（素材・廃材ストック）', 'social_contribution', design,
+            '学習に使う材料や道具を選べる環境')}
+          ${renderEnvironmentCategory('5. あつめるとつながる（完成作品の集合・発展問題への入口）', 'metacognition_reflection', design,
+            '完成作品を集め、次の問いへつなげる環境')}
+          ${renderEnvironmentCategory('6. 失敗メニューを直そう（失敗作と注意の棚）', 'question_generation', design,
+            '失敗例を見て、まちがいやすい点を直す環境')}
 
           <!-- 保存ボタン -->
           <div class="flex justify-end space-x-4 mt-8">
@@ -20333,6 +20333,16 @@ async function loadEnvironmentDesignPage(curriculumId) {
 }
 
 // 環境カテゴリーレンダリング
+// 1行目を太字の児童向け一文、2行目以降を具体操作・先生向け説明として表示
+function formatEnvironmentItem(text) {
+  if (!text) return ''
+  const lines = String(text).split('\n').map(s => s.trim()).filter(Boolean)
+  if (lines.length === 0) return ''
+  const [first, ...rest] = lines
+  return `<p class="text-sm font-bold text-gray-900 leading-relaxed mb-2">${first}</p>` +
+    rest.map(l => `<p class="text-sm text-gray-700 leading-relaxed">${l}</p>`).join('')
+}
+
 function renderEnvironmentCategory(title, key, design, description) {
   const enabled = design[`${key}_enabled`] || false
   const content = design[key] || ''
@@ -20349,7 +20359,7 @@ function renderEnvironmentCategory(title, key, design, description) {
           </label>
           <p class="text-sm text-gray-600 mt-1 mb-3">${description}</p>
           <textarea id="${key}" name="${key}" rows="3" 
-            placeholder="具体的な活動内容を記入してください（例：〇〇を作る、〇〇を調べる、など）"
+            placeholder="1行目に児童向け一文（太字で表示）、2行目以降に具体操作と先生向け説明を書いてください"
             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >${content}</textarea>
         </div>
