@@ -5166,6 +5166,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                           problem.difficulty_level === 'very_hard' ? '★★★★ とてもむずかしい' :
                           '★ かんたん'}
                       </span>
+                      ${canEditEnvironmentItems() ? `<button onclick="regenerateOptionalProblem(${curriculumId}, ${problem.problem_id})" class="bg-white border border-pink-400 text-pink-700 hover:bg-pink-50 px-3 py-1 rounded-full font-bold text-xs transition print:hidden"><i class="fas fa-redo mr-1"></i>この問題を再提案</button>` : ''}
                       <button onclick="openOptionalProblem(${JSON.stringify(problem).replace(/"/g, '&quot;')})"
                               class="bg-pink-500 hover:bg-pink-600 text-white px-3 py-1 rounded-full font-bold text-xs transition">
                         <i class="fas fa-play mr-1"></i>ちょうせんする
@@ -20357,7 +20358,7 @@ function envCardRefsText(it) {
 
 // 学習環境項目の作成・再提案は教師・管理者のみ（ログインユーザーの role で判定）
 function canEditEnvironmentItems() {
-  const role = state.auth && state.auth.user ? state.auth.user.role : ''
+  const role = (state.auth && state.auth.user && state.auth.user.role) || localStorage.getItem('user_role') || ''
   return role === 'teacher' || role === 'admin'
 }
 
@@ -20441,6 +20442,27 @@ async function regenerateEnvironmentItem(curriculumId, itemNo) {
   await loadGuidePage(curriculumId)
   window.scrollTo(0, y)
 }
+
+// えらべるもんだい（発展問題）を1問だけ再提案（教師・管理者のみ）
+async function regenerateOptionalProblem(curriculumId, problemId) {
+  if (!canEditEnvironmentItems()) return
+  if (!confirm('この発展問題を、学習カードをもとに作り直します。よろしいですか？')) return
+  const y = window.scrollY
+  try {
+    await axios.post(`/api/optional-problems/regenerate/${curriculumId}/${problemId}`, {}, { timeout: 120000 })
+  } catch (error) {
+    console.error('Error regenerating optional problem:', error)
+    alert('再提案に失敗しました。もう一度お試しください')
+    return
+  }
+  await loadGuidePage(curriculumId)
+  window.scrollTo(0, y)
+}
+
+// 画面の onclick から呼べるように公開
+window.generateEnvironmentItems = generateEnvironmentItems
+window.regenerateEnvironmentItem = regenerateEnvironmentItem
+window.regenerateOptionalProblem = regenerateOptionalProblem
 
 // 1行目を太字の児童向け一文、2行目以降を具体操作・先生向け説明として表示
 function formatEnvironmentItem(text) {

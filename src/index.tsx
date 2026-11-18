@@ -23857,6 +23857,92 @@ app.put('/api/optional-problem/:id', async (c) => {
   }
 })
 
+// APIルート：えらべるもんだい（発展問題）を1問だけ再提案（教師・管理者のみ。他の問題と題材が重ならないように指示）
+app.post('/api/optional-problems/regenerate/:curriculumId/:problemId', async (c) => {
+  const { env } = c
+  const authUser = c.get('user') as any
+  if (!authUser || !['teacher', 'admin'].includes(authUser.role)) {
+    return c.json({ error: '教師のみ実行できます', success: false }, 403)
+  }
+  const curriculumId = c.req.param('curriculumId')
+  const problemId = Number(c.req.param('problemId'))
+  try {
+    const all = await optSelectByCurriculum(env.DB, curriculumId)
+    const target = all.find((p: any) => Number(p.problem_id) === problemId)
+    if (!target) return c.json({ error: 'Problem not found' }, 404)
+    const others = all.filter((p: any) => Number(p.problem_id) !== problemId)
+    const otherTitles = others.map((o: any) => '- ' + (o.problem_title || '')).join('\n') || '（なし）'
+
+    const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculumId).first() as any
+    if (!curriculum) return c.json({ error: 'Curriculum not found' }, 404)
+    const apiKey = (env as any).GEMINI_API_KEY
+    if (!apiKey) return c.json({ error: 'API key not configured' }, 500)
+
+    const difficulty = target.difficulty_level || 'medium'
+    const cardLines = await loadEnvCardLinesForPrompt(env.DB, curriculum)
+    const prompt = [
+      'あなたは小学校教師のための算数の発展問題（えらべるもんだい）の作成者です。',
+      '自由進度学習で、子どもが「やってみたい！」と思える発展問題を、1問だけ作り直してください。',
+      '',
+      '【単元情報】',
+      '- 教科: ' + curriculum.subject,
+      '- 学年: ' + curriculum.grade,
+      '- 単元名: ' + curriculum.unit_name,
+      '- 単元目標: ' + (curriculum.unit_goal || ''),
+      '',
+      '【学習カード】',
+      cardLines || '（学習カードはありません。単元名から考えてください）',
+      '',
+      '【すでにある発展問題（これらとは題材・場面を変えてください）】',
+      otherTitles,
+      '',
+      '【難易度】' + difficulty + '（medium=ふつう, hard=むずかしい, very_hard=とてもむずかしい。この難易度に合わせる）',
+      '',
+      '【ルール】',
+      '- problem_title は中身がわかる魅力的な題名にする（「実生活問題」「考え方問題」などの分類名は禁止）',
+      '- problem_description は80字以上の具体的な数値・場面・ストーリーを含む問題文にし、答えが一つに決まる形にする',
+      '- 「〜を振り返ろう」「〜を探してみよう」だけの抽象的・メタ的な指示は禁止',
+      '- learning_meaning は、この問題で何ができるようになるかを一文で書く',
+      '',
+      '以下のJSON形式のみで、1問分のオブジェクトを回答してください:',
+      '{"problem_title":"","problem_description":"","learning_meaning":"","difficulty_level":"' + difficulty + '"}',
+    ].join('\n')
+
+    const it = await callEnvGemini(apiKey, prompt)
+    if (!it || !it.problem_title || !it.problem_description) {
+      return c.json({ error: 'generation failed' }, 500)
+    }
+    const desc = String(it.problem_description)
+    const meaning = String(it.learning_meaning || '')
+    // 本番は正規化カラム / ローカルは content にJSON集約（optUpdate と同じ両対応）
+    await optExec(
+      env.DB,
+      (s) => s.isProd
+        ? `UPDATE optional_problems
+           SET problem_title = ?, problem_description = ?, problem_content = ?, learning_meaning = ?
+           WHERE problem_id = ?`
+        : `UPDATE optional_problems
+           SET problem_title = ?, content = ?
+           WHERE problem_id = ?`,
+      (s) => s.isProd
+        ? [String(it.problem_title), desc, desc, meaning, problemId]
+        : [String(it.problem_title),
+           JSON.stringify({
+             problem_number: target.problem_number,
+             problem_description: desc,
+             problem_content: desc,
+             learning_meaning: meaning,
+             problem_type: 'optional',
+           }),
+           problemId]
+    )
+    return c.json({ success: true, problem_id: problemId })
+  } catch (error: any) {
+    console.error('Optional problem regeneration error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
 // APIルート：選択問題の新規追加
 app.post('/api/curriculum/:id/optional-problem', async (c) => {
   const { env } = c
