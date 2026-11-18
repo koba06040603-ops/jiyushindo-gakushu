@@ -20355,7 +20355,14 @@ function envCardRefsText(it) {
   return refs.map(r => escEnvItem(r.label)).join('、')
 }
 
+// 学習環境項目の作成・再提案は教師・管理者のみ（ログインユーザーの role で判定）
+function canEditEnvironmentItems() {
+  const role = state.auth && state.auth.user ? state.auth.user.role : ''
+  return role === 'teacher' || role === 'admin'
+}
+
 async function renderEnvironmentItemsSection(curriculumId) {
+  const canEdit = canEditEnvironmentItems()
   let items = []
   try {
     const r = await axios.get(`/api/environment/items/${curriculumId}`, { timeout: 30000 })
@@ -20365,7 +20372,7 @@ async function renderEnvironmentItemsSection(curriculumId) {
   }
 
   if (items.length === 0) {
-    if (!teacherMode) return ''
+    if (!canEdit) return ''
     return `
       <div class="mb-6 bg-white rounded-xl border-2 border-dashed border-gray-300 p-4 print:hidden">
         <p class="text-sm text-gray-600 mb-3">機能別の学習環境（7〜）は、まだ作成されていません。</p>
@@ -20376,7 +20383,7 @@ async function renderEnvironmentItemsSection(curriculumId) {
   }
 
   const cards = items.map(it => {
-    const regenButton = teacherMode
+    const regenButton = canEdit
       ? `<button onclick="regenerateEnvironmentItem(${curriculumId}, ${it.item_no})" class="mt-3 px-3 py-1 text-sm bg-white border border-teal-400 text-teal-700 rounded-lg hover:bg-teal-50 print:hidden">
            <i class="fas fa-redo mr-1"></i>この項目を再提案
          </button>`

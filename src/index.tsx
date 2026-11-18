@@ -9321,6 +9321,10 @@ app.get('/api/environment/items/:curriculumId', async (c) => {
 // APIルート：機能別の学習環境項目 一括AI生成（3機能 × 2項目）
 app.post('/api/environment/items/generate/:curriculumId', async (c) => {
   const { env } = c
+  const authUser = c.get('user') as any
+  if (!authUser || !['teacher', 'admin'].includes(authUser.role)) {
+    return c.json({ error: '教師のみ実行できます', success: false }, 403)
+  }
   const curriculumId = c.req.param('curriculumId')
   try {
     await ensureEnvironmentItemsTable(env.DB)
@@ -9388,6 +9392,10 @@ app.post('/api/environment/items/generate/:curriculumId', async (c) => {
 // APIルート：1項目だけ再提案（機能は元の項目と同じ。他の項目と重複しないように指示）
 app.post('/api/environment/items/regenerate/:curriculumId/:itemNo', async (c) => {
   const { env } = c
+  const authUser = c.get('user') as any
+  if (!authUser || !['teacher', 'admin'].includes(authUser.role)) {
+    return c.json({ error: '教師のみ実行できます', success: false }, 403)
+  }
   const curriculumId = c.req.param('curriculumId')
   const itemNo = Number(c.req.param('itemNo'))
   try {
