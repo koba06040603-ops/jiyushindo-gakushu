@@ -5208,6 +5208,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                     <h4 class="font-bold text-gray-800">1. 身近なところで見つけよう（生活の掲示）</h4>
                   </div>
                   ${formatEnvironmentItem(environmentDesign.expression_creative)}
+                  ${canEditEnvironmentItems() ? envDesignRegenButton(curriculumId, 'expression_creative') : ''}
                 </div>` : ''}
                 ${environmentDesign.research_fieldwork ? `
                 <div class="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white rounded-xl p-4 hover:shadow-lg transition">
@@ -5216,6 +5217,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                     <h4 class="font-bold text-gray-800">2. さわって確かめよう（体感コーナー）</h4>
                   </div>
                   ${formatEnvironmentItem(environmentDesign.research_fieldwork)}
+                  ${canEditEnvironmentItems() ? envDesignRegenButton(curriculumId, 'research_fieldwork') : ''}
                 </div>` : ''}
                 ${environmentDesign.critical_thinking ? `
                 <div class="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-white rounded-xl p-4 hover:shadow-lg transition">
@@ -5224,6 +5226,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                     <h4 class="font-bold text-gray-800">3. 「なんだろう？」を置こう（問いの触媒コーナー）</h4>
                   </div>
                   ${formatEnvironmentItem(environmentDesign.critical_thinking)}
+                  ${canEditEnvironmentItems() ? envDesignRegenButton(curriculumId, 'critical_thinking') : ''}
                 </div>` : ''}
                 ${environmentDesign.social_contribution ? `
                 <div class="border-2 border-green-200 bg-gradient-to-br from-green-50 to-white rounded-xl p-4 hover:shadow-lg transition">
@@ -5232,6 +5235,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                     <h4 class="font-bold text-gray-800">4. 材料をえらぼう（素材・廃材ストック）</h4>
                   </div>
                   ${formatEnvironmentItem(environmentDesign.social_contribution)}
+                  ${canEditEnvironmentItems() ? envDesignRegenButton(curriculumId, 'social_contribution') : ''}
                 </div>` : ''}
                 ${environmentDesign.metacognition_reflection ? `
                 <div class="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-white rounded-xl p-4 hover:shadow-lg transition">
@@ -5240,6 +5244,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                     <h4 class="font-bold text-gray-800">5. あつめるとつながる（完成作品の集合・発展問題への入口）</h4>
                   </div>
                   ${formatEnvironmentItem(environmentDesign.metacognition_reflection)}
+                  ${canEditEnvironmentItems() ? envDesignRegenButton(curriculumId, 'metacognition_reflection') : ''}
                 </div>` : ''}
                 ${environmentDesign.question_generation ? `
                 <div class="border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-white rounded-xl p-4 hover:shadow-lg transition">
@@ -5248,12 +5253,11 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                     <h4 class="font-bold text-gray-800">6. 失敗メニューを直そう（失敗作と注意の棚）</h4>
                   </div>
                   ${formatEnvironmentItem(environmentDesign.question_generation)}
+                  ${canEditEnvironmentItems() ? envDesignRegenButton(curriculumId, 'question_generation') : ''}
                 </div>` : ''}
               </div>
             </div>
             ` : ''}
-
-            ${await renderEnvironmentItemsSection(curriculumId)}
 
             ${await generateLearningSupportSectionWithData(curriculumId)}
 
@@ -20335,107 +20339,28 @@ async function loadEnvironmentDesignPage(curriculumId) {
   }
 }
 
-// 環境カテゴリーレンダリング
-// 機能別の学習環境（7〜）の表示
-const ENV_ITEM_FUNCTION_LABELS_JS = {
-  atmosphere: '雰囲気・動機付け・見通し',
-  material: '学習材・情報提供',
-  history: '学習履歴・成果の可視化'
-}
-
-function escEnvItem(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
-}
-
-// 関連する学習カードを「単元名（コース名）」で表示
-function envCardRefsText(it) {
-  const refs = Array.isArray(it.card_refs) ? it.card_refs : []
-  if (refs.length === 0) return ''
-  return refs.map(r => escEnvItem(r.label)).join('、')
-}
-
-// 学習環境項目の作成・再提案は教師・管理者のみ（ログインユーザーの role で判定）
+// 学習環境の作成・再提案は教師・管理者のみ（ログインユーザーの role で判定）
 function canEditEnvironmentItems() {
   const role = (state.auth && state.auth.user && state.auth.user.role) || localStorage.getItem('user_role') || ''
   return role === 'teacher' || role === 'admin'
 }
 
-async function renderEnvironmentItemsSection(curriculumId) {
-  const canEdit = canEditEnvironmentItems()
-  let items = []
-  try {
-    const r = await axios.get(`/api/environment/items/${curriculumId}`, { timeout: 30000 })
-    items = Array.isArray(r.data) ? r.data : []
-  } catch (e) {
-    items = []
-  }
-
-  if (items.length === 0) {
-    if (!canEdit) return ''
-    return `
-      <div class="mb-6 bg-white rounded-xl border-2 border-dashed border-gray-300 p-4 print:hidden">
-        <p class="text-sm text-gray-600 mb-3">機能別の学習環境（7〜）は、まだ作成されていません。</p>
-        <button onclick="generateEnvironmentItems(${curriculumId})" class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">
-          <i class="fas fa-magic mr-1"></i>学習カードから提案を作る
-        </button>
-      </div>`
-  }
-
-  const cards = items.map(it => {
-    const regenButton = canEdit
-      ? `<button onclick="regenerateEnvironmentItem(${curriculumId}, ${it.item_no})" class="mt-3 px-3 py-1 text-sm bg-white border border-teal-400 text-teal-700 rounded-lg hover:bg-teal-50 print:hidden">
-           <i class="fas fa-redo mr-1"></i>この項目を再提案
+// 学習環境デザイン（1〜6）の1項目だけを再提案するボタン（教師・管理者のみ）
+function envDesignRegenButton(curriculumId, key) {
+  return `<button onclick="regenerateEnvironmentDesignItem(${curriculumId}, '${key}')" class="mt-3 px-3 py-1 text-sm bg-white border border-teal-400 text-teal-700 rounded-lg hover:bg-teal-50 print:hidden">
+           <i class="fas fa-redo mr-1"></i>この環境を再提案
          </button>`
-      : ''
-    return `
-    <div class="border-2 border-teal-200 bg-gradient-to-br from-teal-50 to-white rounded-xl p-4 hover:shadow-lg transition">
-      <div class="flex items-start justify-between mb-2 gap-2">
-        <h4 class="font-bold text-gray-800">${it.item_no}. ${escEnvItem(it.title)}</h4>
-        <span class="text-xs px-2 py-1 rounded-full bg-white border border-teal-300 text-teal-700 whitespace-nowrap">${ENV_ITEM_FUNCTION_LABELS_JS[it.function_type] || ''}</span>
-      </div>
-      <p class="text-sm font-bold text-gray-900 leading-relaxed mb-2">${escEnvItem(it.child_message)}</p>
-      <p class="text-sm text-gray-700 leading-relaxed mb-1"><span class="font-bold">具体操作：</span>${escEnvItem(it.activity)}</p>
-      <p class="text-sm text-gray-700 leading-relaxed mb-1"><span class="font-bold">問いかけ：</span>${escEnvItem(it.question)}</p>
-      <p class="text-sm text-gray-700 leading-relaxed mb-1"><span class="font-bold">先生向け説明：</span>${escEnvItem(it.teacher_note)}</p>
-      <p class="text-xs text-gray-500 mt-2">関連する学習カード：${envCardRefsText(it)}</p>
-      ${regenButton}
-    </div>`
-  }).join('')
-
-  return `
-    <div class="mb-6">
-      <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-gray-300">
-        <i class="fas fa-lightbulb mr-2 text-teal-600"></i>学習環境デザイン（7〜12：学習カードと連動）
-      </h3>
-      <p class="text-center text-gray-600 mb-4 text-sm">
-        雰囲気・動機付け・見通し、学習材・情報提供、学習履歴・成果の可視化の3つの働きで、学びを支える環境です。
-      </p>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">${cards}</div>
-    </div>`
 }
 
-async function generateEnvironmentItems(curriculumId) {
-  if (!confirm('学習カードをもとに、学習環境の提案を作成します。よろしいですか？')) return
-  try {
-    await axios.post(`/api/environment/items/generate/${curriculumId}`, {}, { timeout: 120000 })
-    alert('学習環境の提案を作成しました')
-    loadGuidePage(curriculumId)
-  } catch (error) {
-    console.error('Error generating environment items:', error)
-    alert('作成に失敗しました')
-  }
-}
-
-// 1項目だけ再提案し、ページを再読み込みして同じ位置に戻す
-async function regenerateEnvironmentItem(curriculumId, itemNo) {
-  if (!confirm(`項目${itemNo}を、学習カードをもとに提案し直します。よろしいですか？`)) return
+// 学習環境デザインの1項目（1〜6）だけを作り直し、同じ位置に戻す
+async function regenerateEnvironmentDesignItem(curriculumId, key) {
+  if (!canEditEnvironmentItems()) return
+  if (!confirm('この学習環境を、学習カードをもとに提案し直します。よろしいですか？')) return
   const y = window.scrollY
   try {
-    await axios.post(`/api/environment/items/regenerate/${curriculumId}/${itemNo}`, {}, { timeout: 120000 })
+    await axios.post(`/api/environment/design/regenerate/${curriculumId}/${key}`, {}, { timeout: 120000 })
   } catch (error) {
-    console.error('Error regenerating environment item:', error)
+    console.error('Error regenerating environment design item:', error)
     alert('再提案に失敗しました。もう一度お試しください')
     return
   }
@@ -20460,9 +20385,8 @@ async function regenerateOptionalProblem(curriculumId, problemId) {
 }
 
 // 画面の onclick から呼べるように公開
-window.generateEnvironmentItems = generateEnvironmentItems
-window.regenerateEnvironmentItem = regenerateEnvironmentItem
 window.regenerateOptionalProblem = regenerateOptionalProblem
+window.regenerateEnvironmentDesignItem = regenerateEnvironmentDesignItem
 
 // 1行目を太字の児童向け一文、2行目以降を具体操作・先生向け説明として表示
 function formatEnvironmentItem(text) {
