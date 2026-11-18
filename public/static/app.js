@@ -5252,6 +5252,8 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
             </div>
             ` : ''}
 
+            ${await renderEnvironmentItemsSection(curriculumId)}
+
             ${await generateLearningSupportSectionWithData(curriculumId)}
 
             <!-- 印刷・ツールボタン -->
@@ -20333,6 +20335,76 @@ async function loadEnvironmentDesignPage(curriculumId) {
 }
 
 // 環境カテゴリーレンダリング
+// 機能別の学習環境（7〜）の表示
+const ENV_ITEM_FUNCTION_LABELS_JS = {
+  atmosphere: '雰囲気・動機付け・見通し',
+  material: '学習材・情報提供',
+  history: '学習履歴・成果の可視化'
+}
+
+function escEnvItem(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
+async function renderEnvironmentItemsSection(curriculumId) {
+  let items = []
+  try {
+    const r = await axios.get(`/api/environment/items/${curriculumId}`, { timeout: 30000 })
+    items = Array.isArray(r.data) ? r.data : []
+  } catch (e) {
+    items = []
+  }
+
+  if (items.length === 0) {
+    if (!teacherMode) return ''
+    return `
+      <div class="mb-6 bg-white rounded-xl border-2 border-dashed border-gray-300 p-4 print:hidden">
+        <p class="text-sm text-gray-600 mb-3">機能別の学習環境（7〜）は、まだ作成されていません。</p>
+        <button onclick="generateEnvironmentItems(${curriculumId})" class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">
+          <i class="fas fa-magic mr-1"></i>学習カードから提案を作る
+        </button>
+      </div>`
+  }
+
+  const cards = items.map(it => `
+    <div class="border-2 border-teal-200 bg-gradient-to-br from-teal-50 to-white rounded-xl p-4 hover:shadow-lg transition">
+      <div class="flex items-start justify-between mb-2 gap-2">
+        <h4 class="font-bold text-gray-800">${it.item_no}. ${escEnvItem(it.title)}</h4>
+        <span class="text-xs px-2 py-1 rounded-full bg-white border border-teal-300 text-teal-700 whitespace-nowrap">${ENV_ITEM_FUNCTION_LABELS_JS[it.function_type] || ''}</span>
+      </div>
+      <p class="text-sm font-bold text-gray-900 leading-relaxed mb-2">${escEnvItem(it.child_message)}</p>
+      <p class="text-sm text-gray-700 leading-relaxed mb-1"><span class="font-bold">具体操作：</span>${escEnvItem(it.activity)}</p>
+      <p class="text-sm text-gray-700 leading-relaxed mb-1"><span class="font-bold">問いかけ：</span>${escEnvItem(it.question)}</p>
+      <p class="text-sm text-gray-700 leading-relaxed mb-1"><span class="font-bold">先生向け説明：</span>${escEnvItem(it.teacher_note)}</p>
+      <p class="text-xs text-gray-500 mt-2">関連する学習カード：${escEnvItem(it.card_numbers)}</p>
+    </div>`).join('')
+
+  return `
+    <div class="mb-6">
+      <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-gray-300">
+        <i class="fas fa-lightbulb mr-2 text-teal-600"></i>学習環境デザイン（7〜12：学習カードと連動）
+      </h3>
+      <p class="text-center text-gray-600 mb-4 text-sm">
+        雰囲気・動機付け・見通し、学習材・情報提供、学習履歴・成果の可視化の3つの働きで、学びを支える環境です。
+      </p>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">${cards}</div>
+    </div>`
+}
+
+async function generateEnvironmentItems(curriculumId) {
+  if (!confirm('学習カードをもとに、学習環境の提案を作成します。よろしいですか？')) return
+  try {
+    await axios.post(`/api/environment/items/generate/${curriculumId}`, {}, { timeout: 120000 })
+    alert('学習環境の提案を作成しました')
+    loadGuidePage(curriculumId)
+  } catch (error) {
+    console.error('Error generating environment items:', error)
+    alert('作成に失敗しました')
+  }
+}
+
 // 1行目を太字の児童向け一文、2行目以降を具体操作・先生向け説明として表示
 function formatEnvironmentItem(text) {
   if (!text) return ''

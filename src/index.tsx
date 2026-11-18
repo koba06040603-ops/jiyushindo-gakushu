@@ -9191,6 +9191,138 @@ app.get('/api/environment/design/:curriculumId', async (c) => {
   }
 })
 
+// ==================== 学習環境の項目（機能別・学習カード連動 7〜） ====================
+const ENV_ITEM_FUNCTION_LABELS: Record<string, string> = {
+  atmosphere: '雰囲気・動機付け・見通し',
+  material: '学習材・情報提供',
+  history: '学習履歴・成果の可視化',
+}
+
+async function ensureEnvironmentItemsTable(db: any) {
+  await db.prepare(
+    'CREATE TABLE IF NOT EXISTS learning_environment_items (' +
+    'id INTEGER PRIMARY KEY AUTOINCREMENT,' +
+    'curriculum_id INTEGER NOT NULL,' +
+    'item_no INTEGER NOT NULL,' +
+    'function_type TEXT NOT NULL,' +
+    'title TEXT NOT NULL,' +
+    'child_message TEXT,' +
+    'activity TEXT,' +
+    'teacher_note TEXT,' +
+    'question TEXT,' +
+    'card_numbers TEXT,' +
+    'created_at DATETIME DEFAULT CURRENT_TIMESTAMP,' +
+    'updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,' +
+    'UNIQUE (curriculum_id, item_no))'
+  ).run()
+}
+
+// APIルート：機能別の学習環境項目 取得
+app.get('/api/environment/items/:curriculumId', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  try {
+    await ensureEnvironmentItemsTable(env.DB)
+    const rows = await env.DB.prepare(
+      'SELECT * FROM learning_environment_items WHERE curriculum_id = ? ORDER BY item_no'
+    ).bind(curriculumId).all()
+    return c.json(rows.results || [])
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：機能別の学習環境項目 AI生成（学習カードを参照）
+app.post('/api/environment/items/generate/:curriculumId', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  try {
+    await ensureEnvironmentItemsTable(env.DB)
+    const cnt = await env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM learning_environment_items WHERE curriculum_id = ?'
+    ).bind(curriculumId).first() as any
+    if (cnt && cnt.n >= 6) return c.json({ success: true, message: 'already exists' })
+
+    const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculumId).first() as any
+    if (!curriculum) return c.json({ error: 'Curriculum not found' }, 404)
+    const apiKey = (env as any).GEMINI_API_KEY
+    if (!apiKey) return c.json({ error: 'API key not configured' }, 500)
+
+    const cards = await env.DB.prepare(
+      'SELECT card_number, card_title, substr(problem_text, 1, 120) AS problem FROM learning_cards WHERE subject = ? AND unit_name = ? ORDER BY card_number LIMIT 40'
+    ).bind(curriculum.subject, curriculum.unit_name).all()
+    const cardLines = ((cards.results || []) as any[])
+      .map((r: any) => '- カード' + r.card_number + '：' + r.card_title + '（' + (r.problem || '') + '）')
+      .join('\n')
+
+    const prompt = [
+      'あなたは小学校教師のための学習環境デザインの専門家です。',
+      '自由進度学習で、子どもが手に取りたくなる教室の物的環境（掲示・展示・具体操作できる環境）を提案してください。',
+      '',
+      '【単元情報】',
+      '- 教科: ' + curriculum.subject,
+      '- 学年: ' + curriculum.grade,
+      '- 単元名: ' + curriculum.unit_name,
+      '- 単元目標: ' + (curriculum.unit_goal || ''),
+      '',
+      '【学習カード】',
+      cardLines || '（学習カードはありません。単元名から考えてください）',
+      '',
+      '【条件】',
+      '- 次の3つの機能（function_type）から、それぞれ2項目ずつ、合計6項目を作ってください。',
+      '  - atmosphere: 雰囲気・動機付け・見通し',
+      '  - material: 学習材・情報提供',
+      '  - history: 学習履歴・成果の可視化',
+      '- 各項目には、単元に関係する具体操作を必ず1つ以上含めてください。',
+      '- 教室に普段ないもの、「こんなものがあったらあの子が喜ぶかも」と思えるものにしてください。',
+      '- 生活に密着し、子どもが思わず手に取りたくなる内容にしてください。',
+      '- 思考を深める問いかけを1文入れてください。',
+      '- 関連する学習カードの番号を card_numbers に入れてください（例: 2839, 2849）。',
+      '- child_message は子どもに語りかける短い一文にしてください。',
+      '- activity は具体操作、teacher_note は先生向けの説明（1〜2文）にしてください。',
+      '',
+      '以下のJSON形式のみで回答してください:',
+      '{"items":[{"function_type":"atmosphere","title":"項目名","child_message":"","activity":"","teacher_note":"","question":"","card_numbers":""}]}',
+    ].join('\n')
+
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_QUALITY}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 3000, responseMimeType: 'application/json' }
+        })
+      }
+    )
+    const geminiData = await geminiRes.json() as any
+    const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    const parsed = extractJSON(text) || {}
+    const items: any[] = Array.isArray(parsed.items) ? parsed.items.slice(0, 6) : []
+    if (items.length === 0) return c.json({ error: 'no items generated' }, 500)
+
+    const saved: any[] = []
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i]
+      const fn = ENV_ITEM_FUNCTION_LABELS[it.function_type] ? it.function_type : 'atmosphere'
+      const itemNo = 7 + i
+      await env.DB.prepare(
+        'INSERT OR IGNORE INTO learning_environment_items (curriculum_id, item_no, function_type, title, child_message, activity, teacher_note, question, card_numbers) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(
+        curriculumId, itemNo, fn,
+        it.title || '', it.child_message || '', it.activity || '',
+        it.teacher_note || '', it.question || '', String(it.card_numbers || '')
+      ).run()
+      saved.push({ item_no: itemNo, function_type: fn })
+    }
+    return c.json({ success: true, saved })
+  } catch (error: any) {
+    console.error('Environment items generation error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
 // APIルート：学習環境デザイン保存
 app.post('/api/environment/design', async (c) => {
   const { env } = c
