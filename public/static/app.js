@@ -5186,7 +5186,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
             `}
 
             <!-- 学習環境デザイン（3機能×6事例） -->
-            ${environmentDesign ? renderEnvDesignGuide(curriculumId, environmentDesign) : ''}
+            ${renderEnvDesignGuide(curriculumId, environmentDesign)}
 
             ${await generateLearningSupportSectionWithData(curriculumId)}
 
@@ -20185,19 +20185,17 @@ function toggleTeacherMode() {
   }
 }
 
-// 学習環境デザインタブ
+// 学習環境デザインタブ（3機能×6事例の表示と、項目ごとの再提案）
 async function loadEnvironmentDesignPage(curriculumId) {
   state.currentView = 'environment'
-  
+
   try {
-    // 環境デザイン取得
     const designResponse = await axios.get(`/api/environment/design/${curriculumId}`)
     const design = designResponse.data || {}
-    
-    // カリキュラム情報取得
+
     const currResponse = await axios.get(`/api/curriculum/${curriculumId}`)
     const curriculum = currResponse.data
-    
+
     document.getElementById('app').innerHTML = `
       <!-- ヘッダー -->
       <div class="bg-white shadow-md p-4 mb-6">
@@ -20217,51 +20215,22 @@ async function loadEnvironmentDesignPage(curriculumId) {
       </div>
 
       <div class="max-w-7xl mx-auto p-6">
-        <!-- 説明 -->
         <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
           <p class="text-blue-800">
             <i class="fas fa-info-circle mr-2"></i>
-            <strong>学習環境デザイン</strong>とは、学びの理解の深まりや意欲を高めるための、教室の環境のデザインです。
-            チェックを入れた環境が、学習のてびきや学習カードに反映されます。
+            学習環境デザインは、<strong>3つの機能</strong>と<strong>6つの事例</strong>で構成しています。
+            各項目の下の要望欄に書いてから「再提案」を押すと、その項目だけを作り直します。
           </p>
         </div>
-
-        <form id="envDesignForm">
-          <!-- 6観点 -->
-          ${renderEnvironmentCategory('1. 身近なところで見つけよう（生活の掲示）', 'expression_creative', design, 
-            '単元に関係するものを身近な場所で見つける環境')}
-          ${renderEnvironmentCategory('2. さわって確かめよう（体感コーナー）', 'research_fieldwork', design,
-            '実際に手で操作して確かめる環境')}
-          ${renderEnvironmentCategory('3. 「なんだろう？」を置こう（問いの触媒コーナー）', 'critical_thinking', design,
-            '問いを置き、予想してから確かめる環境')}
-          ${renderEnvironmentCategory('4. 材料をえらぼう（素材・廃材ストック）', 'social_contribution', design,
-            '学習に使う材料や道具を選べる環境')}
-          ${renderEnvironmentCategory('5. あつめるとつながる（完成作品の集合・発展問題への入口）', 'metacognition_reflection', design,
-            '完成作品を集め、次の問いへつなげる環境')}
-          ${renderEnvironmentCategory('6. 失敗メニューを直そう（失敗作と注意の棚）', 'question_generation', design,
-            '失敗例を見て、まちがいやすい点を直す環境')}
-
-          <!-- 保存ボタン -->
-          <div class="flex justify-end space-x-4 mt-8">
-            <button type="button" onclick="loadGuidePage(${curriculumId})" 
-              class="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
-              キャンセル
-            </button>
-            <button type="submit" 
-              class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-              <i class="fas fa-save mr-2"></i>保存する
-            </button>
-          </div>
-        </form>
+        ${renderEnvDesignGuide(curriculumId, parseEnvDesignItems(design).length ? design : null)}
+        <div class="flex justify-end mt-8">
+          <button type="button" onclick="loadGuidePage(${curriculumId})"
+            class="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
+            学習のてびきに戻る
+          </button>
+        </div>
       </div>
     `
-    
-    // フォーム送信
-    document.getElementById('envDesignForm').addEventListener('submit', async (e) => {
-      e.preventDefault()
-      await saveEnvironmentDesign(curriculumId, design.id)
-    })
-    
   } catch (error) {
     console.error('Error loading environment design:', error)
     alert('環境デザインの読み込みに失敗しました')
@@ -20285,30 +20254,56 @@ function parseEnvDesignItems(design) {
   }
 }
 
-// 3つの機能（見出しの順）
+// 3つの機能と、その事例（見出しの順）。この対応は画面に常時表示し、再提案のヒントにもする
 const ENV_FUNCTION_GROUPS = [
-  { func: '雰囲気・動機付け・見通し', icon: 'fa-compass', text: 'text-teal-800', border: 'border-teal-200', bg: 'from-teal-50' },
-  { func: '学習材・情報提供', icon: 'fa-book-open', text: 'text-blue-800', border: 'border-blue-200', bg: 'from-blue-50' },
-  { func: '学習履歴・成果の可視化', icon: 'fa-chart-line', text: 'text-purple-800', border: 'border-purple-200', bg: 'from-purple-50' },
+  { func: '雰囲気・動機付け・見通し', cases: ['時間の流れを体感する掲示・展示', '好奇心を刺激し活動を誘発する掲示・展示'], icon: 'fa-compass', text: 'text-teal-800', border: 'border-teal-200', bg: 'from-teal-50' },
+  { func: '学習材・情報提供', cases: ['思考を深める足場となる掲示・展示', '知識を関連付け多面的に広げる掲示・展示'], icon: 'fa-book-open', text: 'text-blue-800', border: 'border-blue-200', bg: 'from-blue-50' },
+  { func: '学習履歴・成果の可視化', cases: ['情報交流や形成的評価の場となる掲示・展示', '学びの履歴や振り返りの材となる掲示・展示'], icon: 'fa-chart-line', text: 'text-purple-800', border: 'border-purple-200', bg: 'from-purple-50' },
 ]
 
-// 学習環境デザイン（3機能×6事例）の表示
+// 3機能と6事例の対応表（常時表示）
+function renderEnvFunctionMap() {
+  const rows = ENV_FUNCTION_GROUPS.map(g => `
+      <tr class="border-t border-gray-200">
+        <th scope="row" class="text-left align-top p-2 font-bold ${g.text} whitespace-nowrap">${escapeHtmlSafe(g.func)}</th>
+        <td class="p-2 text-sm text-gray-700">${g.cases.map(c => '・' + escapeHtmlSafe(c)).join('<br>')}</td>
+      </tr>`).join('')
+  return `
+    <section id="env-function-map" class="bg-white border border-teal-200 rounded-xl p-4 mb-6">
+      <h4 class="font-bold text-gray-800 mb-2"><i class="fas fa-table mr-2 text-teal-600"></i>3つの機能と6つの事例の対応</h4>
+      <table class="w-full">
+        <thead>
+          <tr class="text-sm text-gray-600"><th scope="col" class="text-left p-2 w-1/3">機能</th><th scope="col" class="text-left p-2">対応する事例</th></tr>
+        </thead>
+        <tbody>${rows}
+        </tbody>
+      </table>
+      <p class="text-xs text-gray-500 mt-2">この対応は、項目を再提案するときの手がかりとして使います。</p>
+    </section>`
+}
+
+// 学習環境デザイン（3機能×6事例）の表示。対応表は常に出す
 function renderEnvDesignGuide(curriculumId, design) {
   const items = parseEnvDesignItems(design)
-  if (items.length === 0) return ''
-  const groups = ENV_FUNCTION_GROUPS.map(g => {
-    const list = items.filter(it => it.function === g.func)
-    if (list.length === 0) return ''
-    return `
-      <section class="mb-6" aria-label="${escapeHtmlSafe(g.func)}">
-        <h4 class="text-lg font-bold ${g.text} mb-3"><i class="fas ${g.icon} mr-2"></i>${escapeHtmlSafe(g.func)}</h4>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          ${list.map(it => renderEnvItemCard(curriculumId, it, g)).join('')}
-        </div>
-      </section>`
-  }).join('')
+  let body = ''
+  if (items.length === 0) {
+    if (!canEditEnvironmentItems()) return ''
+    body = `<p class="text-center text-gray-600 py-6">学習環境デザインはまだ作成されていません。</p>`
+  } else {
+    body = ENV_FUNCTION_GROUPS.map(g => {
+      const list = items.filter(it => it.function === g.func)
+      if (list.length === 0) return ''
+      return `
+        <section class="mb-6" aria-label="${escapeHtmlSafe(g.func)}">
+          <h4 class="text-lg font-bold ${g.text} mb-3"><i class="fas ${g.icon} mr-2"></i>${escapeHtmlSafe(g.func)}</h4>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            ${list.map(it => renderEnvItemCard(curriculumId, it, g)).join('')}
+          </div>
+        </section>`
+    }).join('')
+  }
   return `
-    <div class="mb-6">
+    <div class="mb-6" id="env-design-section">
       <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-gray-300">
         <i class="fas fa-palette mr-2 text-teal-600"></i>
         学習環境デザイン
@@ -20317,7 +20312,8 @@ function renderEnvDesignGuide(curriculumId, design) {
         <i class="fas fa-seedling mr-1 text-green-500"></i>
         子どもが自分で気づき、動きたくなる教室の環境のアイデアです。掲示は、いつでも見て確かめられる情報源になります。
       </p>
-      ${groups}
+      ${renderEnvFunctionMap()}
+      ${body}
     </div>`
 }
 
@@ -20344,7 +20340,7 @@ function renderEnvItemCard(curriculumId, it, g) {
 function envRequestBox(idPrefix, id, onclickCode, buttonLabel) {
   return `<div class="mt-3 print:hidden">
       <label for="${idPrefix}-${id}" class="block text-xs font-bold text-gray-700 mb-1"><i class="fas fa-pen mr-1"></i>こんなものにしてほしい（任意）</label>
-      <textarea id="${idPrefix}-${id}" rows="2" maxlength="300" placeholder="例：身近な食べ物を使って、比を見つけられるようにしたい" class="w-full text-sm border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-teal-400"></textarea>
+      <textarea id="${idPrefix}-${id}" rows="2" maxlength="300" placeholder="例：もっと身近な場面にしたい" class="w-full text-sm border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-teal-400"></textarea>
       <button onclick="${onclickCode}" class="mt-2 px-3 py-1 text-sm bg-white border border-teal-400 text-teal-700 rounded-lg hover:bg-teal-50"><i class="fas fa-redo mr-1"></i>${buttonLabel}</button>
     </div>`
 }
@@ -20431,64 +20427,6 @@ async function regenerateOptionalProblem(curriculumId, problemId) {
 // 画面の onclick から呼べるように公開
 window.regenerateOptionalProblem = regenerateOptionalProblem
 window.regenerateEnvironmentDesignItem = regenerateEnvironmentDesignItem
-
-function renderEnvironmentCategory(title, key, design, description) {
-  const enabled = design[`${key}_enabled`] || false
-  const content = design[key] || ''
-  
-  return `
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-      <div class="flex items-start space-x-4">
-        <input type="checkbox" id="${key}_enabled" name="${key}_enabled" 
-          ${enabled ? 'checked' : ''}
-          class="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-blue-500">
-        <div class="flex-1">
-          <label for="${key}_enabled" class="text-lg font-bold text-gray-800 cursor-pointer">
-            ${title}
-          </label>
-          <p class="text-sm text-gray-600 mt-1 mb-3">${description}</p>
-          <textarea id="${key}" name="${key}" rows="3" 
-            placeholder="1行目に児童向け一文（太字で表示）、2行目以降に具体操作と先生向け説明を書いてください"
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >${content}</textarea>
-        </div>
-      </div>
-    </div>
-  `
-}
-
-// 環境デザイン保存
-async function saveEnvironmentDesign(curriculumId, designId) {
-  const formData = {
-    curriculum_id: curriculumId,
-    expression_creative: document.getElementById('expression_creative').value,
-    expression_creative_enabled: document.getElementById('expression_creative_enabled').checked,
-    research_fieldwork: document.getElementById('research_fieldwork').value,
-    research_fieldwork_enabled: document.getElementById('research_fieldwork_enabled').checked,
-    critical_thinking: document.getElementById('critical_thinking').value,
-    critical_thinking_enabled: document.getElementById('critical_thinking_enabled').checked,
-    social_contribution: document.getElementById('social_contribution').value,
-    social_contribution_enabled: document.getElementById('social_contribution_enabled').checked,
-    metacognition_reflection: document.getElementById('metacognition_reflection').value,
-    metacognition_reflection_enabled: document.getElementById('metacognition_reflection_enabled').checked,
-    question_generation: document.getElementById('question_generation').value,
-    question_generation_enabled: document.getElementById('question_generation_enabled').checked
-  }
-  
-  try {
-    if (designId) {
-      await axios.put(`/api/environment/design/${designId}`, formData)
-    } else {
-      await axios.post('/api/environment/design', formData)
-    }
-    
-    alert('学習環境デザインを保存しました！')
-    loadGuidePage(curriculumId)
-  } catch (error) {
-    console.error('Error saving environment design:', error)
-    alert('保存に失敗しました')
-  }
-}
 
 // 指導・評価タブ
 async function loadEvaluationPage(curriculumId) {

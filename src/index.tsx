@@ -9303,7 +9303,7 @@ function buildEnvItem(raw: any, slot: { slot: string; func: string; caseName: st
   // 同じ番号は3コースにあるので、番号に当たるカードをすべて載せる
   const cards = refs
     .filter(r => nums.includes(r.card_number))
-    .map(r => ({ card_id: r.card_id, card_number: r.card_number, label: r.course_name + ' ' + r.card_number + '（' + r.card_title + '）' }))
+    .map(r => ({ card_id: r.card_id, card_number: r.card_number, label: r.course_name + ' ' + r.card_number + '「' + r.card_title + '」' }))
   const item = {
     slot: slot.slot,
     function: slot.func,
