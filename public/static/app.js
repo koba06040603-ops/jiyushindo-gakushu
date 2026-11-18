@@ -20348,6 +20348,13 @@ function escEnvItem(s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }
 
+// 関連する学習カードを「単元名（コース名）」で表示
+function envCardRefsText(it) {
+  const refs = Array.isArray(it.card_refs) ? it.card_refs : []
+  if (refs.length === 0) return ''
+  return refs.map(r => escEnvItem(r.label)).join('、')
+}
+
 async function renderEnvironmentItemsSection(curriculumId) {
   let items = []
   try {
@@ -20368,7 +20375,13 @@ async function renderEnvironmentItemsSection(curriculumId) {
       </div>`
   }
 
-  const cards = items.map(it => `
+  const cards = items.map(it => {
+    const regenButton = teacherMode
+      ? `<button onclick="regenerateEnvironmentItem(${curriculumId}, ${it.item_no})" class="mt-3 px-3 py-1 text-sm bg-white border border-teal-400 text-teal-700 rounded-lg hover:bg-teal-50 print:hidden">
+           <i class="fas fa-redo mr-1"></i>この項目を再提案
+         </button>`
+      : ''
+    return `
     <div class="border-2 border-teal-200 bg-gradient-to-br from-teal-50 to-white rounded-xl p-4 hover:shadow-lg transition">
       <div class="flex items-start justify-between mb-2 gap-2">
         <h4 class="font-bold text-gray-800">${it.item_no}. ${escEnvItem(it.title)}</h4>
@@ -20378,8 +20391,10 @@ async function renderEnvironmentItemsSection(curriculumId) {
       <p class="text-sm text-gray-700 leading-relaxed mb-1"><span class="font-bold">具体操作：</span>${escEnvItem(it.activity)}</p>
       <p class="text-sm text-gray-700 leading-relaxed mb-1"><span class="font-bold">問いかけ：</span>${escEnvItem(it.question)}</p>
       <p class="text-sm text-gray-700 leading-relaxed mb-1"><span class="font-bold">先生向け説明：</span>${escEnvItem(it.teacher_note)}</p>
-      <p class="text-xs text-gray-500 mt-2">関連する学習カード：${escEnvItem(it.card_numbers)}</p>
-    </div>`).join('')
+      <p class="text-xs text-gray-500 mt-2">関連する学習カード：${envCardRefsText(it)}</p>
+      ${regenButton}
+    </div>`
+  }).join('')
 
   return `
     <div class="mb-6">
@@ -20403,6 +20418,21 @@ async function generateEnvironmentItems(curriculumId) {
     console.error('Error generating environment items:', error)
     alert('作成に失敗しました')
   }
+}
+
+// 1項目だけ再提案し、ページを再読み込みして同じ位置に戻す
+async function regenerateEnvironmentItem(curriculumId, itemNo) {
+  if (!confirm(`項目${itemNo}を、学習カードをもとに提案し直します。よろしいですか？`)) return
+  const y = window.scrollY
+  try {
+    await axios.post(`/api/environment/items/regenerate/${curriculumId}/${itemNo}`, {}, { timeout: 120000 })
+  } catch (error) {
+    console.error('Error regenerating environment item:', error)
+    alert('再提案に失敗しました。もう一度お試しください')
+    return
+  }
+  await loadGuidePage(curriculumId)
+  window.scrollTo(0, y)
 }
 
 // 1行目を太字の児童向け一文、2行目以降を具体操作・先生向け説明として表示
