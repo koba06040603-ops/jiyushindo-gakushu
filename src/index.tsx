@@ -9202,38 +9202,6 @@ async function loadEnvCardLinesForPrompt(db: any, curriculum: any): Promise<stri
     .join('\n')
 }
 
-// Gemini 呼び出し（混雑時の503などに備え、モデルを順に試す。空応答なら次のモデルへ）
-async function callEnvGemini(apiKey: string, prompt: string): Promise<any> {
-  const models = [GEMINI_MODEL_QUALITY, GEMINI_MODEL_FALLBACK_PRIMARY, GEMINI_MODEL_FALLBACK, GEMINI_MODEL_LEGACY]
-  for (const model of models) {
-    try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 3000, responseMimeType: 'application/json' }
-          })
-        }
-      )
-      if (!res.ok) {
-        console.error('Env Gemini HTTP error:', model, res.status)
-        continue
-      }
-      const data = await res.json() as any
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-      const parsed = extractJSON(text)
-      if (parsed && Object.keys(parsed).length > 0) return parsed
-      console.error('Env Gemini empty result:', model)
-    } catch (error) {
-      console.error('Env Gemini error:', model, error)
-    }
-  }
-  return {}
-}
-
 // APIルート：学習環境デザイン保存
 app.post('/api/environment/design', async (c) => {
   const { env } = c
@@ -9272,13 +9240,241 @@ app.post('/api/environment/design', async (c) => {
   }
 })
 
-// APIルート：学習環境デザインをAIで自動生成
+// APIルート：学習環境デザインをAIで自動生成（比の単元のみ・3機能×6事例・design_json に保存）
+// ===== 学習環境デザイン：3機能×6事例 =====
+// 機能は「雰囲気・動機付け・見通し」「学習材・情報提供」「学習履歴・成果の可視化」の3つ。各機能に2事例ずつ置く。
+const ENV_SLOTS: { slot: string; func: string; caseName: string; hint: string }[] = [
+  { slot: 'A-1', func: '雰囲気・動機付け・見通し', caseName: '時間の流れを体感する掲示・展示', hint: '単元全体の流れを床や壁に長く見せ、今どこまで進んだかを子どもが自分で分かるようにする' },
+  { slot: 'A-2', func: '雰囲気・動機付け・見通し', caseName: '好奇心を刺激し活動を誘発する掲示・展示', hint: '見た目の印象と比の大きさがずれる仕掛けで、予想したくなり確かめたくなるようにする' },
+  { slot: 'B-1', func: '学習材・情報提供', caseName: '思考を深める足場となる掲示・展示', hint: '比の値を位置で捉え、等しい比や大小を見比べられる足場にする' },
+  { slot: 'B-2', func: '学習材・情報提供', caseName: '知識を関連付け多面的に広げる掲示・展示', hint: '比を小数・分数・割合と結びつけ、単元外の知識ともつながるようにする' },
+  { slot: 'C-1', func: '学習履歴・成果の可視化', caseName: '情報交流や形成的評価の場となる掲示・展示', hint: '友だちの考えを見て比べ、付箋などで理解の状況が教師にも見えるようにする' },
+  { slot: 'C-2', func: '学習履歴・成果の可視化', caseName: '学びの履歴や振り返りの材となる掲示・展示', hint: '解けた比や直し方を残し、自分の伸びを振り返れるようにする' },
+]
+
+type EnvCardRef = { card_id: number; course_name: string; card_number: number; card_title: string }
+
+// 先生が入力した自由記述の要望を、安全な文字・長さに整える
+function cleanTeacherRequest(raw: any): string {
+  return String(raw ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 300)
+}
+
+function cleanEnvText(raw: any, max: number): string {
+  return String(raw ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max)
+}
+
+// 単元の学習カード（コース名・番号・カード名・card_id）を取得
+async function loadEnvCardRefs(db: any, curriculum: any): Promise<EnvCardRef[]> {
+  const rows = await db.prepare(
+    'SELECT lc.card_id, lc.card_number, lc.card_title, c.course_name ' +
+    'FROM learning_cards lc LEFT JOIN courses c ON c.id = lc.course_id ' +
+    'WHERE lc.subject = ? AND lc.unit_name = ? ORDER BY lc.course_id, lc.card_number'
+  ).bind(curriculum.subject, curriculum.unit_name).all()
+  return ((rows.results || []) as any[]).map((r: any) => ({
+    card_id: Number(r.card_id),
+    course_name: String(r.course_name || 'コース不明'),
+    card_number: Number(r.card_number),
+    card_title: String(r.card_title || ''),
+  }))
+}
+
+// プロンプト用：カード番号ごとに、3コースのカード名を並べる
+function envCardListForPrompt(refs: EnvCardRef[]): string {
+  const byNum = new Map<number, string[]>()
+  for (const r of refs) {
+    if (!byNum.has(r.card_number)) byNum.set(r.card_number, [])
+    byNum.get(r.card_number)!.push(r.course_name + '「' + r.card_title + '」')
+  }
+  const nums = Array.from(byNum.keys()).sort((a, b) => a - b)
+  return nums.map(n => '- カード番号' + n + '：' + byNum.get(n)!.join(' ／ ')).join('\n')
+}
+
+// AIの1項目を検査・整形し、保存用の形にする（不備があれば null）
+function buildEnvItem(raw: any, slot: { slot: string; func: string; caseName: string }, refs: EnvCardRef[]): any | null {
+  if (!raw || typeof raw !== 'object') return null
+  const nums: number[] = []
+  if (Array.isArray(raw.card_numbers)) {
+    for (const v of raw.card_numbers) {
+      const n = Number(v)
+      if (Number.isInteger(n) && n >= 1 && n <= 10 && !nums.includes(n)) nums.push(n)
+    }
+  }
+  nums.sort((a, b) => a - b)
+  // 同じ番号は3コースにあるので、番号に当たるカードをすべて載せる
+  const cards = refs
+    .filter(r => nums.includes(r.card_number))
+    .map(r => ({ card_id: r.card_id, card_number: r.card_number, label: r.course_name + ' ' + r.card_number + '（' + r.card_title + '）' }))
+  const item = {
+    slot: slot.slot,
+    function: slot.func,
+    case: slot.caseName,
+    child_message: cleanEnvText(raw.child_message, 80),
+    not_in_classroom: cleanEnvText(raw.not_in_classroom, 120),
+    operation: cleanEnvText(raw.operation, 160),
+    question: cleanEnvText(raw.question, 120),
+    card_numbers: nums,
+    cards,
+    teacher_note: cleanEnvText(raw.teacher_note, 220),
+  }
+  if (!item.child_message || !item.not_in_classroom || !item.operation || !item.question || !item.teacher_note || cards.length === 0) return null
+  return item
+}
+
+function parseEnvDesignItems(row: any): any[] {
+  if (!row || !row.design_json) return []
+  try {
+    const d = JSON.parse(row.design_json)
+    return Array.isArray(d?.items) ? d.items : []
+  } catch {
+    return []
+  }
+}
+
+// design_json を最新行に保存（行が無ければ作成。既存の6列とenabledは変更しない）
+async function saveEnvDesignItems(db: any, curriculumId: any, items: any[]): Promise<number> {
+  const json = JSON.stringify({ version: 2, items })
+  const latest = await db.prepare(
+    'SELECT id FROM learning_environment_designs WHERE curriculum_id = ? ORDER BY id DESC LIMIT 1'
+  ).bind(curriculumId).first() as any
+  if (latest) {
+    await db.prepare(
+      'UPDATE learning_environment_designs SET design_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+    ).bind(json, latest.id).run()
+    return latest.id
+  }
+  const r = await db.prepare(`
+    INSERT INTO learning_environment_designs (
+      curriculum_id, design_json,
+      expression_creative_enabled, research_fieldwork_enabled, critical_thinking_enabled,
+      social_contribution_enabled, metacognition_reflection_enabled, question_generation_enabled
+    ) VALUES (?, ?, 1, 1, 1, 1, 1, 1)
+  `).bind(curriculumId, json).run()
+  return r.meta.last_row_id
+}
+
+// Gemini 呼び出し（混雑時の503などに備え、モデルを順に試す。空応答なら次のモデルへ）
+async function callEnvGemini(apiKey: string, prompt: string): Promise<any> {
+  const models = [GEMINI_MODEL_QUALITY, GEMINI_MODEL_FALLBACK_PRIMARY, GEMINI_MODEL_FALLBACK, GEMINI_MODEL_LEGACY]
+  for (const model of models) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 3000, responseMimeType: 'application/json' }
+          })
+        }
+      )
+      if (!res.ok) {
+        console.error('Env Gemini HTTP error:', model, res.status)
+        continue
+      }
+      const data = await res.json() as any
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      const parsed = extractJSON(text)
+      if (parsed && Object.keys(parsed).length > 0) return parsed
+      console.error('Env Gemini empty result:', model)
+    } catch (error) {
+      console.error('Env Gemini error:', model, error)
+    }
+  }
+  return {}
+}
+
+function envTheoryText(): string {
+  return [
+    '【考え方】子どもはもともと有能で、環境との相互作用によって成長・発達します。空間は人に行動を誘発する可能性（アフォーダンス）をもつため、壁面掲示・立体展示は常時見える情報ツールとして計画的に配置し、教師の直接指導を間接的に補助するものにしてください。',
+    '見て・読んで・聴いて・やってみて気づく子どもの違いに応えられる、体験的な学習環境にしてください。',
+  ].join('\n')
+}
+
+function envUnitInfoText(curriculum: any): string {
+  const lines = [
+    '【単元情報】',
+    '- 教科: ' + curriculum.subject,
+    '- 学年: ' + curriculum.grade,
+    '- 単元名: ' + curriculum.unit_name,
+    '- 単元目標: ' + (curriculum.unit_goal || ''),
+  ]
+  const mikata = getMikataKangaekata(curriculum.subject)
+  if (mikata) lines.push('', '【この教科の「見方・考え方」】', mikata, '→ この教科固有の「見方・考え方」を反映させてください。')
+  if (curriculum.unit_name === '比') {
+    lines.push('', '【学習の設定】ジュース屋（ジュースの濃さを比で表す）。ただし実際に飲んだり味わったりする活動は書かないでください。')
+  }
+  return lines.join('\n')
+}
+
+function envItemRulesText(): string {
+  return [
+    '【各項目の必須要素】',
+    '- child_message：子どもに向けた一文（1文。子どもの言葉で）',
+    '- not_in_classroom：「教室にないもの」を具体的に（何を・どんな形で・どこに置くか）。「あの子が喜ぶかも」と思えるもの',
+    '- operation：子どもが手を動かす具体操作を1つ以上（「〜する」の形で短く）',
+    '- question：掲示の上に書く、思考を深める問いかけ（1文の疑問文）',
+    '- card_numbers：関連する学習カードのカード番号（1〜10の整数を2〜3個）',
+    '- teacher_note：先生向けの説明（1〜2文。この掲示の教育的なねらい）',
+    '',
+    '【禁止】飲んだり味わったりする活動、食べ物を使う活動、単元外の専門用語（黄金比など）、同じ活動の繰り返し。',
+  ].join('\n')
+}
+
+function buildEnvGenerationPrompt(curriculum: any, refs: EnvCardRef[]): string {
+  return [
+    'あなたは小学校教師のための学習環境デザインの専門家です。',
+    envTheoryText(),
+    '',
+    envUnitInfoText(curriculum),
+    '',
+    '【作る6項目】次の6つの事例について、それぞれ1項目ずつ作ってください。',
+    ENV_SLOTS.map(s => '- ' + s.slot + '：【機能】' + s.func + ' ／【事例】' + s.caseName + ' ／【ねらい】' + s.hint).join('\n'),
+    '',
+    '【学習カード（カード番号で指定します）】',
+    envCardListForPrompt(refs),
+    '',
+    envItemRulesText(),
+    '',
+    '以下のJSON形式のみで回答してください:',
+    '{"items":[{"slot":"A-1","child_message":"","not_in_classroom":"","operation":"","question":"","card_numbers":[1,2],"teacher_note":""}]}',
+    '※ items は A-1, A-2, B-1, B-2, C-1, C-2 の6件にしてください。',
+  ].join('\n')
+}
+
+function buildEnvRegenPrompt(curriculum: any, slot: { slot: string; func: string; caseName: string; hint: string }, others: any[], refs: EnvCardRef[], teacherReq: string): string {
+  const otherLines = others.map(o => '- ' + o.slot + '（' + o.case + '）：' + o.child_message + ' ／ 教室にないもの：' + o.not_in_classroom)
+  return [
+    'あなたは小学校教師のための学習環境デザインの専門家です。',
+    envTheoryText(),
+    '',
+    envUnitInfoText(curriculum),
+    '',
+    '【今回作り直す項目】' + slot.slot + '：【機能】' + slot.func + ' ／【事例】' + slot.caseName + ' ／【ねらい】' + slot.hint,
+    teacherReq ? '【先生からの要望（必ず反映してください）】' + teacherReq : '',
+    '',
+    '【同じ単元の他の項目（内容や活動が重ならないようにしてください）】',
+    otherLines.join('\n'),
+    '',
+    '【学習カード（カード番号で指定します）】',
+    envCardListForPrompt(refs),
+    '',
+    envItemRulesText(),
+    '',
+    '以下のJSON形式のみで回答してください:',
+    '{"child_message":"","not_in_classroom":"","operation":"","question":"","card_numbers":[1,2],"teacher_note":""}',
+  ].filter(line => line !== '').join('\n')
+}
+
 app.post('/api/environment/design/generate/:curriculumId', async (c) => {
   const { env } = c
+  const authUser = c.get('user') as any
+  if (!authUser || !['teacher', 'admin'].includes(authUser.role)) {
+    return c.json({ error: '教師のみ実行できます', success: false }, 403)
+  }
   const curriculumId = c.req.param('curriculumId')
-  
+
   try {
-    // テーブルが存在しなければ作成
     await env.DB.prepare(`
       CREATE TABLE IF NOT EXISTS learning_environment_designs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -9295,101 +9491,48 @@ app.post('/api/environment/design/generate/:curriculumId', async (c) => {
         metacognition_reflection_enabled BOOLEAN DEFAULT 0,
         question_generation TEXT,
         question_generation_enabled BOOLEAN DEFAULT 0,
+        design_json TEXT DEFAULT '',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `).run()
 
-    // 既に生成済みかチェック
-    const existing = await env.DB.prepare(
-      'SELECT id FROM learning_environment_designs WHERE curriculum_id = ?'
-    ).bind(curriculumId).first()
-    if (existing) return c.json({ success: true, message: 'already exists', id: (existing as any).id })
-
     const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculumId).first() as any
     if (!curriculum) return c.json({ error: 'Curriculum not found' }, 404)
+    if (curriculum.unit_name !== '比') return c.json({ error: 'この単元は対象外です（比の単元のみ）' }, 400)
+
+    // 既に6項目がそろっていれば何もしない
+    const existing = await env.DB.prepare(
+      'SELECT id, design_json FROM learning_environment_designs WHERE curriculum_id = ? ORDER BY id DESC LIMIT 1'
+    ).bind(curriculumId).first() as any
+    if (existing && parseEnvDesignItems(existing).length === ENV_SLOTS.length) {
+      return c.json({ success: true, message: 'already exists', id: existing.id })
+    }
 
     const apiKey = env.GEMINI_API_KEY
     if (!apiKey) return c.json({ error: 'API key not configured' }, 500)
 
-    const prompt = `あなたは小学校教師のための学習環境デザインの専門家です。
-以下の単元情報をもとに、子どもが手に取りたくなり、やってみたくなる6つの学習環境を提案してください。
+    const refs = await loadEnvCardRefs(env.DB, curriculum)
+    const parsed = await callEnvGemini(apiKey, buildEnvGenerationPrompt(curriculum, refs))
+    const rawItems: any[] = Array.isArray(parsed?.items) ? parsed.items : []
+    const items: any[] = []
+    for (let i = 0; i < ENV_SLOTS.length; i++) {
+      const slot = ENV_SLOTS[i]
+      const raw = rawItems.find((x: any) => x && x.slot === slot.slot) ?? rawItems[i]
+      const item = buildEnvItem(raw, slot, refs)
+      if (!item) return c.json({ error: '生成結果が不完全です（' + slot.slot + '）。もう一度お試しください' }, 500)
+      items.push(item)
+    }
 
-【単元情報】
-- 教科: ${curriculum.subject}
-- 学年: ${curriculum.grade}
-- 単元名: ${curriculum.unit_name}
-- 単元目標: ${curriculum.unit_goal || ''}
-${getMikataKangaekata(curriculum.subject) ? `\n【この教科の「見方・考え方」】\n${getMikataKangaekata(curriculum.subject)}\n→ 各環境の提案にこの教科固有の「見方・考え方」を反映させてください。\n` : ''}
-【6つの環境】各環境について、この単元に具体的に関係する操作を含めて提案してください。各値は、1行目に児童向け一文、2行目に「具体操作：」、3行目に「先生向け説明：」を改行で区切って書いてください。
-
-以下のJSON形式で回答してください:
-{
-  "expression_creative": "1. 身近なところで見つけよう（生活の掲示）の提案",
-  "research_fieldwork": "2. さわって確かめよう（体感コーナー）の提案",
-  "critical_thinking": "3. 「なんだろう？」を置こう（問いの触媒コーナー）の提案",
-  "social_contribution": "4. 材料をえらぼう（素材・廃材ストック）の提案",
-  "metacognition_reflection": "5. あつめるとつながる（完成作品の集合・発展問題への入口）の提案",
-  "question_generation": "6. 失敗メニューを直そう（失敗作と注意の棚）の提案"
-}
-
-JSON配列ではなくオブジェクトのみ返してください。`
-
-    const design = await callEnvGemini(apiKey, prompt)
-
-    const result = await env.DB.prepare(`
-      INSERT INTO learning_environment_designs (
-        curriculum_id,
-        expression_creative, expression_creative_enabled,
-        research_fieldwork, research_fieldwork_enabled,
-        critical_thinking, critical_thinking_enabled,
-        social_contribution, social_contribution_enabled,
-        metacognition_reflection, metacognition_reflection_enabled,
-        question_generation, question_generation_enabled
-      ) VALUES (?, ?, 1, ?, 1, ?, 1, ?, 1, ?, 1, ?, 1)
-    `).bind(
-      curriculumId,
-      design.expression_creative || '',
-      design.research_fieldwork || '',
-      design.critical_thinking || '',
-      design.social_contribution || '',
-      design.metacognition_reflection || '',
-      design.question_generation || ''
-    ).run()
-
-    return c.json({ success: true, id: result.meta.last_row_id, design })
+    const id = await saveEnvDesignItems(env.DB, curriculumId, items)
+    return c.json({ success: true, id, items })
   } catch (error: any) {
     console.error('Environment design generation error:', error)
     return c.json({ error: error.message }, 500)
   }
 })
 
-// 学習環境デザイン（1〜6）のキーと見出し（再提案の対象を限定するホワイトリスト）
-const ENV_DESIGN_KEY_TITLES: Record<string, string> = {
-  expression_creative: '1. 身近なところで見つけよう（生活の掲示）',
-  research_fieldwork: '2. さわって確かめよう（体感コーナー）',
-  critical_thinking: '3. 「なんだろう？」を置こう（問いの触媒コーナー）',
-  social_contribution: '4. 材料をえらぼう（素材・廃材ストック）',
-  metacognition_reflection: '5. あつめるとつながる（完成作品の集合・発展問題への入口）',
-  question_generation: '6. 失敗メニューを直そう（失敗作と注意の棚）',
-}
-
-// 6つの環境がどの観点に当たるか（画面の説明と生成プロンプトで共通に使う）
-const ENV_DESIGN_PERSPECTIVES: Record<string, { label: string; desc: string }> = {
-  expression_creative: { label: '表現・創造', desc: '生活の中の算数を見つけ、自分の言葉や形で表す' },
-  research_fieldwork: { label: '探究・体験', desc: '手でふれて操作しながら、予想を確かめる' },
-  critical_thinking: { label: '批判的思考・問い', desc: '予想や問いを持ち、理由を考えながら確かめる' },
-  social_contribution: { label: '協働・社会参加', desc: '役割をもって道具や材料を選び、みんなで使う' },
-  metacognition_reflection: { label: 'メタ認知・振り返り', desc: '作品を集めて比べ、自分の学びを振り返る' },
-  question_generation: { label: '誤りの分析・再構成', desc: '失敗の原因を見つけ、直し方を自分で考える' },
-}
-
-// 先生が入力した自由記述の要望を、安全な文字・長さに整える
-function cleanTeacherRequest(raw: any): string {
-  return String(raw ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 300)
-}
-
-// APIルート：学習環境デザインの1項目（1〜6のどれか）だけをAIで作り直す（教師・管理者のみ・enabledは変えない）
+// APIルート：学習環境デザインの1項目（A-1〜C-2）だけをAIで作り直す（教師・管理者のみ・他項目は変えない）
 app.post('/api/environment/design/regenerate/:curriculumId/:key', async (c) => {
   const { env } = c
   const authUser = c.get('user') as any
@@ -9398,59 +9541,33 @@ app.post('/api/environment/design/regenerate/:curriculumId/:key', async (c) => {
   }
   const curriculumId = c.req.param('curriculumId')
   const key = c.req.param('key')
-  if (!Object.prototype.hasOwnProperty.call(ENV_DESIGN_KEY_TITLES, key)) {
-    return c.json({ error: 'Invalid key' }, 400)
-  }
+  const slot = ENV_SLOTS.find(s => s.slot === key)
+  if (!slot) return c.json({ error: 'Invalid key' }, 400)
   const body: any = await c.req.json().catch(() => ({}))
   const teacherReq = cleanTeacherRequest(body?.request)
   try {
-    // key はホワイトリストで検証済みのため、列名として直接埋め込んでも安全
-    const design = await env.DB.prepare(
-      'SELECT id FROM learning_environment_designs WHERE curriculum_id = ? ORDER BY id DESC LIMIT 1'
+    const row = await env.DB.prepare(
+      'SELECT id, design_json FROM learning_environment_designs WHERE curriculum_id = ? ORDER BY id DESC LIMIT 1'
     ).bind(curriculumId).first() as any
-    if (!design) return c.json({ error: 'Design not found' }, 404)
+    if (!row) return c.json({ error: 'Design not found' }, 404)
+    const items = parseEnvDesignItems(row)
+    if (items.length !== ENV_SLOTS.length) return c.json({ error: '先に6項目を生成してください' }, 409)
 
     const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculumId).first() as any
     if (!curriculum) return c.json({ error: 'Curriculum not found' }, 404)
     const apiKey = (env as any).GEMINI_API_KEY
     if (!apiKey) return c.json({ error: 'API key not configured' }, 500)
 
-    const others = Object.keys(ENV_DESIGN_KEY_TITLES)
-      .filter(k => k !== key)
-      .map(k => '- ' + ENV_DESIGN_KEY_TITLES[k])
-      .join('\n')
-    const mikata = getMikataKangaekata(curriculum.subject)
-    const prompt = [
-      'あなたは小学校教師のための学習環境デザインの専門家です。',
-      '以下の単元情報をもとに、子どもが手に取りたくなり、やってみたくなる学習環境を1つだけ提案し直してください。',
-      '',
-      '【単元情報】',
-      '- 教科: ' + curriculum.subject,
-      '- 学年: ' + curriculum.grade,
-      '- 単元名: ' + curriculum.unit_name,
-      '- 単元目標: ' + (curriculum.unit_goal || ''),
-      mikata ? '\n【この教科の「見方・考え方」】\n' + mikata + '\n→ この教科固有の「見方・考え方」を反映させてください。' : '',
-      '',
-      '【今回作り直す環境】' + ENV_DESIGN_KEY_TITLES[key],
-      '【この環境の観点】' + ENV_DESIGN_PERSPECTIVES[key].label + '（' + ENV_DESIGN_PERSPECTIVES[key].desc + '）',
-      teacherReq ? '【先生からの要望（必ず反映してください）】' + teacherReq : '',
-      '【同じ単元の他の環境（これらと内容や操作が重ならないようにしてください）】',
-      others,
-      '',
-      '【書き方】この単元に具体的に関係する操作を含めてください。1行目に児童向け一文、2行目に「具体操作：」、3行目に「先生向け説明：」を改行で区切って書いてください。',
-      '',
-      '以下のJSON形式のみで回答してください:',
-      '{"text": "児童向け一文・具体操作・先生向け説明（改行区切り）"}',
-    ].filter(line => line !== '').join('\n')
-
+    const refs = await loadEnvCardRefs(env.DB, curriculum)
+    const others = items.filter((it: any) => it.slot !== key)
+    const prompt = buildEnvRegenPrompt(curriculum, slot, others, refs, teacherReq)
     const parsed = await callEnvGemini(apiKey, prompt)
-    const text = typeof parsed.text === 'string' ? parsed.text.trim() : ''
-    if (!text) return c.json({ error: 'generation failed' }, 500)
+    const newItem = buildEnvItem(parsed, slot, refs)
+    if (!newItem) return c.json({ error: 'generation failed' }, 500)
 
-    await env.DB.prepare(
-      'UPDATE learning_environment_designs SET ' + key + ' = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-    ).bind(text, design.id).run()
-    return c.json({ success: true, key, text })
+    const next = ENV_SLOTS.map(s => (s.slot === key ? newItem : items.find((it: any) => it.slot === s.slot)))
+    await saveEnvDesignItems(env.DB, curriculumId, next)
+    return c.json({ success: true, key, item: newItem })
   } catch (error: any) {
     console.error('Environment design item regeneration error:', error)
     return c.json({ error: error.message }, 500)
