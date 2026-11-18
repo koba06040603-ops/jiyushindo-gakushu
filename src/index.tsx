@@ -9374,6 +9374,21 @@ const ENV_DESIGN_KEY_TITLES: Record<string, string> = {
   question_generation: '6. 失敗メニューを直そう（失敗作と注意の棚）',
 }
 
+// 6つの環境がどの観点に当たるか（画面の説明と生成プロンプトで共通に使う）
+const ENV_DESIGN_PERSPECTIVES: Record<string, { label: string; desc: string }> = {
+  expression_creative: { label: '表現・創造', desc: '生活の中の算数を見つけ、自分の言葉や形で表す' },
+  research_fieldwork: { label: '探究・体験', desc: '手でふれて操作しながら、予想を確かめる' },
+  critical_thinking: { label: '批判的思考・問い', desc: '予想や問いを持ち、理由を考えながら確かめる' },
+  social_contribution: { label: '協働・社会参加', desc: '役割をもって道具や材料を選び、みんなで使う' },
+  metacognition_reflection: { label: 'メタ認知・振り返り', desc: '作品を集めて比べ、自分の学びを振り返る' },
+  question_generation: { label: '誤りの分析・再構成', desc: '失敗の原因を見つけ、直し方を自分で考える' },
+}
+
+// 先生が入力した自由記述の要望を、安全な文字・長さに整える
+function cleanTeacherRequest(raw: any): string {
+  return String(raw ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 300)
+}
+
 // APIルート：学習環境デザインの1項目（1〜6のどれか）だけをAIで作り直す（教師・管理者のみ・enabledは変えない）
 app.post('/api/environment/design/regenerate/:curriculumId/:key', async (c) => {
   const { env } = c
@@ -9386,6 +9401,8 @@ app.post('/api/environment/design/regenerate/:curriculumId/:key', async (c) => {
   if (!Object.prototype.hasOwnProperty.call(ENV_DESIGN_KEY_TITLES, key)) {
     return c.json({ error: 'Invalid key' }, 400)
   }
+  const body: any = await c.req.json().catch(() => ({}))
+  const teacherReq = cleanTeacherRequest(body?.request)
   try {
     // key はホワイトリストで検証済みのため、列名として直接埋め込んでも安全
     const design = await env.DB.prepare(
@@ -9415,6 +9432,8 @@ app.post('/api/environment/design/regenerate/:curriculumId/:key', async (c) => {
       mikata ? '\n【この教科の「見方・考え方」】\n' + mikata + '\n→ この教科固有の「見方・考え方」を反映させてください。' : '',
       '',
       '【今回作り直す環境】' + ENV_DESIGN_KEY_TITLES[key],
+      '【この環境の観点】' + ENV_DESIGN_PERSPECTIVES[key].label + '（' + ENV_DESIGN_PERSPECTIVES[key].desc + '）',
+      teacherReq ? '【先生からの要望（必ず反映してください）】' + teacherReq : '',
       '【同じ単元の他の環境（これらと内容や操作が重ならないようにしてください）】',
       others,
       '',
@@ -23702,6 +23721,8 @@ app.post('/api/optional-problems/regenerate/:curriculumId/:problemId', async (c)
   }
   const curriculumId = c.req.param('curriculumId')
   const problemId = Number(c.req.param('problemId'))
+  const reqBody: any = await c.req.json().catch(() => ({}))
+  const teacherReq = cleanTeacherRequest(reqBody?.request)
   try {
     const all = await optSelectByCurriculum(env.DB, curriculumId)
     const target = all.find((p: any) => Number(p.problem_id) === problemId)
@@ -23733,6 +23754,7 @@ app.post('/api/optional-problems/regenerate/:curriculumId/:problemId', async (c)
       otherTitles,
       '',
       '【難易度】' + difficulty + '（medium=ふつう, hard=むずかしい, very_hard=とてもむずかしい。この難易度に合わせる）',
+      teacherReq ? '【先生からの要望（必ず反映してください）】' + teacherReq : '',
       '',
       '【ルール】',
       '- problem_title は中身がわかる魅力的な題名にする（「実生活問題」「考え方問題」などの分類名は禁止）',

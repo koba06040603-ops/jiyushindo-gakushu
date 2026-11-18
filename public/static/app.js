@@ -5154,6 +5154,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                       </div>
                     ` : ''}
 
+                    ${canEditEnvironmentItems() ? optRegenRequestBox(curriculumId, problem.problem_id) : ''}
                     <div class="flex items-center justify-between text-xs">
                       <span class="px-2 py-1 rounded-full ${
                         problem.difficulty_level === 'medium' ? 'bg-blue-100 text-blue-700' :
@@ -5166,7 +5167,6 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                           problem.difficulty_level === 'very_hard' ? '★★★★ とてもむずかしい' :
                           '★ かんたん'}
                       </span>
-                      ${canEditEnvironmentItems() ? `<button onclick="regenerateOptionalProblem(${curriculumId}, ${problem.problem_id})" class="bg-white border border-pink-400 text-pink-700 hover:bg-pink-50 px-3 py-1 rounded-full font-bold text-xs transition print:hidden"><i class="fas fa-redo mr-1"></i>この問題を再提案</button>` : ''}
                       <button onclick="openOptionalProblem(${JSON.stringify(problem).replace(/"/g, '&quot;')})"
                               class="bg-pink-500 hover:bg-pink-600 text-white px-3 py-1 rounded-full font-bold text-xs transition">
                         <i class="fas fa-play mr-1"></i>ちょうせんする
@@ -5200,6 +5200,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                 <i class="fas fa-seedling mr-1 text-green-500"></i>
                 学びの理解の深まりや意欲を高める、教室の環境のアイデアです。
               </p>
+              ${envPerspectiveList()}
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 ${environmentDesign.expression_creative ? `
                 <div class="border-2 border-pink-200 bg-gradient-to-br from-pink-50 to-white rounded-xl p-4 hover:shadow-lg transition">
@@ -5207,6 +5208,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                     <div class="w-10 h-10 rounded-full bg-pink-500 text-white flex items-center justify-center text-lg mr-3">🎨</div>
                     <h4 class="font-bold text-gray-800">1. 身近なところで見つけよう（生活の掲示）</h4>
                   </div>
+                  ${envPerspectiveLabel('expression_creative')}
                   ${formatEnvironmentItem(environmentDesign.expression_creative)}
                   ${canEditEnvironmentItems() ? envDesignRegenButton(curriculumId, 'expression_creative') : ''}
                 </div>` : ''}
@@ -5216,6 +5218,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                     <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center text-lg mr-3">🔍</div>
                     <h4 class="font-bold text-gray-800">2. さわって確かめよう（体感コーナー）</h4>
                   </div>
+                  ${envPerspectiveLabel('research_fieldwork')}
                   ${formatEnvironmentItem(environmentDesign.research_fieldwork)}
                   ${canEditEnvironmentItems() ? envDesignRegenButton(curriculumId, 'research_fieldwork') : ''}
                 </div>` : ''}
@@ -5225,6 +5228,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                     <div class="w-10 h-10 rounded-full bg-purple-500 text-white flex items-center justify-center text-lg mr-3">💡</div>
                     <h4 class="font-bold text-gray-800">3. 「なんだろう？」を置こう（問いの触媒コーナー）</h4>
                   </div>
+                  ${envPerspectiveLabel('critical_thinking')}
                   ${formatEnvironmentItem(environmentDesign.critical_thinking)}
                   ${canEditEnvironmentItems() ? envDesignRegenButton(curriculumId, 'critical_thinking') : ''}
                 </div>` : ''}
@@ -5234,6 +5238,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                     <div class="w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center text-lg mr-3">🤝</div>
                     <h4 class="font-bold text-gray-800">4. 材料をえらぼう（素材・廃材ストック）</h4>
                   </div>
+                  ${envPerspectiveLabel('social_contribution')}
                   ${formatEnvironmentItem(environmentDesign.social_contribution)}
                   ${canEditEnvironmentItems() ? envDesignRegenButton(curriculumId, 'social_contribution') : ''}
                 </div>` : ''}
@@ -5243,6 +5248,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                     <div class="w-10 h-10 rounded-full bg-yellow-500 text-white flex items-center justify-center text-lg mr-3">🪞</div>
                     <h4 class="font-bold text-gray-800">5. あつめるとつながる（完成作品の集合・発展問題への入口）</h4>
                   </div>
+                  ${envPerspectiveLabel('metacognition_reflection')}
                   ${formatEnvironmentItem(environmentDesign.metacognition_reflection)}
                   ${canEditEnvironmentItems() ? envDesignRegenButton(curriculumId, 'metacognition_reflection') : ''}
                 </div>` : ''}
@@ -5252,6 +5258,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                     <div class="w-10 h-10 rounded-full bg-orange-500 text-white flex items-center justify-center text-lg mr-3">❓</div>
                     <h4 class="font-bold text-gray-800">6. 失敗メニューを直そう（失敗作と注意の棚）</h4>
                   </div>
+                  ${envPerspectiveLabel('question_generation')}
                   ${formatEnvironmentItem(environmentDesign.question_generation)}
                   ${canEditEnvironmentItems() ? envDesignRegenButton(curriculumId, 'question_generation') : ''}
                 </div>` : ''}
@@ -20345,11 +20352,52 @@ function canEditEnvironmentItems() {
   return role === 'teacher' || role === 'admin'
 }
 
-// 学習環境デザイン（1〜6）の1項目だけを再提案するボタン（教師・管理者のみ）
+// 6つの環境がどの観点で提案されているか（サーバーの定義と揃える）
+const ENV_PERSPECTIVES_JS = {
+  expression_creative: ['表現・創造', '生活の中の算数を見つけ、自分の言葉や形で表す'],
+  research_fieldwork: ['探究・体験', '手でふれて操作しながら、予想を確かめる'],
+  critical_thinking: ['批判的思考・問い', '予想や問いを持ち、理由を考えながら確かめる'],
+  social_contribution: ['協働・社会参加', '役割をもって道具や材料を選び、みんなで使う'],
+  metacognition_reflection: ['メタ認知・振り返り', '作品を集めて比べ、自分の学びを振り返る'],
+  question_generation: ['誤りの分析・再構成', '失敗の原因を見つけ、直し方を自分で考える'],
+}
+
+// 各環境カードに付ける「観点」の説明
+function envPerspectiveLabel(key) {
+  const p = ENV_PERSPECTIVES_JS[key]
+  if (!p) return ''
+  return `<p class="text-xs text-teal-700 mb-2"><span class="font-bold">観点：${p[0]}</span>（${p[1]}）</p>`
+}
+
+// 学習環境デザインの見出し下に出す、6つの観点の一覧
+function envPerspectiveList() {
+  const items = Object.keys(ENV_PERSPECTIVES_JS).map(k => {
+    const p = ENV_PERSPECTIVES_JS[k]
+    return `<li class="text-sm text-gray-700"><span class="font-bold text-gray-800">${p[0]}</span>：${p[1]}</li>`
+  }).join('')
+  return `<div class="bg-white border border-teal-200 rounded-xl p-4 mb-4 print:hidden">
+      <p class="text-sm font-bold text-teal-800 mb-2"><i class="fas fa-info-circle mr-1"></i>この6つは次の観点で提案しています</p>
+      <ul class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 list-disc pl-5">${items}</ul>
+    </div>`
+}
+
+// 要望を書く欄と「再提案」ボタン（教師・管理者のみ）
+function envRequestBox(idPrefix, id, onclickCode, buttonLabel) {
+  return `<div class="mt-3 print:hidden">
+      <label for="${idPrefix}-${id}" class="block text-xs font-bold text-gray-700 mb-1"><i class="fas fa-pen mr-1"></i>こんなものにしてほしい（任意）</label>
+      <textarea id="${idPrefix}-${id}" rows="2" maxlength="300" placeholder="例：身近な食べ物を使って、比を見つけられるようにしたい" class="w-full text-sm border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-teal-400"></textarea>
+      <button onclick="${onclickCode}" class="mt-2 px-3 py-1 text-sm bg-white border border-teal-400 text-teal-700 rounded-lg hover:bg-teal-50"><i class="fas fa-redo mr-1"></i>${buttonLabel}</button>
+    </div>`
+}
+
+// 学習環境デザイン（1〜6）の1項目を再提案する欄（教師・管理者のみ）
 function envDesignRegenButton(curriculumId, key) {
-  return `<button onclick="regenerateEnvironmentDesignItem(${curriculumId}, '${key}')" class="mt-3 px-3 py-1 text-sm bg-white border border-teal-400 text-teal-700 rounded-lg hover:bg-teal-50 print:hidden">
-           <i class="fas fa-redo mr-1"></i>この環境を再提案
-         </button>`
+  return envRequestBox('env-req', key, `regenerateEnvironmentDesignItem(${curriculumId}, '${key}')`, 'この環境を再提案')
+}
+
+// 発展問題（えらべるもんだい）の要望欄と再提案ボタン（教師・管理者のみ）
+function optRegenRequestBox(curriculumId, problemId) {
+  return envRequestBox('opt-req', problemId, `regenerateOptionalProblem(${curriculumId}, ${problemId})`, 'この問題を再提案')
 }
 
 // 学習環境デザインの1項目（1〜6）だけを作り直し、同じ位置に戻す
@@ -20379,10 +20427,11 @@ function hideRegenOverlay() {
 async function regenerateEnvironmentDesignItem(curriculumId, key) {
   if (!canEditEnvironmentItems()) return
   if (!confirm('この学習環境を、学習カードをもとに提案し直します。よろしいですか？')) return
+  const request = (document.getElementById(`env-req-${key}`)?.value || '').trim()
   const y = window.scrollY
   showRegenOverlay('学習環境を提案し直しています…')
   try {
-    await axios.post(`/api/environment/design/regenerate/${curriculumId}/${key}`, {}, { timeout: 120000 })
+    await axios.post(`/api/environment/design/regenerate/${curriculumId}/${key}`, { request }, { timeout: 120000 })
   } catch (error) {
     console.error('Error regenerating environment design item:', error)
     hideRegenOverlay()
@@ -20401,10 +20450,11 @@ async function regenerateEnvironmentDesignItem(curriculumId, key) {
 async function regenerateOptionalProblem(curriculumId, problemId) {
   if (!canEditEnvironmentItems()) return
   if (!confirm('この発展問題を、学習カードをもとに作り直します。よろしいですか？')) return
+  const request = (document.getElementById(`opt-req-${problemId}`)?.value || '').trim()
   const y = window.scrollY
   showRegenOverlay('発展問題を作り直しています…')
   try {
-    await axios.post(`/api/optional-problems/regenerate/${curriculumId}/${problemId}`, {}, { timeout: 120000 })
+    await axios.post(`/api/optional-problems/regenerate/${curriculumId}/${problemId}`, { request }, { timeout: 120000 })
   } catch (error) {
     console.error('Error regenerating optional problem:', error)
     hideRegenOverlay()
