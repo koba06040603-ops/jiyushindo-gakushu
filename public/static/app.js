@@ -20353,19 +20353,48 @@ function envDesignRegenButton(curriculumId, key) {
 }
 
 // 学習環境デザインの1項目（1〜6）だけを作り直し、同じ位置に戻す
+// 再提案中の表示（画面全体にぐるぐるを重ねる。処理が終わるまで消えない）
+function showRegenOverlay(message) {
+  hideRegenOverlay()
+  const overlay = document.createElement('div')
+  overlay.id = 'regen-overlay'
+  overlay.setAttribute('role', 'status')
+  overlay.setAttribute('aria-live', 'polite')
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:9999;'
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;padding:2rem 2.5rem;max-width:360px;width:90%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.3);">
+      <i class="fas fa-spinner fa-spin" style="font-size:2.5rem;color:#0d9488;"></i>
+      <p style="margin-top:1rem;font-size:1.1rem;font-weight:bold;color:#1f2937;">${message}</p>
+      <p style="margin-top:0.5rem;font-size:0.85rem;color:#6b7280;">AIが作成しています。このまましばらくお待ちください（約30秒〜2分）</p>
+    </div>`
+  document.body.appendChild(overlay)
+}
+
+function hideRegenOverlay() {
+  const el = document.getElementById('regen-overlay')
+  if (el) el.remove()
+}
+
+// 1項目だけ再提案する（ぐるぐる表示 → 生成 → ページ再描画 → 同じ位置に戻す）
 async function regenerateEnvironmentDesignItem(curriculumId, key) {
   if (!canEditEnvironmentItems()) return
   if (!confirm('この学習環境を、学習カードをもとに提案し直します。よろしいですか？')) return
   const y = window.scrollY
+  showRegenOverlay('学習環境を提案し直しています…')
   try {
     await axios.post(`/api/environment/design/regenerate/${curriculumId}/${key}`, {}, { timeout: 120000 })
   } catch (error) {
     console.error('Error regenerating environment design item:', error)
+    hideRegenOverlay()
     alert('再提案に失敗しました。もう一度お試しください')
     return
   }
-  await loadGuidePage(curriculumId)
-  window.scrollTo(0, y)
+  try {
+    await loadGuidePage(curriculumId)
+    window.scrollTo(0, y)
+  } finally {
+    hideRegenOverlay()
+  }
 }
 
 // えらべるもんだい（発展問題）を1問だけ再提案（教師・管理者のみ）
@@ -20373,15 +20402,21 @@ async function regenerateOptionalProblem(curriculumId, problemId) {
   if (!canEditEnvironmentItems()) return
   if (!confirm('この発展問題を、学習カードをもとに作り直します。よろしいですか？')) return
   const y = window.scrollY
+  showRegenOverlay('発展問題を作り直しています…')
   try {
     await axios.post(`/api/optional-problems/regenerate/${curriculumId}/${problemId}`, {}, { timeout: 120000 })
   } catch (error) {
     console.error('Error regenerating optional problem:', error)
+    hideRegenOverlay()
     alert('再提案に失敗しました。もう一度お試しください')
     return
   }
-  await loadGuidePage(curriculumId)
-  window.scrollTo(0, y)
+  try {
+    await loadGuidePage(curriculumId)
+    window.scrollTo(0, y)
+  } finally {
+    hideRegenOverlay()
+  }
 }
 
 // 画面の onclick から呼べるように公開
