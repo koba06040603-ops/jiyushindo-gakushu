@@ -20319,7 +20319,10 @@ function renderEnvDesignGuide(curriculumId, design) {
 
 // 1項目の表示（児童向け一文、教室にないもの、具体操作、掲示の上の問い、学習カード、先生向け説明）
 function renderEnvItemCard(curriculumId, it, g) {
-  const cards = (it.cards || []).map(c => `<li>${escapeHtmlSafe(c.label)}</li>`).join('')
+  const cards = (it.card_numbers || []).map(n => {
+    const labels = (it.cards || []).filter(c => c.card_number === n).map(c => escapeHtmlSafe(c.label))
+    return labels.length ? `<li><span class="font-bold">${n}：</span>${labels.join(' ／ ')}</li>` : ''
+  }).join('')
   return `
     <article class="border-2 ${g.border} bg-gradient-to-br ${g.bg} to-white rounded-xl p-4 hover:shadow-lg transition">
       <p class="text-xs font-bold text-gray-500 mb-1">${escapeHtmlSafe(it.slot)}：${escapeHtmlSafe(it.case)}</p>
@@ -20329,7 +20332,7 @@ function renderEnvItemCard(curriculumId, it, g) {
       <p class="text-base font-bold text-blue-900 bg-white border border-blue-200 rounded-lg p-2 mb-2"><i class="fas fa-question-circle mr-1 text-blue-600"></i>${escapeHtmlSafe(it.question)}</p>
       <div class="text-sm text-gray-700 mb-2">
         <p class="font-bold">学習カード（カード番号 ${(it.card_numbers || []).join('・')}）</p>
-        <ul class="list-disc pl-5">${cards}</ul>
+        <ul class="list-none pl-0 space-y-1">${cards}</ul>
       </div>
       <p class="text-sm text-gray-600"><span class="font-bold">先生向け説明：</span>${escapeHtmlSafe(it.teacher_note)}</p>
       ${canEditEnvironmentItems() ? envDesignRegenButton(curriculumId, it.slot) : ''}
@@ -20763,7 +20766,6 @@ async function saveNonCognitiveEvaluation(studentId, curriculumId, evaluationId)
 // グローバル関数として公開
 window.toggleTeacherMode = toggleTeacherMode
 window.loadEnvironmentDesignPage = loadEnvironmentDesignPage
-window.saveEnvironmentDesign = saveEnvironmentDesign
 window.loadEvaluationPage = loadEvaluationPage
 window.loadStudentEvaluation = loadStudentEvaluation
 window.saveThreePointEvaluation = saveThreePointEvaluation
