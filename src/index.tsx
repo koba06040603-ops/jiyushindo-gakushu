@@ -9194,16 +9194,17 @@ async function loadEnvCardLinesForPrompt(db: any, curriculum: any): Promise<stri
     .join('\n')
 }
 
-// APIルート：学習環境デザインをAIで自動生成（比の単元のみ・3機能×6事例・design_json に保存）
+// APIルート：学習環境デザインをAIで自動生成（全単元対応・3機能×6事例・design_json に保存）
 // ===== 学習環境デザイン：3機能×6事例 =====
 // 機能は「雰囲気・動機付け・見通し」「学習材・情報提供」「学習履歴・成果の可視化」の3つ。各機能に2事例ずつ置く。
+// 各事例のねらい（hint）は単元に依存しない表現にし、単元名はプロンプト側で埋め込む。
 const ENV_SLOTS: { slot: string; func: string; caseName: string; hint: string }[] = [
   { slot: 'A-1', func: '雰囲気・動機付け・見通し', caseName: '時間の流れを体感する掲示・展示', hint: '単元全体の流れを床や壁に長く見せ、今どこまで進んだかを子どもが自分で分かるようにする' },
-  { slot: 'A-2', func: '雰囲気・動機付け・見通し', caseName: '好奇心を刺激し活動を誘発する掲示・展示', hint: '見た目の印象と比の大きさがずれる仕掛けで、予想したくなり確かめたくなるようにする' },
-  { slot: 'B-1', func: '学習材・情報提供', caseName: '思考を深める足場となる掲示・展示', hint: '比の値を位置で捉え、等しい比や大小を見比べられる足場にする' },
-  { slot: 'B-2', func: '学習材・情報提供', caseName: '知識を関連付け多面的に広げる掲示・展示', hint: '比を小数・分数・割合と結びつけ、単元外の知識ともつながるようにする' },
+  { slot: 'A-2', func: '雰囲気・動機付け・見通し', caseName: '好奇心を刺激し活動を誘発する掲示・展示', hint: '見た目の印象と実際の関係や結果がずれる仕掛けで、予想したくなり確かめたくなるようにする' },
+  { slot: 'B-1', func: '学習材・情報提供', caseName: '思考を深める足場となる掲示・展示', hint: '単元の中心となる考え方や数量・関係を位置や並びで捉え、見比べられる足場にする' },
+  { slot: 'B-2', func: '学習材・情報提供', caseName: '知識を関連付け多面的に広げる掲示・展示', hint: '単元の内容を既習の知識や身近な生活・単元外の知識と結びつけ、多面的に広げられるようにする' },
   { slot: 'C-1', func: '学習履歴・成果の可視化', caseName: '情報交流や形成的評価の場となる掲示・展示', hint: '友だちの考えを見て比べ、付箋などで理解の状況が教師にも見えるようにする' },
-  { slot: 'C-2', func: '学習履歴・成果の可視化', caseName: '学びの履歴や振り返りの材となる掲示・展示', hint: '解けた比や直し方を残し、自分の伸びを振り返れるようにする' },
+  { slot: 'C-2', func: '学習履歴・成果の可視化', caseName: '学びの履歴や振り返りの材となる掲示・展示', hint: '解けた問題や直し方を残し、自分の伸びを振り返れるようにする' },
 ]
 
 type EnvCardRef = { card_id: number; course_name: string; card_number: number; card_title: string }
@@ -9234,6 +9235,7 @@ async function loadEnvCardRefs(db: any, curriculum: any): Promise<EnvCardRef[]> 
 
 // プロンプト用：カード番号ごとに、3コースのカード名を並べる
 function envCardListForPrompt(refs: EnvCardRef[]): string {
+  if (refs.length === 0) return '（この単元には学習カードがまだありません。card_numbers は空の配列 [] にし、カードに頼らず単元の内容だけで作ってください）'
   const byNum = new Map<number, string[]>()
   for (const r of refs) {
     if (!byNum.has(r.card_number)) byNum.set(r.card_number, [])
@@ -9254,6 +9256,8 @@ function buildEnvItem(raw: any, slot: { slot: string; func: string; caseName: st
     }
   }
   nums.sort((a, b) => a - b)
+  // 学習カードが無い単元は、カード番号を使わない（空のまま保存する）
+  if (refs.length === 0) nums.length = 0
   // 同じ番号は3コースにあるので、番号に当たるカードをすべて載せる
   const cards = refs
     .filter(r => nums.includes(r.card_number))
@@ -9273,7 +9277,8 @@ function buildEnvItem(raw: any, slot: { slot: string; func: string; caseName: st
     cards,
     teacher_note: cleanEnvText(raw.teacher_note, 220),
   }
-  if (!item.child_message || !item.intent || !item.not_in_classroom || !item.materials || !item.operation || !item.question || !item.effect || !item.teacher_note || cards.length === 0) return null
+  if (!item.child_message || !item.intent || !item.not_in_classroom || !item.materials || !item.operation || !item.question || !item.effect || !item.teacher_note) return null
+  if (refs.length > 0 && cards.length === 0) return null
   return item
 }
 
@@ -9388,7 +9393,7 @@ function buildEnvGenerationPrompt(curriculum: any, refs: EnvCardRef[]): string {
     '',
     envUnitInfoText(curriculum),
     '',
-    '【作る6項目】次の6つの事例について、それぞれ1項目ずつ作ってください。',
+    '【作る6項目】次の6つの事例について、それぞれ1項目ずつ作ってください。単元名「' + curriculum.unit_name + '」の内容に合わせ、他の単元の題材を持ち込まないでください。',
     ENV_SLOTS.map(s => '- ' + s.slot + '：【機能】' + s.func + ' ／【事例】' + s.caseName + ' ／【ねらい】' + s.hint).join('\n'),
     '',
     '【学習カード（カード番号で指定します）】',
@@ -9459,7 +9464,6 @@ app.post('/api/environment/design/generate/:curriculumId', async (c) => {
 
     const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculumId).first() as any
     if (!curriculum) return c.json({ error: 'Curriculum not found' }, 404)
-    if (curriculum.unit_name !== '比') return c.json({ error: 'この単元は対象外です（比の単元のみ）' }, 400)
 
     // 既に6項目がそろっていれば何もしない
     const existing = await env.DB.prepare(

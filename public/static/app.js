@@ -20283,24 +20283,16 @@ function renderEnvFunctionMap() {
 }
 
 // 学習環境デザイン（3機能×6事例）の表示。対応表は常に出す
-// 学習環境デザインの作成は現在「比」の単元のみ対応（API 側も同じ条件で判定）
-function isEnvDesignSupportedUnit(unitName) {
-  return unitName === '比'
-}
-
+// 学習環境デザインの作成は全単元で可能（学習カードが無い単元もカード参照なしで作成する）
 function renderEnvDesignGuide(curriculumId, design, unitName) {
   // 学習環境は教師・管理者のみに表示する（生徒画面には出さない）
   if (!canEditEnvironmentItems()) return ''
   const items = parseEnvDesignItems(design)
   let body = ''
   if (items.length === 0) {
-    body = isEnvDesignSupportedUnit(unitName)
-      ? `<div class="text-center py-6">
+    body = `<div class="text-center py-6">
       <p class="text-gray-600 mb-3">学習環境デザインはまだ作成されていません。</p>
       <button onclick="createEnvironmentDesign(${Number(curriculumId)})" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold"><i class="fas fa-magic mr-1"></i>学習環境デザインを作成する</button>
-    </div>`
-      : `<div class="text-center py-6">
-      <p class="text-gray-600">この単元の学習環境デザインは、まだ対応していません（現在は「比」の単元のみ）。</p>
     </div>`
   } else {
     body = ENV_FUNCTION_GROUPS.map(g => {
@@ -20416,7 +20408,7 @@ async function regenerateEnvironmentDesignItem(curriculumId, key) {
   }
 }
 
-// 学習環境デザイン（3機能×6事例）を単元ごとに作成する（教師・管理者のみ。比の単元のみ・既に6項目あれば何もしない）
+// 学習環境デザイン（3機能×6事例）を単元ごとに作成する（教師・管理者のみ。全単元対応・既に6項目あれば何もしない）
 async function createEnvironmentDesign(curriculumId) {
   if (!canEditEnvironmentItems()) return
   if (!confirm('この単元の学習環境デザイン（3機能×6事例）を、学習カードをもとに作成します。よろしいですか？')) return
