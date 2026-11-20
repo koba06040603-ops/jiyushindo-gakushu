@@ -12,7 +12,7 @@
 - 使用ボイス: Puck、Kore、Leda、Sadachbia、Fenrir、Vindemiatrix（既定 Puck）
 - フォールバック: 主力→副の順。各 25 秒でタイムアウトし、失敗時は `fallbackToWebSpeech: true` を返す
 - 健康チェック: `GET /api/admin/model-audit?live=1` は TTS を Interactions 形式で呼ぶ（管理者のみ）
-- 検証（2026-11-20）: 両モデルとも API が WAV を返すことを確認。既定の日本語 style でも本文のみが読まれることを文字起こしで確認（flash）。ローカル・本番の `/api/ai/tts` は認証必須のため、認証付きの実測は未実施（テストログインの確認待ち）
+- 検証（2026-11-20）: 両モデルとも API が WAV を返すことを確認。既定の日本語 style でも本文のみが読まれることを文字起こしで確認（flash）。認証付きの実測（2026-11-20、本番・管理者）: `/api/ai/tts` が 200 で WAV（`gemini-3.8-flash-tts`、Puck、24kHz）を返すことを確認。`/api/admin/model-audit?live=1` では `gemini-3.8-flash-tts` と `gemini-3.8-flash-lite-tts` がともに 200（alive）
 
 ---
 
