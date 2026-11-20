@@ -63,7 +63,7 @@ import { AdaptiveLearningEngine } from './adaptive-learning'
 import { SchoolManagementSystem } from './school-management'
 import { AIContentGenerator } from './ai-content-generator'
 import { buildQualityRules, buildQualityChecklist, buildReviseCardsPrompt } from './quality-rules'
-import { isProportionUnit, buildProportionSection, checkProportionCoverage } from './proportion-unit'
+import { isProportionUnit, buildProportionSection, checkProportionCoverage, checkProportionQuality } from './proportion-unit'
 import { renderCardsPrintPage, renderCardsBodyForPrint, renderCheckTestForPrint, renderOptionalForPrint, renderGuideForPrint, wrapPrintDocument, renderHintCardsPage, GUIDE_COURSE_BLURB } from './print-cards'
 import { 
   addToMistakeNotebook, 
@@ -20326,8 +20326,12 @@ ${buildQualityChecklist(String(unitName || ''))}
 
     // 比例・反比例：必須基礎 B1〜B7 の充足を確認する。不足は破棄せず、教師が見える形で返す
     const proportionMissing: string[] = proportionMode ? checkProportionCoverage(courseData.cards) : []
+    const proportionIssues: string[] = proportionMode ? checkProportionQuality(courseData.cards) : []
     if (proportionMissing.length > 0) {
       console.warn('⚠️ 比例・反比例の必須基礎が不足:', proportionMissing.join(','))
+    }
+    if (proportionIssues.length > 0) {
+      console.warn('⚠️ 比例・反比例の品質問題:', proportionIssues.join(' / '))
     }
     
     return c.json({
@@ -20335,7 +20339,8 @@ ${buildQualityChecklist(String(unitName || ''))}
       course: courseData,
       cards_count: courseData.cards.length,
       requested_cards: numCards,
-      proportion_coverage_missing: proportionMissing
+      proportion_coverage_missing: proportionMissing,
+      proportion_quality_issues: proportionIssues
     })
     
   } catch (error: any) {

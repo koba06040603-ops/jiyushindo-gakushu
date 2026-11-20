@@ -66,6 +66,20 @@ ${profile}
 `
 }
 
+// 品質の検査: 例題の答えが空、本問題と同じ答え、正解が空 を検出する（カード番号と理由の一覧）
+export function checkProportionQuality(cards: any[]): string[] {
+  const issues: string[] = []
+  for (const card of cards || []) {
+    const n = card?.card_number
+    const ans = String(card?.answer ?? '').trim()
+    const exAns = String(card?.example_answer ?? '').trim()
+    if (!ans) issues.push(`#${n}: 正解(answer)が空`)
+    if (!exAns) issues.push(`#${n}: 例題の答え(example_answer)が空`)
+    if (ans && exAns && ans === exAns) issues.push(`#${n}: 例題の答えが本問題と同じ`)
+  }
+  return issues
+}
+
 // 生成されたカード群が、必須基礎 B1〜B7 を全て含んでいるか確認する。
 // 戻り値は不足している基礎項目の ID 一覧（空配列なら合格）。
 export function checkProportionCoverage(cards: any[]): string[] {
