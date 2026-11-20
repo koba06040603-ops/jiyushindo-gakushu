@@ -20288,7 +20288,10 @@ function renderEnvDesignGuide(curriculumId, design) {
   let body = ''
   if (items.length === 0) {
     if (!canEditEnvironmentItems()) return ''
-    body = `<p class="text-center text-gray-600 py-6">学習環境デザインはまだ作成されていません。</p>`
+    body = `<div class="text-center py-6">
+      <p class="text-gray-600 mb-3">学習環境デザインはまだ作成されていません。</p>
+      <button onclick="createEnvironmentDesign(${Number(curriculumId)})" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold"><i class="fas fa-magic mr-1"></i>学習環境デザインを作成する</button>
+    </div>`
   } else {
     body = ENV_FUNCTION_GROUPS.map(g => {
       const list = items.filter(it => it.function === g.func)
@@ -20403,6 +20406,28 @@ async function regenerateEnvironmentDesignItem(curriculumId, key) {
   }
 }
 
+// 学習環境デザイン（3機能×6事例）を単元ごとに作成する（教師・管理者のみ。比の単元のみ・既に6項目あれば何もしない）
+async function createEnvironmentDesign(curriculumId) {
+  if (!canEditEnvironmentItems()) return
+  if (!confirm('この単元の学習環境デザイン（3機能×6事例）を、学習カードをもとに作成します。よろしいですか？')) return
+  const y = window.scrollY
+  showRegenOverlay('学習環境デザインを作成しています…')
+  try {
+    await axios.post(`/api/environment/design/generate/${curriculumId}`, {}, { timeout: 180000 })
+  } catch (error) {
+    console.error('Error creating environment design:', error)
+    hideRegenOverlay()
+    alert(error?.response?.data?.error || '作成に失敗しました。もう一度お試しください')
+    return
+  }
+  try {
+    await loadGuidePage(curriculumId)
+    window.scrollTo(0, y)
+  } finally {
+    hideRegenOverlay()
+  }
+}
+
 // えらべるもんだい（発展問題）を1問だけ再提案（教師・管理者のみ）
 async function regenerateOptionalProblem(curriculumId, problemId) {
   if (!canEditEnvironmentItems()) return
@@ -20429,6 +20454,7 @@ async function regenerateOptionalProblem(curriculumId, problemId) {
 // 画面の onclick から呼べるように公開
 window.regenerateOptionalProblem = regenerateOptionalProblem
 window.regenerateEnvironmentDesignItem = regenerateEnvironmentDesignItem
+window.createEnvironmentDesign = createEnvironmentDesign
 
 // 指導・評価タブ
 async function loadEvaluationPage(curriculumId) {
