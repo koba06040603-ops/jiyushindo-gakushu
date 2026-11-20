@@ -9309,14 +9309,17 @@ function buildEnvItem(raw: any, slot: { slot: string; func: string; caseName: st
     function: slot.func,
     case: slot.caseName,
     child_message: cleanEnvText(raw.child_message, 80),
+    intent: cleanEnvText(raw.intent, 200),
     not_in_classroom: cleanEnvText(raw.not_in_classroom, 120),
+    materials: cleanEnvText(raw.materials, 200),
     operation: cleanEnvText(raw.operation, 160),
     question: cleanEnvText(raw.question, 120),
+    effect: cleanEnvText(raw.effect, 200),
     card_numbers: nums,
     cards,
     teacher_note: cleanEnvText(raw.teacher_note, 220),
   }
-  if (!item.child_message || !item.not_in_classroom || !item.operation || !item.question || !item.teacher_note || cards.length === 0) return null
+  if (!item.child_message || !item.intent || !item.not_in_classroom || !item.materials || !item.operation || !item.question || !item.effect || !item.teacher_note || cards.length === 0) return null
   return item
 }
 
@@ -9411,9 +9414,12 @@ function envItemRulesText(): string {
   return [
     '【各項目の必須要素】',
     '- child_message：子どもに向けた一文（1文。子どもの言葉で）',
+    '- intent：この環境アイディアの意図・目的（何のために、どの学びを支えるか。1〜2文）',
     '- not_in_classroom：「教室にないもの」を具体的に（何を・どんな形で・どこに置くか）。「あの子が喜ぶかも」と思えるもの',
+    '- materials：用意する材料（教室にないものを含め、準備するものを具体的に列挙する。1〜2文）',
     '- operation：子どもが手を動かす具体操作を1つ以上（「〜する」の形で短く）',
     '- question：掲示の上に書く、思考を深める問いかけ（1文の疑問文）',
+    '- effect：期待できる効果（子どもの学びや行動にどう表れるか。1〜2文）',
     '- card_numbers：関連する学習カードのカード番号（1〜10の整数を2〜3個）',
     '- teacher_note：先生向けの説明（1〜2文。この掲示の教育的なねらい）',
     '',
@@ -9437,7 +9443,7 @@ function buildEnvGenerationPrompt(curriculum: any, refs: EnvCardRef[]): string {
     envItemRulesText(),
     '',
     '以下のJSON形式のみで回答してください:',
-    '{"items":[{"slot":"A-1","child_message":"","not_in_classroom":"","operation":"","question":"","card_numbers":[1,2],"teacher_note":""}]}',
+    '{"items":[{"slot":"A-1","child_message":"","intent":"","not_in_classroom":"","materials":"","operation":"","question":"","effect":"","card_numbers":[1,2],"teacher_note":""}]}',
     '※ items は A-1, A-2, B-1, B-2, C-1, C-2 の6件にしてください。',
   ].join('\n')
 }
@@ -9462,7 +9468,7 @@ function buildEnvRegenPrompt(curriculum: any, slot: { slot: string; func: string
     envItemRulesText(),
     '',
     '以下のJSON形式のみで回答してください:',
-    '{"child_message":"","not_in_classroom":"","operation":"","question":"","card_numbers":[1,2],"teacher_note":""}',
+    '{"child_message":"","intent":"","not_in_classroom":"","materials":"","operation":"","question":"","effect":"","card_numbers":[1,2],"teacher_note":""}',
   ].filter(line => line !== '').join('\n')
 }
 
