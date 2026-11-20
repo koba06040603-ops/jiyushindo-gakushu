@@ -2,6 +2,20 @@
 
 > 📘 **一般向けの簡易版READMEは [README_SIMPLE.md](./README_SIMPLE.md) をご覧ください**
 
+## 🔊 音声生成（TTS）の移行: Gemini 3.8 Flash TTS **NEW** (2026-11-20)
+
+- 期限: 2026年12月18日までに旧モデルから移行（完了）
+- 主力: `gemini-3.8-flash-tts`（130言語）／ 副（低遅延・低コスト）: `gemini-3.8-flash-lite-tts`（101言語）
+- エンドポイント: `POST https://generativelanguage.googleapis.com/v1beta/interactions`（Interactions API、生の fetch。SDK 依存なし）
+- リクエスト: `input[].content[].annotations[].speech_metadata.style` に話し方の指示を入れる。本文は一字一句読み上げられるため、指示は本文に混ぜない
+- 応答: `output_audio.data` または `steps[].content[]`（type=audio）の base64。WAV（RIFF、24kHz、mono、16bit）
+- 使用ボイス: Puck、Kore、Leda、Sadachbia、Fenrir、Vindemiatrix（既定 Puck）
+- フォールバック: 主力→副の順。各 25 秒でタイムアウトし、失敗時は `fallbackToWebSpeech: true` を返す
+- 健康チェック: `GET /api/admin/model-audit?live=1` は TTS を Interactions 形式で呼ぶ（管理者のみ）
+- 検証（2026-11-20）: 両モデルとも API が WAV を返すことを確認。既定の日本語 style でも本文のみが読まれることを文字起こしで確認（flash）。ローカル・本番の `/api/ai/tts` は認証必須のため、認証付きの実測は未実施（テストログインの確認待ち）
+
+---
+
 ## 📐 比例・反比例（ひれいとはんぴれい、curriculum id 8875）**NEW** (2026-11-20)
 
 小学6年 算数・東京書籍「ひれいとはんぴれい」の学習カードを、3コース（じっくり・しっかり・ぐんぐん）× 各10枚で作成しています。比（8872）は変更していません。
@@ -13,7 +27,7 @@
 | コース | 477 じっくり（basic）／ 478 しっかり（standard）／ 479 ぐんぐん（advanced） |
 | 学習カード | 30 枚（card_id 2888〜2917。各コース10枚） |
 | ヒント | 90 件（1カードあたり3件。`hint_cards`） |
-| 画像 | 6 枚（`learning_cards.problem_image_url`、JPEG の data URL） |
+| 画像 | 30 枚すべて（`learning_cards.problem_image_url`、JPEG の data URL。2026-11-20 に 24 枚を D1 へ書き込み、読み戻しで一致を確認） |
 
 ### 必須基礎 B1〜B7（全コース共通・最優先）
 | ID | 内容 |
@@ -47,6 +61,8 @@
 
 ### 表示の制限
 - 学習環境（学習環境デザイン）は比の単元のみが対象です。比例反比例（8875）には学習環境はまだありません。
+- 8875 では教師・管理者画面に「学習環境デザインを作成する」ボタンを出しません（比のみ作成可）。8875 では「まだ対応していません」の説明文を出します。
+- 生徒画面（`/guide/:curriculumId`、student-home）には学習環境を出しません。
 - 学習カードの表示は、教師・管理者の学習のてびき（`loadGuidePage`）で確認します。
 
 ### 未決定・今後の確認事項
