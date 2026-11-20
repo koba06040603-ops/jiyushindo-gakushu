@@ -72,16 +72,25 @@
 - `GET /api/environment/design/:curriculumId` — `design_json` を文字列のまま返す。フロントで `JSON.parse` する
 
 ### 旧APIと注意点
-- `POST /api/environment/design` と `PUT /api/environment/design/:id` は**旧6列へ書く処理のまま残っています**。画面からは使っていません。削除するか決めてから対応します（未決定）。
+- 旧API（`POST /api/environment/design`、`PUT /api/environment/design/:id`、`GET /api/environment/:curriculumId`）は**削除済み**です。旧6列（`design_json` 以外）は旧データのロールバック用に残しています。
 - 表示時の自動生成は停止しています（承認前に D1 へ書き込まないため）。作成は上のボタンか API で明示的に行います。
 - Gemini のモデルは順に試します（`gemini-3.7-flash` → `gemini-3.8-flash` → `gemini-3.5-flash`）。503 のときは次のモデルへ進みます。
 
 ### 未実装・今後の確認事項
 - 比以外の単元への展開（現在は比のみ）
-- 旧APIの削除
 - 実 Gemini での再提案の結果確認（ログインした教師アカウントで）
 - 比の単元の 5 件（8872 以外）のブラウザ表示の確認
 - 児童画面に学習環境を出すかどうか（現在は出さない方針）
+
+### 📚 教科書の取り込み（単元ごと・教師・管理者のみ）
+学習カードの生成画面（教科書会社・単元名を選んだ後）に「教科書の取り込み」欄を置いています。
+- 手順: ファイル（PDF / JPEG / PNG / WebP、1つ10MBまで）とページ（例: p.52-55）をアップロード → 「読み取る（AI）」で学習内容を整理 → 教師が内容を確認・修正して「内容を確認して保存」。
+- 確認して保存された内容だけが、`/api/ai/generate-course`（単元の学習カード生成）のプロンプトに入ります。読み取り結果のままでは使いません。
+- 原本は R2 の非公開キー（`private/textbooks/`）に保存し、`/api/media/` からは配信しません（404）。
+- 保存期間は**1年**（`expires_at`）。期限切れは一覧・アップロード時に原本と学習内容を削除します。教師は「削除」でいつでも消せます。
+- D1 テーブル: `textbook_sources`（migration `0106_textbook_sources.sql`、本番適用済み）。
+- API: `GET /api/textbook-sources`、`POST /api/textbook-sources/upload`、`POST /api/textbook-sources/:id/extract`、`POST /api/textbook-sources/:id/confirm`、`DELETE /api/textbook-sources/:id`（いずれも教師・管理者のみ）。
+- 注意: 教科書は著作物です。学校内での利用の範囲に限り、生成物に長い引用を残さないように読み取りプロンプトで指示しています。
 
 ### 関連コミット
 - `49248a5` ～ `fc87f4e`: 生成・再提案の処理と design_json 対応
@@ -90,6 +99,8 @@
 - `c36ff08`: 参照切れ（`saveEnvironmentDesign`）の修正、カードを番号ごとに1行に
 - `f79aead`: 学習カードの列記を外し、比 A-1 に説明文を表示（後に一般化）
 - `a5d0f56`: 意図・目的、材料、効果の欄を追加
+- 旧API削除（`ae3bd66` ほか、この節の後の作業）: 旧 `GET /api/environment/:curriculumId` を削除
+- 教科書の取り込み（migration 0106、`private/` の配信拒否）: 今回のコミット
 - `dc9799d`: 学習環境デザインの作成ボタン（比のみ）を追加
 
 ## 🔒 セキュリティ大規模改善 v4.0 — SE米田氏フィードバック対応 **NEW** (2026-04-16)

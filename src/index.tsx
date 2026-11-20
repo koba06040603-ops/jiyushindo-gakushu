@@ -8927,24 +8927,6 @@ app.post('/api/learning-plan/save', async (c) => {
   }
 })
 
-// APIルート：学習環境デザイン取得
-app.get('/api/environment/:curriculumId', async (c) => {
-  const { env } = c
-  const curriculumId = c.req.param('curriculumId')
-  
-  try {
-    const environments = await env.DB.prepare(`
-      SELECT * FROM learning_environment
-      WHERE curriculum_id = ?
-      ORDER BY category, id
-    `).bind(curriculumId).all()
-    
-    return c.json(environments.results)
-  } catch (error) {
-    return c.json({ error: 'Database error' }, 500)
-  }
-})
-
 // ==================== Phase 5: 先生カスタマイズモード API ====================
 
 // APIルート：3観点評価取得
@@ -19815,6 +19797,9 @@ app.post('/api/ai/generate-course', async (c) => {
     // 🎓 v12 品質ルール（scripts/quality の評価ハーネスで 94.7点を達成）
     //    ルール本体は src/quality-rules.ts に集約。変更時は必ず回帰テストすること。
     const qualityCtx = { grade: String(grade || ''), subject: String(subject || ''), unit: String(unitName || ''), goal: String(unitGoal || '') }
+    // 教師が確認済みの教科書の学習内容（未確認の読み取り結果は使わない）
+    const textbookNotes = await loadConfirmedTextbookNotes(env.DB, { grade: String(grade || ''), subject: String(subject || ''), textbook: String(textbook || ''), unitName: String(unitName || '') })
+    const textbookSection = textbookNotes ? `\n【教科書の学習内容（教師が確認済み）】\n${textbookNotes}\n→ 上記の用語・公式・例題の型・手順に沿ってカードを作成すること。教科書にない内容は増やさないこと。\n` : ''
     const selfLearningRules = buildQualityRules(qualityCtx)
 
     const prompt = `あなたは小学校の教科指導に精通した優秀な教師です。以下の単元の学習カード${numCards}枚を生成してください。
@@ -19826,7 +19811,7 @@ ${selfLearningRules}
 - 単元名: ${unitName}
 - 単元目標: ${unitGoal || '未指定'}
 - コース: ${courseInfo.name} (${difficultyDescription})
-${customInfo}${mikataSection}
+${textbookSection}${customInfo}${mikataSection}
 【カード設計の方針】
 - 単元の学習内容を網羅的にカバーする（導入→基本→応用→まとめ）
 - ${numCards}枚で単元全体の主要な学習項目を漏れなく扱う
@@ -37547,6 +37532,225 @@ app.post('/api/cards/:cardId/edit-history', async (c) => {
 // Phase 14: ファイルアップロード機能（R2優先・Base64フォールバック）
 // =============================================================================
 
+// ==================== 教科書取り込み（単元ごと・教師・管理者のみ） ====================
+// 原本は R2 の非公開キー（private/textbooks/）に保存する（/api/media/ からは配信しない）。
+// D1 には教師が確認した学習内容（整理済みテキスト）だけを保存する。保存期間は1年。
+const TEXTBOOK_MAX_BYTES = 10 * 1024 * 1024
+const TEXTBOOK_RETENTION_SQL = "datetime('now','+365 days')"
+const TEXTBOOK_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+const TEXTBOOK_R2_PREFIX = 'private/textbooks/'
+const TEXTBOOK_NOTES_MAX_CHARS = 6000
+
+function textbookBytesToBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf)
+  let bin = ''
+  const CHUNK = 0x8000
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+  }
+  return btoa(bin)
+}
+
+async function purgeExpiredTextbookSources(env: any): Promise<void> {
+  const rows = await env.DB.prepare(
+    `SELECT id, r2_key FROM textbook_sources WHERE expires_at < datetime('now')`
+  ).all()
+  for (const r of (rows.results || []) as any[]) {
+    if (env.MEDIA_BUCKET && r.r2_key) await env.MEDIA_BUCKET.delete(r.r2_key)
+    await env.DB.prepare('DELETE FROM textbook_sources WHERE id = ?').bind(r.id).run()
+  }
+}
+
+// 生成時に使う: 教師が確認済みの学習内容だけを単元キーで取り出す（失敗しても生成は止めない）
+async function loadConfirmedTextbookNotes(db: any, key: { grade: string, subject: string, textbook: string, unitName: string }): Promise<string> {
+  try {
+    const rows = await db.prepare(
+      `SELECT extracted_text FROM textbook_sources
+       WHERE status = 'confirmed' AND grade = ? AND subject = ? AND textbook_company = ? AND unit_name = ?
+         AND expires_at > datetime('now')
+       ORDER BY id`
+    ).bind(key.grade, key.subject, key.textbook || '', key.unitName).all()
+    const text = ((rows.results || []) as any[]).map(r => r.extracted_text || '').filter(Boolean).join('\n\n')
+    return text.slice(0, TEXTBOOK_NOTES_MAX_CHARS)
+  } catch (e) {
+    console.error('教科書学習内容の取得に失敗（生成は続行）:', e)
+    return ''
+  }
+}
+
+async function callTextbookGemini(apiKey: string, mime: string, b64: string, prompt: string): Promise<string> {
+  const models = [GEMINI_MODEL_QUALITY, GEMINI_MODEL_FALLBACK_PRIMARY, GEMINI_MODEL_FALLBACK, GEMINI_MODEL_LEGACY]
+  for (const model of models) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ inline_data: { mime_type: mime, data: b64 } }, { text: prompt }] }],
+            generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
+          })
+        }
+      )
+      if (!res.ok) {
+        console.error('Textbook Gemini HTTP error:', model, res.status)
+        continue
+      }
+      const data = await res.json() as any
+      const text = ((data.candidates?.[0]?.content?.parts || []) as any[]).map(p => p.text || '').join('').trim()
+      if (text) return text
+      console.error('Textbook Gemini empty result:', model)
+    } catch (error) {
+      console.error('Textbook Gemini error:', model, error)
+    }
+  }
+  return ''
+}
+
+// 一覧（期限切れは先に削除）
+app.get('/api/textbook-sources', authMiddleware, requireRole('teacher', 'admin'), async (c) => {
+  const { env } = c
+  const grade = c.req.query('grade') || ''
+  const subject = c.req.query('subject') || ''
+  const textbook = c.req.query('textbook') || ''
+  const unitName = c.req.query('unitName') || ''
+  if (!grade || !subject || !unitName) return c.json({ success: false, error: '学年・教科・単元名を指定してください' }, 400)
+  try {
+    await purgeExpiredTextbookSources(env)
+    const rows = await env.DB.prepare(
+      `SELECT id, file_name, page_label, file_size, extracted_text, status, error_message, created_at, confirmed_at, expires_at
+       FROM textbook_sources
+       WHERE grade = ? AND subject = ? AND textbook_company = ? AND unit_name = ?
+       ORDER BY id DESC`
+    ).bind(grade, subject, textbook, unitName).all()
+    return c.json({ success: true, sources: rows.results || [] })
+  } catch (error: any) {
+    console.error('教科書一覧エラー:', error)
+    return c.json({ success: false, error: 'Database error', details: error.message }, 500)
+  }
+})
+
+// アップロード（原本は R2 の非公開キーへ。D1 にはメタ情報のみ）
+app.post('/api/textbook-sources/upload', authMiddleware, requireRole('teacher', 'admin'), async (c) => {
+  const { env } = c
+  const user = c.get('user') as any
+  try {
+    if (!env.MEDIA_BUCKET) return c.json({ success: false, error: 'R2ストレージが設定されていません。' }, 500)
+    const form = await c.req.formData()
+    const file = form.get('file') as File | null
+    const grade = String(form.get('grade') || '').trim()
+    const subject = String(form.get('subject') || '').trim()
+    const textbook = String(form.get('textbook') || '').trim()
+    const unitName = String(form.get('unitName') || '').trim()
+    const pageLabel = String(form.get('pageLabel') || '').trim().slice(0, 100)
+
+    if (!file) return c.json({ success: false, error: 'ファイルが選択されていません' }, 400)
+    if (!grade || !subject || !unitName) return c.json({ success: false, error: '学年・教科・単元名を先に選択してください' }, 400)
+    if (!TEXTBOOK_TYPES.includes(file.type)) {
+      return c.json({ success: false, error: 'PDF・JPEG・PNG・WebPに対応しています。' }, 400)
+    }
+    if (file.size > TEXTBOOK_MAX_BYTES) {
+      return c.json({ success: false, error: 'ファイルは1つ10MBまでです。ページを分けて追加してください。' }, 400)
+    }
+
+    await purgeExpiredTextbookSources(env)
+
+    const ext = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg'
+    const r2Key = `${TEXTBOOK_R2_PREFIX}${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`
+    await env.MEDIA_BUCKET.put(r2Key, await file.arrayBuffer(), { httpMetadata: { contentType: file.type } })
+
+    const ins = await env.DB.prepare(
+      `INSERT INTO textbook_sources
+         (grade, subject, textbook_company, unit_name, page_label, r2_key, file_name, mime_type, file_size, status, uploaded_by, created_at, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'uploaded', ?, datetime('now'), ${TEXTBOOK_RETENTION_SQL})`
+    ).bind(grade, subject, textbook, unitName, pageLabel, r2Key, String(file.name || '').slice(0, 200), file.type, file.size, user?.user_id ?? null).run()
+
+    return c.json({ success: true, id: ins.meta.last_row_id })
+  } catch (error: any) {
+    console.error('教科書アップロードエラー:', error)
+    return c.json({ success: false, error: 'アップロードに失敗しました', details: error.message }, 500)
+  }
+})
+
+// 読み取り（Gemini で学習内容を整理。結果は教師が確認するまで生成には使わない）
+app.post('/api/textbook-sources/:id/extract', authMiddleware, requireRole('teacher', 'admin'), async (c) => {
+  const { env } = c
+  const id = c.req.param('id')
+  const apiKey = env.GEMINI_API_KEY
+  if (!apiKey || apiKey === 'your-gemini-api-key-here') {
+    return c.json({ success: false, error: 'Gemini APIキーが設定されていません。' }, 500)
+  }
+  try {
+    const row = await env.DB.prepare('SELECT * FROM textbook_sources WHERE id = ?').bind(id).first() as any
+    if (!row) return c.json({ success: false, error: '見つかりません' }, 404)
+    if (!env.MEDIA_BUCKET) return c.json({ success: false, error: 'R2ストレージが設定されていません。' }, 500)
+
+    const obj = await env.MEDIA_BUCKET.get(row.r2_key)
+    if (!obj) return c.json({ success: false, error: '原本ファイルが見つかりません。削除して再アップロードしてください。' }, 404)
+    const b64 = textbookBytesToBase64(await obj.arrayBuffer())
+
+    const prompt = `あなたは小学校の教師の授業準備を助けるアシスタントです。添付は「${row.textbook_company || '教科書'}」の${row.grade}・${row.subject}「${row.unit_name}」の教科書ページです${row.page_label ? `（対象: ${row.page_label}）` : ''}。
+次の見出しで、この単元の学習内容を教師向けに整理してください。
+1. 学習の流れ（見出し・小単元の順）
+2. 用語と定義、公式・決まり（教科書の記述どおりに正確に）
+3. 例題の型と解き方の手順（数値・条件は教科書どおり）
+4. 図・表・グラフの内容（文章で説明）
+5. つまずきやすい点
+注意: 教科書の文章を長く引用せず、要点を整理した言葉で書くこと。添付にない内容は書かないこと。`
+
+    const text = await callTextbookGemini(apiKey, row.mime_type || 'application/pdf', b64, prompt)
+    if (!text) {
+      await env.DB.prepare(`UPDATE textbook_sources SET status = 'failed', error_message = ? WHERE id = ?`)
+        .bind('読み取りに失敗しました（時間をおいて再実行してください）', id).run()
+      return c.json({ success: false, error: '読み取りに失敗しました。時間をおいて再実行してください。' }, 502)
+    }
+    const trimmed = text.slice(0, 20000)
+    await env.DB.prepare(`UPDATE textbook_sources SET extracted_text = ?, status = 'extracted', error_message = '' WHERE id = ?`)
+      .bind(trimmed, id).run()
+    return c.json({ success: true, id: Number(id), extracted_text: trimmed })
+  } catch (error: any) {
+    console.error('教科書読み取りエラー:', error)
+    return c.json({ success: false, error: '読み取りに失敗しました', details: error.message }, 500)
+  }
+})
+
+// 確認（教師が整えた学習内容を保存。これで初めて生成に使われる）
+app.post('/api/textbook-sources/:id/confirm', authMiddleware, requireRole('teacher', 'admin'), async (c) => {
+  const { env } = c
+  const id = c.req.param('id')
+  try {
+    const body = await c.req.json().catch(() => ({}))
+    const text = String(body.extracted_text || '').trim().slice(0, 20000)
+    if (!text) return c.json({ success: false, error: '学習内容が空です' }, 400)
+    const row = await env.DB.prepare('SELECT id FROM textbook_sources WHERE id = ?').bind(id).first()
+    if (!row) return c.json({ success: false, error: '見つかりません' }, 404)
+    await env.DB.prepare(
+      `UPDATE textbook_sources SET extracted_text = ?, status = 'confirmed', confirmed_at = datetime('now'), error_message = '' WHERE id = ?`
+    ).bind(text, id).run()
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('教科書確認保存エラー:', error)
+    return c.json({ success: false, error: 'Database error', details: error.message }, 500)
+  }
+})
+
+// 削除（原本と学習内容を両方削除）
+app.delete('/api/textbook-sources/:id', authMiddleware, requireRole('teacher', 'admin'), async (c) => {
+  const { env } = c
+  const id = c.req.param('id')
+  try {
+    const row = await env.DB.prepare('SELECT r2_key FROM textbook_sources WHERE id = ?').bind(id).first() as any
+    if (!row) return c.json({ success: false, error: '見つかりません' }, 404)
+    if (env.MEDIA_BUCKET && row.r2_key) await env.MEDIA_BUCKET.delete(row.r2_key)
+    await env.DB.prepare('DELETE FROM textbook_sources WHERE id = ?').bind(id).run()
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('教科書削除エラー:', error)
+    return c.json({ success: false, error: 'Database error', details: error.message }, 500)
+  }
+})
+
 // 画像ファイルアップロード（JPG/PNG/GIF/WebP/PDF対応）
 // R2バケットが利用可能な場合はR2に保存、なければBase64でDB保存
 app.post('/api/upload/image', async (c) => {
@@ -37793,6 +37997,10 @@ app.get('/api/media/*', async (c) => {
   
   if (!rest) {
     return c.json({ error: 'ファイル名が指定されていません' }, 400)
+  }
+  // 非公開領域（教科書原本など）は配信しない。basename フォールバックでも取得させない
+  if (decodeURIComponent(rest).replace(/^\/+/, '').startsWith('private/')) {
+    return c.json({ error: 'Not found' }, 404)
   }
   
   // 他のAPIルートへのリクエストは通さない（Honoのルート順序で先にマッチするはず）

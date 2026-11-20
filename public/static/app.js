@@ -23527,6 +23527,34 @@ function showUnitGeneratorModal() {
           </div>
         </div>
 
+        <!-- 教科書の取り込み（単元ごと・教師・管理者のみ。確認した学習内容だけを生成に使う） -->
+        <div id="textbookSourcePanel" class="bg-amber-50 rounded-lg p-6 mb-6">
+          <h3 class="text-xl font-bold text-amber-800 mb-2">
+            <i class="fas fa-book-open mr-2"></i>教科書の取り込み（任意）
+          </h3>
+          <p class="text-sm text-gray-700 mb-3">
+            教科書のページ（PDFまたは画像）を読み込み、教師が内容を確認したものを学習カードの生成に使います。
+            原本は非公開で保存し、保存期間は1年です。教師・管理者のみ閲覧できます。
+          </p>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+            <input type="file" id="tbFile" accept="application/pdf,image/jpeg,image/png,image/webp"
+                   class="md:col-span-2 p-2 border-2 border-gray-300 rounded-lg bg-white text-sm">
+            <input type="text" id="tbPageLabel" placeholder="ページ（例: p.52-55）"
+                   class="p-2 border-2 border-gray-300 rounded-lg bg-white text-sm">
+          </div>
+          <div class="flex flex-wrap gap-2 mb-3">
+            <button type="button" onclick="uploadTextbookSource()"
+                    class="text-sm bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600">
+              <i class="fas fa-upload mr-1"></i>教科書をアップロード
+            </button>
+            <button type="button" onclick="loadTextbookSources()"
+                    class="text-sm bg-white border-2 border-amber-400 text-amber-800 px-4 py-2 rounded-lg hover:bg-amber-100">
+              この単元の取り込みを表示
+            </button>
+          </div>
+          <div id="textbookSourceList" class="space-y-3 text-sm"></div>
+        </div>
+
         <!-- カスタマイズ（不登校・個別支援対応） -->
         <div class="bg-green-50 rounded-lg p-6">
           <h3 class="text-xl font-bold text-green-800 mb-4">
@@ -23681,7 +23709,141 @@ function showUnitGeneratorModal() {
     }
   })
   document.getElementById('genTextbook').addEventListener('change', updateSuggestButton)
+  // 教科書の取り込み一覧は、学年・教科・教科書・単元名が変わるたびに更新する
+  ;['genGrade','genSubject','genTextbook'].forEach(id => document.getElementById(id)?.addEventListener('change', () => loadTextbookSources()))
+  document.getElementById('genUnitName')?.addEventListener('change', () => loadTextbookSources())
+  loadTextbookSources()
 }
+
+// ===== 教科書の取り込み（単元ごと・教師・管理者のみ。原本は非公開、保存1年） =====
+function getTextbookUnitKey() {
+  return {
+    grade: document.getElementById('genGrade')?.value || '',
+    subject: document.getElementById('genSubject')?.value || '',
+    textbook: document.getElementById('genTextbook')?.value || '',
+    unitName: (document.getElementById('genUnitName')?.value || '').trim()
+  }
+}
+
+function textbookStatusLabel(status) {
+  const labels = {
+    uploaded: '未読み取り',
+    extracted: '読み取り済み（内容を確認してください）',
+    confirmed: '確認済み（学習カードの生成に使用）',
+    failed: '読み取り失敗'
+  }
+  return labels[status] || status || ''
+}
+
+function renderTextbookSources(list) {
+  const el = document.getElementById('textbookSourceList')
+  if (!el) return
+  if (!list.length) {
+    el.innerHTML = '<p class="text-gray-500">この単元の教科書はまだ取り込まれていません。</p>'
+    return
+  }
+  el.innerHTML = list.map(s => `
+    <article class="bg-white border-2 border-amber-200 rounded-lg p-3">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <p class="font-bold text-gray-800">${escapeHtmlSafe(s.file_name || '（名称なし）')}${s.page_label ? '／' + escapeHtmlSafe(s.page_label) : ''}</p>
+        <span class="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-800">${escapeHtmlSafe(textbookStatusLabel(s.status))}</span>
+      </div>
+      <p class="text-xs text-gray-500 mb-2">保存期限: ${escapeHtmlSafe(String(s.expires_at || '').slice(0, 10))}</p>
+      ${s.error_message ? `<p class="text-xs text-red-600 mb-2">${escapeHtmlSafe(s.error_message)}</p>` : ''}
+      <label class="block text-xs font-bold text-gray-700 mb-1" for="tbText_${s.id}">学習内容（読み取り結果を確認・修正してから保存）</label>
+      <textarea id="tbText_${s.id}" rows="8" class="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" placeholder="「読み取る」を押すと、ここに学習内容が入ります">${escapeHtmlSafe(s.extracted_text || '')}</textarea>
+      <div class="flex flex-wrap gap-2 mt-2">
+        <button type="button" onclick="extractTextbookSource(${Number(s.id)})" class="text-sm bg-white border-2 border-amber-400 text-amber-800 px-3 py-1 rounded-lg hover:bg-amber-100">読み取る（AI）</button>
+        <button type="button" onclick="confirmTextbookSource(${Number(s.id)})" class="text-sm bg-amber-500 text-white px-3 py-1 rounded-lg hover:bg-amber-600">内容を確認して保存</button>
+        <button type="button" onclick="deleteTextbookSource(${Number(s.id)})" class="text-sm bg-white border-2 border-red-300 text-red-600 px-3 py-1 rounded-lg hover:bg-red-50">削除</button>
+      </div>
+    </article>`).join('')
+}
+
+async function loadTextbookSources() {
+  const el = document.getElementById('textbookSourceList')
+  const panel = document.getElementById('textbookSourcePanel')
+  if (!el || !panel) return
+  if (!canEditEnvironmentItems()) {
+    panel.style.display = 'none'
+    return
+  }
+  panel.style.display = ''
+  const key = getTextbookUnitKey()
+  if (!key.grade || !key.subject || !key.unitName) {
+    el.innerHTML = '<p class="text-gray-500">学年・教科・単元名を入力すると、この単元の取り込みが表示されます。</p>'
+    return
+  }
+  try {
+    const res = await axios.get('/api/textbook-sources', { params: key, timeout: 30000 })
+    renderTextbookSources((res.data && res.data.sources) || [])
+  } catch (err) {
+    el.innerHTML = `<p class="text-red-600">一覧の取得に失敗しました: ${escapeHtmlSafe(err.response?.data?.error || err.message)}</p>`
+  }
+}
+
+async function uploadTextbookSource() {
+  if (!canEditEnvironmentItems()) { alert('教科書の取り込みは教師・管理者のみ利用できます'); return }
+  const key = getTextbookUnitKey()
+  const file = document.getElementById('tbFile')?.files?.[0]
+  if (!key.grade || !key.subject || !key.unitName) { alert('学年・教科・単元名を先に入力してください'); return }
+  if (!file) { alert('教科書のファイル（PDFまたは画像）を選んでください'); return }
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('grade', key.grade)
+  fd.append('subject', key.subject)
+  fd.append('textbook', key.textbook)
+  fd.append('unitName', key.unitName)
+  fd.append('pageLabel', document.getElementById('tbPageLabel')?.value || '')
+  try {
+    await axios.post('/api/textbook-sources/upload', fd, { timeout: 120000 })
+    const input = document.getElementById('tbFile')
+    if (input) input.value = ''
+    await loadTextbookSources()
+  } catch (err) {
+    alert('アップロードに失敗しました: ' + (err.response?.data?.error || err.message))
+  }
+}
+
+async function extractTextbookSource(id) {
+  const btn = event?.currentTarget
+  if (btn) { btn.disabled = true; btn.textContent = '読み取り中…' }
+  try {
+    await axios.post(`/api/textbook-sources/${id}/extract`, {}, { timeout: 180000 })
+    await loadTextbookSources()
+  } catch (err) {
+    alert('読み取りに失敗しました: ' + (err.response?.data?.error || err.message))
+    await loadTextbookSources()
+  }
+}
+
+async function confirmTextbookSource(id) {
+  const ta = document.getElementById(`tbText_${id}`)
+  const text = (ta?.value || '').trim()
+  if (!text) { alert('学習内容が空です。読み取るか、内容を入力してください。'); return }
+  try {
+    await axios.post(`/api/textbook-sources/${id}/confirm`, { extracted_text: text }, { timeout: 30000 })
+    await loadTextbookSources()
+  } catch (err) {
+    alert('保存に失敗しました: ' + (err.response?.data?.error || err.message))
+  }
+}
+
+async function deleteTextbookSource(id) {
+  if (!confirm('この教科書の原本と学習内容を削除します。よろしいですか？')) return
+  try {
+    await axios.delete(`/api/textbook-sources/${id}`, { timeout: 30000 })
+    await loadTextbookSources()
+  } catch (err) {
+    alert('削除に失敗しました: ' + (err.response?.data?.error || err.message))
+  }
+}
+
+window.loadTextbookSources = loadTextbookSources
+window.uploadTextbookSource = uploadTextbookSource
+window.extractTextbookSource = extractTextbookSource
+window.confirmTextbookSource = confirmTextbookSource
+window.deleteTextbookSource = deleteTextbookSource
 
 // 最後の生成パラメータを保存（再生成用）
 let lastGenerationParams = null
@@ -24170,6 +24332,7 @@ function generateDummyUnits(grade, subject) { return [] }
 // 候補から単元を選択
 function selectSuggestedUnit(unitName, index) {
   document.getElementById('genUnitName').value = unitName
+  loadTextbookSources()
   
   // 選択した候補を強調表示
   const buttons = document.getElementById('unitSuggestionList').querySelectorAll('button')
