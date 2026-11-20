@@ -10631,6 +10631,554 @@ const STAGED_LESSON_CONFIG = {
       '1時間の 3kWh を 4倍すると、いくつになるかな？'
     ],
     reflectionPrompt: '発電時間が2倍、3倍になると発電量も2倍、3倍になるのはなぜか、ことばで一言書いてみよう。'
+  },
+  // ===== 比例（type: proportion）: x を動かすと y＝rate×x で決まる =====
+  // じっくり2「比例の表の空らん」（2889）
+  2889: {
+    concrete: {
+      type: 'proportion',
+      xLabel: '針金の長さ x', xUnit: 'm', yLabel: '重さ y', yUnit: 'g',
+      rate: 20, max: 5, start: 0, target: 4,
+      intro: '1mの重さが20gの針金です。長さ x を動かして、4m のときの重さ y を見てみよう。'
+    },
+    step2Question: '長さが1mから4mになると、重さは何倍になりますか。式を選ぼう。',
+    formulaChoices: ['20×4', '20÷4', '4÷20', '20＋4'],
+    formulaCorrect: '20×4',
+    formulaOkText: '○ せいかい！ 1mの重さ20gの4倍だから、20×4 で 80g になるね。',
+    formulaNgText: '× ちがうよ。1mの重さ20gを、長さの何倍にすればよいかを考えよう。',
+    step3ButtonLabel: '次へ（数で答える）',
+    step3Question: '長さが4mのとき、重さは何gですか。単位をつけて書こう。',
+    placeholder: '例：〇g',
+    answerAccepted: ['80', '80g'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 答えは 80g だね。',
+    hints: [
+      '1mのときの重さは何gかな？',
+      '長さが何倍になったかを見てみよう。1m から 4m は何倍？',
+      '1mの重さ 20g を 4 倍すると、いくつになるかな？'
+    ],
+    reflectionPrompt: '長さが2倍、3倍になると重さも2倍、3倍になるのはなぜか、ことばで一言書いてみよう。'
+  },
+  // 商が一定（じっくり3「商が一定を見つけよう」）（2890）
+  2890: {
+    concrete: {
+      type: 'proportion',
+      xLabel: '高さ x', xUnit: 'cm', yLabel: '面積 y', yUnit: 'cm²',
+      rate: 4, max: 5, start: 0, target: 3,
+      intro: '底辺4cmの平行四辺形です。高さ x を動かして、高さ3cmのときの面積 y を見てみよう。'
+    },
+    step2Question: '面積 y を高さ x でわった答え（y÷x）は、どの組でも同じになります。この答えの名前はどれ？',
+    formulaChoices: ['商（わり算の答え）', '積（かけ算の答え）', '和（たし算の答え）', '差（ひき算の答え）'],
+    formulaCorrect: '商（わり算の答え）',
+    formulaOkText: '○ せいかい！ わり算の答えを「商」といい、比例では商がいつも一定になるね。',
+    formulaNgText: '× ちがうよ。y を x でわった答えは「商」だよ。',
+    step3ButtonLabel: '次へ（数で答える）',
+    step3Question: 'y÷x の商はいくつですか。数字で書こう。',
+    placeholder: '数字で入力',
+    answerAccepted: ['4'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 商はいつも 4 だね。',
+    hints: [
+      '高さが1cmのときの面積を見てみよう。',
+      '面積を高さでわると、どの組でも同じ数になるかな？',
+      '底辺が4cmだから、面積は高さの何倍になっているかな？'
+    ],
+    reflectionPrompt: '商が一定になると、比例の関係だといえるのはなぜか、ことばで一言書いてみよう。'
+  },
+  // 比例の式（じっくり4の関係、1個の値段×個数）（2891）
+  2891: {
+    concrete: {
+      type: 'proportion',
+      xLabel: 'みかんの個数 x', xUnit: '個', yLabel: '代金 y', yUnit: '円',
+      rate: 50, max: 5, start: 0, target: 3,
+      intro: '1個50円のみかんです。個数 x を動かして、3個買ったときの代金 y を見てみよう。'
+    },
+    step2Question: 'みかんを3個買ったときの代金を求める式はどれですか。',
+    formulaChoices: ['50×3', '50÷3', '3÷50', '50＋3'],
+    formulaCorrect: '50×3',
+    formulaOkText: '○ せいかい！ 1個の値段 50円 × 個数 3 で、代金は 150円になるね。',
+    formulaNgText: '× ちがうよ。代金は「1個の値段 × 個数」で求められるよ。',
+    step3ButtonLabel: '次へ（式の数で答える）',
+    step3Question: '代金 y は y＝（決まった数）×x の形で表せます。決まった数はいくつですか。',
+    placeholder: '数字で入力',
+    answerAccepted: ['50', '50円'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 決まった数は 50 だね。y＝50×x と表せるよ。',
+    hints: [
+      '個数が1個のときの代金は何円かな？',
+      '代金は 1個の値段 × 個数 で求まるよ。',
+      'y＝（決まった数）×x の決まった数は、1つ分の値段だね。'
+    ],
+    reflectionPrompt: 'みかんの個数を2倍にすると代金が2倍になるのはなぜか、ことばで一言書いてみよう。'
+  },
+  // 比例の式（しっかり1「比例の表を読み取ろう」の応用）（2898）
+  2898: {
+    concrete: {
+      type: 'proportion',
+      xLabel: '水を入れた時間 x', xUnit: '分', yLabel: '水の深さ y', yUnit: 'cm',
+      rate: 3, max: 7, start: 0, target: 6,
+      intro: '1分に3cmずつ深さが増える水そうです。時間 x を動かして、6分後の深さ y を見てみよう。'
+    },
+    step2Question: '6分後の深さを求める式はどれですか。',
+    formulaChoices: ['3×6', '3÷6', '3＋6', '6－3'],
+    formulaCorrect: '3×6',
+    formulaOkText: '○ せいかい！ 1分3cm × 6分 で 18cm になるね。',
+    formulaNgText: '× ちがうよ。1分あたりの増え方 × 時間 で求めよう。',
+    step3ButtonLabel: '次へ（単位をつけて答える）',
+    step3Question: '6分後の水の深さは何cmですか。単位をつけて書こう。',
+    placeholder: '例：〇cm',
+    answerAccepted: ['18cm', '18'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 答えは 18cm だね。',
+    hints: [
+      '1分後の深さは何cmかな？',
+      '時間が何倍になったかを見てみよう。',
+      '1分の 3cm を 6 倍すると、いくつになるかな？'
+    ],
+    reflectionPrompt: '時間が3倍になると深さが3倍になるのはなぜか、ことばで一言書いてみよう。'
+  },
+  // 商（y÷x）を使う比例（しっかり2「比例のきまり（商）」）（2899）
+  2899: {
+    concrete: {
+      type: 'proportion',
+      xLabel: '深さ x', xUnit: 'cm', yLabel: '体積 y', yUnit: 'cm³',
+      rate: 25, max: 6, start: 0, target: 4,
+      intro: '底面積が一定の容器です。深さ x を動かして、深さ4cmのときの体積 y を見てみよう。'
+    },
+    step2Question: '体積 y を深さ x でわった答え（y÷x）は、どの組でも同じになります。この答えの名前はどれ？',
+    formulaChoices: ['商（わり算の答え）', '積（かけ算の答え）', '和（たし算の答え）', '差（ひき算の答え）'],
+    formulaCorrect: '商（わり算の答え）',
+    formulaOkText: '○ せいかい！ y÷x の商がいつも一定だから、比例だといえるね。',
+    formulaNgText: '× ちがうよ。y を x でわった答えは「商」だよ。',
+    step3ButtonLabel: '次へ（数で答える）',
+    step3Question: 'y÷x の商はいくつですか。数字で書こう。',
+    placeholder: '数字で入力',
+    answerAccepted: ['25'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 商はいつも 25 だね。',
+    hints: [
+      '深さ1cmのときの体積を見てみよう。',
+      '体積を深さでわると、どの組でも同じになるかな？',
+      '2cmのときの体積 50 を 2 でわると、いくつかな？'
+    ],
+    reflectionPrompt: '商が一定の数は、この容器の何を表しているか一言書いてみよう。'
+  },
+  // 比例の式（しっかり3「比例の式を求めて計算しよう」）（2900）
+  2900: {
+    concrete: {
+      type: 'proportion',
+      xLabel: '針金の長さ x', xUnit: 'm', yLabel: '重さ y', yUnit: 'g',
+      rate: 40, max: 10, start: 0, target: 8,
+      intro: '1mあたり40gの針金です。長さ x を動かして、8m のときの重さ y を見てみよう。'
+    },
+    step2Question: '針金8mの重さを求める式はどれですか。',
+    formulaChoices: ['40×8', '40÷8', '40＋8', '8－40'],
+    formulaCorrect: '40×8',
+    formulaOkText: '○ せいかい！ 1mの重さ 40g × 8m で 320g だね。',
+    formulaNgText: '× ちがうよ。y＝40×x の x に 8 をあてはめよう。',
+    step3ButtonLabel: '次へ（単位をつけて答える）',
+    step3Question: '針金8mの重さは何gですか。単位をつけて書こう。',
+    placeholder: '例：〇g',
+    answerAccepted: ['320g', '320'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 答えは 320g だね。',
+    hints: [
+      '1mの重さは何gかな？',
+      '式 y＝40×x の x に 8 を入れてみよう。',
+      '40 × 8 を計算すると、いくつになるかな？'
+    ],
+    reflectionPrompt: '式の 40 は、針金の何を表しているか一言書いてみよう。'
+  },
+  // 比例のグラフ（しっかり5「比例のグラフを読み取ろう」）（2902）
+  2902: {
+    concrete: {
+      type: 'proportion',
+      xLabel: 'おもりの重さ x', xUnit: 'g', yLabel: 'バネの伸び y', yUnit: 'cm',
+      rate: 3, max: 10, start: 0, target: 5,
+      intro: 'おもりの重さ x を動かして、5g のときのバネの伸び y を見てみよう。グラフは原点を通る直線です。'
+    },
+    step2Question: 'グラフは原点を通る直線（比例）です。1gあたりの伸び（決まった数）を求める式はどれ？',
+    formulaChoices: ['y÷x（商）', 'x×y（積）', 'x＋y（和）', 'x－y（差）'],
+    formulaCorrect: 'y÷x（商）',
+    formulaOkText: '○ せいかい！ y÷x で 1gあたりの伸びが求められるね。',
+    formulaNgText: '× ちがうよ。比例では、y÷x の商が決まった数になるよ。',
+    step3ButtonLabel: '次へ（単位をつけて答える）',
+    step3Question: 'おもりの重さが5gのとき、バネの伸びは何cmですか。単位をつけて書こう。',
+    placeholder: '例：〇cm',
+    answerAccepted: ['15cm', '15'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 答えは 15cm だね。',
+    hints: [
+      '点（2, 6）から、1gあたりの伸びを求めてみよう。',
+      '6 ÷ 2 は、いくつになるかな？',
+      '1gあたり3cmだから、5g では 3 × 5 になるね。'
+    ],
+    reflectionPrompt: 'グラフが原点を通る直線になるのは、どんな関係だからか一言書いてみよう。'
+  },
+  // 比例の式（しっかり以外のぐんぐん3「3Dプリンタの資源計算」）（2910）
+  2910: {
+    concrete: {
+      type: 'proportion',
+      xLabel: '作る個数 x', xUnit: '個', yLabel: 'フィラメント y', yUnit: 'm',
+      rate: 8, max: 15, start: 0, target: 15,
+      intro: '1個あたり8mのフィラメントを使います。個数 x を動かして、15個のときの長さ y を見てみよう。'
+    },
+    step2Question: '15個作るときの必要な長さを求める式はどれですか。',
+    formulaChoices: ['8×15', '8÷15', '15＋8', '15－8'],
+    formulaCorrect: '8×15',
+    formulaOkText: '○ せいかい！ 1個あたり8m × 15個 で 120m だね。',
+    formulaNgText: '× ちがうよ。y＝8×x の x に 15 をあてはめよう。',
+    step3ButtonLabel: '次へ（単位をつけて答える）',
+    step3Question: '必要なフィラメントの長さは何mですか。単位をつけて書こう。',
+    placeholder: '例：〇m',
+    answerAccepted: ['120m', '120'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 答えは 120m だね。',
+    hints: [
+      '1個分の長さは何mかな？',
+      '個数が15個だと、長さは何倍になるかな？',
+      '8 × 15 を計算してみよう。'
+    ],
+    reflectionPrompt: '個数を2倍にすると、必要な長さも2倍になるのはなぜか一言書いてみよう。'
+  },
+  // 比例（ぐんぐん2「食品ロスとCO2削減」）（2909）
+  2909: {
+    concrete: {
+      type: 'proportion',
+      xLabel: '食品の重さ x', xUnit: 'kg', yLabel: 'CO2の量 y', yUnit: 'kg',
+      rate: 2.5, max: 8, start: 0, target: 4,
+      intro: '食品を集めると、CO2の削減量が決まります。食品の重さ x を動かして、4kgのときのCO2の量 y を見てみよう。'
+    },
+    step2Question: 'y÷x でいつも同じになる「決まった数」は、どの計算で求めますか。',
+    formulaChoices: ['y÷x（商）', 'y×x（積）', 'x÷y', 'y－x'],
+    formulaCorrect: 'y÷x（商）',
+    formulaOkText: '○ せいかい！ y÷x の商が決まった数になるね。',
+    formulaNgText: '× ちがうよ。比例では、y を x でわった商が決まった数になるよ。',
+    step3ButtonLabel: '次へ（小数で答える）',
+    step3Question: '決まった数はいくつですか。小数で書こう。',
+    placeholder: '小数で入力',
+    answerAccepted: ['2.5'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 決まった数は 2.5 だね。',
+    hints: [
+      'x が2のときの y は何かな？',
+      'y を x でわると、いくつになるかな？',
+      '5 ÷ 2 を計算してみよう。'
+    ],
+    reflectionPrompt: '決まった数 2.5 が、1kgあたりのCO2の量を表していることをことばで書いてみよう。'
+  },
+  // 比例（ぐんぐん7「防災無線の音波グラフ分析」）（2914）
+  2914: {
+    concrete: {
+      type: 'proportion',
+      xLabel: '時間 x', xUnit: '秒', yLabel: '伝わる距離 y', yUnit: 'm',
+      rate: 340, max: 6, start: 0, target: 5,
+      intro: '音は1秒に340m進みます。時間 x を動かして、音が1700m進むまでの時間を見つけよう。'
+    },
+    step2Question: '距離 1700m まで届く時間 x を求める式はどれですか。',
+    formulaChoices: ['1700÷340', '1700×340', '340－1700', '1700－340'],
+    formulaCorrect: '1700÷340',
+    formulaOkText: '○ せいかい！ 1700 ÷ 340 で 5秒 だね。',
+    formulaNgText: '× ちがうよ。y＝340×x の x を求めるには、わり算を使おう。',
+    step3ButtonLabel: '次へ（単位をつけて答える）',
+    step3Question: '音が1700m離れた避難所まで届くのは何秒ですか。単位をつけて書こう。',
+    placeholder: '例：〇秒',
+    answerAccepted: ['5秒', '5'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 答えは 5秒 だね。',
+    hints: [
+      '1秒あたり何m進むかな？',
+      '1700m は、340m の何倍かな？',
+      '1700 ÷ 340 を計算してみよう。'
+    ],
+    reflectionPrompt: '1秒あたり340m という数が、グラフの何を表しているか一言書いてみよう。'
+  },
+  // 比例（ぐんぐん9「フードバンク支援計画の検証」）（2916）
+  2916: {
+    concrete: {
+      type: 'proportion',
+      xLabel: '支援世帯数 x', xUnit: '世帯', yLabel: 'お米の総量 y', yUnit: 'kg',
+      rate: 5, max: 10, start: 0, target: 8,
+      intro: '比例の計画です。世帯数 x を動かして、8世帯のときの総量 y を見てみよう。'
+    },
+    step2Question: '計画の正しい比例の決まった数（y÷x）はいくつですか。',
+    formulaChoices: ['5', '3', '6', '8'],
+    formulaCorrect: '5',
+    formulaOkText: '○ せいかい！ 15÷3 も 30÷6 も 5 になるね。',
+    formulaNgText: '× ちがうよ。計画表の 3 世帯と 6 世帯の値から、y÷x を計算してみよう。',
+    step3ButtonLabel: '次へ（単位をつけて答える）',
+    step3Question: '8世帯のとき、正しいお米の総量は何kgですか。単位をつけて書こう。',
+    placeholder: '例：〇kg',
+    answerAccepted: ['40kg', '40'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 正しい値は 40kg だね。表の 48 は計算ミスだったんだね。',
+    hints: [
+      '3世帯のときの 15 と、6世帯のときの 30 を比べてみよう。',
+      'y÷x を計算すると、いつも同じ数になるかな？',
+      '決まった数 5 に 8 をかけると、いくつになるかな？'
+    ],
+    reflectionPrompt: '計算ミスを見つけるには、どの組で y÷x を確かめればよいか一言書いてみよう。'
+  },
+  // ===== 反比例（type: inverse）: x を動かすと y＝k÷x で決まる =====
+  // 反比例の意味（じっくり6・しっかり4系の面積一定）（2893）
+  2893: {
+    concrete: {
+      type: 'inverse',
+      xLabel: '横の長さ x', xUnit: 'cm', yLabel: '縦の長さ y', yUnit: 'cm',
+      k: 12, xValues: [1, 2, 3, 4, 6, 12], start: 0, target: 2,
+      intro: '面積が12cm²の長方形です。横の長さ x を動かして、縦の長さ y がどう変わるか見てみよう。'
+    },
+    step2Question: '横の長さが2倍、3倍になると、縦の長さはどうなりますか。',
+    formulaChoices: ['2分の1、3分の1になる', '2倍、3倍になる'],
+    formulaCorrect: '2分の1、3分の1になる',
+    formulaOkText: '○ せいかい！ 横が2倍になると縦は半分になるね。これが反比例だよ。',
+    formulaNgText: '× ちがうよ。横を2cmにしたとき、縦は何cmになったかを見てみよう。',
+    step3ButtonLabel: '次へ（分数で答える）',
+    step3Question: '横の長さが2倍になると、縦の長さは何倍になりますか。分数で書こう。',
+    placeholder: '例：2分の1',
+    answerAccepted: ['2分の1', '1/2', '2分の1倍', '1/2倍'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 縦は 2分の1倍になるね。',
+    hints: [
+      '横が1cmのとき、縦は何cmかな？',
+      '横が2cmのとき、縦は何cmになったかな？',
+      '12cm が 6cm になるのは、もとの何分の1かな？'
+    ],
+    reflectionPrompt: '面積が決まっているとき、片方が増えるともう片方が減るのはなぜか一言書いてみよう。'
+  },
+  // 積が一定（じっくり7・しっかり6）（2894）
+  2894: {
+    concrete: {
+      type: 'inverse',
+      xLabel: '横の長さ x', xUnit: 'cm', yLabel: '縦の長さ y', yUnit: 'cm',
+      k: 24, xValues: [1, 2, 3, 4, 6, 8, 12, 24], start: 0, target: 2,
+      intro: '面積が24cm²の長方形です。横の長さ x を動かして、縦の長さ y を見てみよう。'
+    },
+    step2Question: 'x×y（積）は、どの組でも同じ数になります。この積はどれですか。',
+    formulaChoices: ['x×y（積）', 'y÷x（商）', 'x＋y（和）', 'x－y（差）'],
+    formulaCorrect: 'x×y（積）',
+    formulaOkText: '○ せいかい！ 反比例では、x×y の積がいつも一定になるね。',
+    formulaNgText: '× ちがうよ。横と縦をかけると、どの組でも同じになるかな？',
+    step3ButtonLabel: '次へ（数で答える）',
+    step3Question: 'x×y の積はいくつですか。数字で書こう。',
+    placeholder: '数字で入力',
+    answerAccepted: ['24'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 積はいつも 24 だね。長方形の面積と同じだよ。',
+    hints: [
+      '横が1cmのとき、縦は24cmだね。かけると？',
+      '横が2cmのとき、縦は12cm。かけると？',
+      'どの組をかけても、長方形の面積と同じ数になるよ。'
+    ],
+    reflectionPrompt: '積が一定になると、どうして反比例といえるのか一言書いてみよう。'
+  },
+  // 反比例の式（じっくり8・しっかり7）（2895）
+  2895: {
+    concrete: {
+      type: 'inverse',
+      xLabel: '1分間に入れる水 x', xUnit: 'L', yLabel: '時間 y', yUnit: '分',
+      k: 30, xValues: [1, 2, 3, 5, 6, 10, 15, 30], start: 0, target: 5,
+      intro: '30Lの水そうに水を入れます。1分間に入れる量 x を動かして、いっぱいになる時間 y を見てみよう。'
+    },
+    step2Question: '1分間に5Lずつ入れるとき、時間 y を求める式はどれですか。',
+    formulaChoices: ['30÷5', '5÷30', '30×5', '30＋5'],
+    formulaCorrect: '30÷5',
+    formulaOkText: '○ せいかい！ x×y＝30 から、y＝30÷x で求められるね。',
+    formulaNgText: '× ちがうよ。5×y＝30 の y は、かけ算の逆のわり算で求めよう。',
+    step3ButtonLabel: '次へ（単位をつけて答える）',
+    step3Question: '1分間に5Lずつ入れると、いっぱいになるのは何分ですか。単位をつけて書こう。',
+    placeholder: '例：〇分',
+    answerAccepted: ['6分', '6'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 答えは 6分 だね。',
+    hints: [
+      '水の全体量は何Lかな？',
+      '1分間に5Lずつ入れると、何分でいっぱいになるかな？',
+      '30 ÷ 5 を計算してみよう。'
+    ],
+    reflectionPrompt: '1分間に入れる量を増やすと、時間が短くなるのはなぜか一言書いてみよう。'
+  },
+  // 反比例の積（しっかり6・面積24）（2903）
+  2903: {
+    concrete: {
+      type: 'inverse',
+      xLabel: '横の長さ x', xUnit: 'cm', yLabel: '縦の長さ y', yUnit: 'cm',
+      k: 24, xValues: [1, 2, 3, 4, 6, 8, 12, 24], start: 0, target: 4,
+      intro: '面積が24cm²の長方形です。横の長さ x を動かして、横4cmのときの縦の長さ y を見てみよう。'
+    },
+    step2Question: 'x×y（積）は、どの組でも同じ数になります。この積はどれですか。',
+    formulaChoices: ['x×y（積）', 'y÷x（商）', 'x＋y（和）', 'x－y（差）'],
+    formulaCorrect: 'x×y（積）',
+    formulaOkText: '○ せいかい！ 反比例では、x×y の積がいつも一定になるね。',
+    formulaNgText: '× ちがうよ。横と縦をかけると、どの組でも同じになるかな？',
+    step3ButtonLabel: '次へ（数で答える）',
+    step3Question: 'x×y の積はいくつですか。数字で書こう。',
+    placeholder: '数字で入力',
+    answerAccepted: ['24'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 積はいつも 24 だね。',
+    hints: [
+      '横が1cmのとき、縦は何cmかな？',
+      'x と y をかけると、いくつになるかな？',
+      '横が4cmのとき、縦は6cmだね。4×6 を計算してみよう。'
+    ],
+    reflectionPrompt: '積が一定の数は、長方形の何を表しているか一言書いてみよう。'
+  },
+  // 反比例の式（しっかり7・水そうの計算、60L）（2904）
+  2904: {
+    concrete: {
+      type: 'inverse',
+      xLabel: '1分間に入れる水 x', xUnit: 'L', yLabel: '時間 y', yUnit: '分',
+      k: 60, xValues: [1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30], start: 0, target: 12,
+      intro: '容積60Lの水そうに水を入れます。1分間に入れる量 x を動かして、満水までの時間 y を見てみよう。'
+    },
+    step2Question: 'x×y＝60 から、満水までの時間 y を求める式はどれですか。',
+    formulaChoices: ['60÷x', '60×x', 'x÷60', '60－x'],
+    formulaCorrect: '60÷x',
+    formulaOkText: '○ せいかい！ y＝60÷x で求められるね。',
+    formulaNgText: '× ちがうよ。x×y＝60 の y を求めるには、わり算を使おう。',
+    step3ButtonLabel: '次へ（単位をつけて答える）',
+    step3Question: '毎分12Lで入れると、満水になるのは何分ですか。単位をつけて書こう。',
+    placeholder: '例：〇分',
+    answerAccepted: ['5分', '5'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 答えは 5分 だね。',
+    hints: [
+      '毎分12Lで入れると、何L入るかな？',
+      '60 は全体の水の量だね。何分で入るかな？',
+      '60 ÷ 12 を計算してみよう。'
+    ],
+    reflectionPrompt: '毎分の量を2倍にすると、時間が半分になるのはなぜか一言書いてみよう。'
+  },
+  // 反比例の辺（しっかり8・面積12のグラフ）（2905）
+  2905: {
+    concrete: {
+      type: 'inverse',
+      xLabel: '横の長さ x', xUnit: 'cm', yLabel: '縦の長さ y', yUnit: 'cm',
+      k: 12, xValues: [1, 2, 3, 4, 6, 12], start: 0, target: 6,
+      intro: '面積が12cm²の長方形です。横の長さ x を動かして、横6cmのときの縦の長さ y を見てみよう。'
+    },
+    step2Question: 'x×y（積）は、どの組でも同じ数になります。この積はどれですか。',
+    formulaChoices: ['x×y（積）', 'y÷x（商）', 'x＋y（和）', 'x－y（差）'],
+    formulaCorrect: 'x×y（積）',
+    formulaOkText: '○ せいかい！ x×y の積は 12 で一定だね。',
+    formulaNgText: '× ちがうよ。横と縦をかけると、どの組でも同じになるかな？',
+    step3ButtonLabel: '次へ（単位をつけて答える）',
+    step3Question: '横の長さが6cmのとき、縦の長さは何cmですか。単位をつけて書こう。',
+    placeholder: '例：〇cm',
+    answerAccepted: ['2cm', '2'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 答えは 2cm だね。',
+    hints: [
+      '積 x×y は、いくつだったかな？',
+      '横が6cmのとき、12 をどうわればよいかな？',
+      '12 ÷ 6 を計算してみよう。'
+    ],
+    reflectionPrompt: '横が長くなると縦が短くなるのはなぜか、ことばで一言書いてみよう。'
+  },
+  // 反比例の式（ぐんぐん4「避難所の備蓄飲料水」）（2911）
+  2911: {
+    concrete: {
+      type: 'inverse',
+      xLabel: '避難者の人数 x', xUnit: '人', yLabel: '1人あたりの水 y', yUnit: 'L',
+      k: 60, xValues: [5, 10, 12, 15, 20, 30, 60], start: 0, target: 20,
+      intro: '全体の水量は60Lです。人数 x を動かして、20人のときの1人あたりの量 y を見てみよう。'
+    },
+    step2Question: 'x×y（積）は、どの組でも同じ数になります。この積はどれですか。',
+    formulaChoices: ['x×y（積）', 'y÷x（商）', 'x＋y（和）', 'x－y（差）'],
+    formulaCorrect: 'x×y（積）',
+    formulaOkText: '○ せいかい！ 人数と1人分の量をかけると、いつも全体の水量になるね。',
+    formulaNgText: '× ちがうよ。人数と1人分の量をかけると、どの組でも同じになるかな？',
+    step3ButtonLabel: '次へ（数で答える）',
+    step3Question: 'x×y の積はいくつですか。数字で書こう。',
+    placeholder: '数字で入力',
+    answerAccepted: ['60'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 積は 60 だね。全体の水量と同じだよ。',
+    hints: [
+      '人数が5人のとき、1人分は何Lかな？',
+      '5 × 12 は、いくつになるかな？',
+      'どの組をかけても、全体の水量 60 になるよ。'
+    ],
+    reflectionPrompt: '全体の量が決まっているとき、人数が増えると1人分が減るのはなぜか一言書いてみよう。'
+  },
+  // 反比例の式（ぐんぐん5「EV充電器の共同整備」）（2912）
+  2912: {
+    concrete: {
+      type: 'inverse',
+      xLabel: '参加自治体数 x', xUnit: '自治体', yLabel: '1自治体の負担金 y', yUnit: '万円',
+      k: 360, xValues: [6, 8, 9, 10, 12, 15, 18, 20, 24, 30, 36], start: 0, target: 12,
+      intro: '全体の費用は360万円です。参加自治体数 x を動かして、12自治体のときの負担金 y を見てみよう。'
+    },
+    step2Question: 'x×y＝360 から、負担金 y を求める式はどれですか。',
+    formulaChoices: ['360÷x', '360×x', 'x÷360', '360－x'],
+    formulaCorrect: '360÷x',
+    formulaOkText: '○ せいかい！ y＝360÷x で求められるね。',
+    formulaNgText: '× ちがうよ。全体の費用を自治体数でわると、1自治体分になるよ。',
+    step3ButtonLabel: '次へ（単位をつけて答える）',
+    step3Question: '参加自治体数が12のとき、1自治体あたりの負担金は何万円ですか。単位をつけて書こう。',
+    placeholder: '例：〇万円',
+    answerAccepted: ['30万円', '30'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 答えは 30万円 だね。',
+    hints: [
+      '全体の費用は何万円かな？',
+      '12 の自治体で分けると、1自治体分はいくらかな？',
+      '360 ÷ 12 を計算してみよう。'
+    ],
+    reflectionPrompt: '参加自治体が増えると、1自治体の負担が減るのはなぜか一言書いてみよう。'
+  },
+  // 反比例の式（ぐんぐん8「ボランティア清掃」）（2915）
+  2915: {
+    concrete: {
+      type: 'inverse',
+      xLabel: '参加人数 x', xUnit: '人', yLabel: '清掃時間 y', yUnit: '時間',
+      k: 24, xValues: [1, 2, 3, 4, 6, 8, 12, 24], start: 0, target: 12,
+      intro: 'ゴミ拾いの全体の作業は24人時間です。参加人数 x を動かして、清掃時間 y が2時間になる人数を見つけよう。'
+    },
+    step2Question: 'x×y＝24 から、y＝2 のときの参加人数 x を求める式はどれですか。',
+    formulaChoices: ['24÷2', '2÷24', '24×2', '24－2'],
+    formulaCorrect: '24÷2',
+    formulaOkText: '○ せいかい！ 2×x＝24 だから、x＝24÷2 で求められるね。',
+    formulaNgText: '× ちがうよ。x×2＝24 の x は、かけ算の逆のわり算で求めよう。',
+    step3ButtonLabel: '次へ（単位をつけて答える）',
+    step3Question: '清掃を2時間で終わらせるには、何人必要ですか。単位をつけて書こう。',
+    placeholder: '例：〇人',
+    answerAccepted: ['12人', '12'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 答えは 12人 だね。',
+    hints: [
+      '全体の作業量 24 は、何と何をかけた数かな？',
+      '2時間で終わらせるには、x×2 が 24 になる x を探そう。',
+      '24 ÷ 2 を計算してみよう。'
+    ],
+    reflectionPrompt: '人数を2倍にすると時間が半分になるのはなぜか、ことばで一言書いてみよう。'
+  },
+  // 反比例（ぐんぐん10「次世代モビリティ」）（2917）
+  2917: {
+    concrete: {
+      type: 'inverse',
+      xLabel: '時速 x', xUnit: 'km', yLabel: '所要時間 y', yUnit: '時間',
+      k: 30, xValues: [1, 2, 3, 5, 6, 10, 15, 30], start: 0, target: 6,
+      intro: 'A案は30km先の駅へ行きます。時速 x を動かして、時速6kmのときの所要時間 y を見てみよう。'
+    },
+    step2Question: 'A案で時速 x から所要時間 y を求める式はどれですか。',
+    formulaChoices: ['30÷x', '30×x', 'x÷30', '30－x'],
+    formulaCorrect: '30÷x',
+    formulaOkText: '○ せいかい！ 距離 30 ÷ 速さ x で時間が求められるね。',
+    formulaNgText: '× ちがうよ。（速さ）×（時間）＝（距離）の式を使おう。',
+    step3ButtonLabel: '次へ（案名と単位をつけて答える）',
+    step3Question: '時速6kmで走ると、A案の所要時間は何時間ですか。案名と単位をつけて書こう。',
+    placeholder: '例：A案で〇時間',
+    answerAccepted: ['A案で5時間', 'A案5時間', '5時間', '5'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 答えは A案で5時間 だね。',
+    hints: [
+      '時速6km で 30km 進むと、何時間かかるかな？',
+      '30 は距離だね。速さでわると時間になるよ。',
+      '30 ÷ 6 を計算してみよう。'
+    ],
+    reflectionPrompt: 'A案のように距離が決まっているとき、速さと時間が反比例する理由を一言書いてみよう。'
   }
 }
 
@@ -10715,6 +11263,7 @@ function stagedStep1Html(cardId) {
   const st = window._stagedLesson
   if (st.cfg.concrete.type === 'balance') return stagedBalanceHtml(cardId)
   if (st.cfg.concrete.type === 'proportion') return stagedProportionHtml(cardId)
+  if (st.cfg.concrete.type === 'inverse') return stagedInverseHtml(cardId)
   const c = st.cfg.concrete
   const cup = (key, label) => {
     const v = st.placed[key]
@@ -10821,6 +11370,56 @@ function stagedProp(delta, cardId) {
   const st = window._stagedLesson
   if (!st || st.cardId !== cardId) return
   st.pos = Math.max(0, Math.min(st.cfg.concrete.max, st.pos + delta))
+  try { TactileSounds.play('tap') } catch (_) {}
+  renderStagedStep(cardId)
+}
+
+// 反比例（x を動かすと y＝k÷x が決まる）: 面積が一定の長方形、一定量の水そう、全体の仕事量など
+// x は xValues の中からだけ選べる（すべて割り切れる値なので y も整数になる）
+function inverseIndex(c, pos) {
+  const i = c.xValues.indexOf(pos)
+  return i < 0 ? 0 : i
+}
+
+function stagedInverseHtml(cardId) {
+  const st = window._stagedLesson
+  const c = st.cfg.concrete
+  const idx = inverseIndex(c, st.pos)
+  const x = c.xValues[idx]
+  const y = c.k / x
+  const yMax = c.k / c.xValues[0]
+  const pct = (y / yMax) * 100
+  const ok = x === c.target
+  return `
+    <p style="font-size:0.9rem;color:#374151;margin-bottom:8px;">${c.intro}<br><span style="font-size:0.8rem;color:#6B7280;">（${c.xLabel}は ${c.xValues.join('、')} のどれかに動かせます。）</span></p>
+    <div style="display:flex;gap:24px;align-items:flex-end;justify-content:center;flex-wrap:wrap;">
+      <div style="text-align:center;">
+        <div style="font-size:0.85rem;font-weight:bold;color:#374151;margin-bottom:4px;">${c.xLabel}</div>
+        <div style="font-size:1.6rem;font-weight:bold;color:#5B21B6;">${x}${c.xUnit}</div>
+        <div style="display:flex;gap:6px;justify-content:center;margin-top:8px;">
+          <button onclick="stagedInv(-1,${cardId})" style="background:#e5e7eb;border:none;border-radius:8px;padding:6px 12px;font-weight:bold;">−</button>
+          <button onclick="stagedInv(1,${cardId})" style="background:#7C3AED;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:bold;">＋</button>
+        </div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:0.85rem;font-weight:bold;color:#374151;margin-bottom:4px;">${c.yLabel}</div>
+        <div style="position:relative;margin:0 auto;width:70px;height:130px;border:3px solid #111;border-radius:6px;background:#fff;overflow:hidden;">
+          <div style="position:absolute;left:0;right:0;bottom:0;height:${pct}%;background:#34D399;transition:height .2s;"></div>
+        </div>
+        <p style="font-size:1.1rem;font-weight:bold;margin-top:6px;color:${ok ? '#16A34A' : '#374151'};">${y}${c.yUnit}</p>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:12px;">
+      <button onclick="stagedNext(${cardId})" ${ok ? '' : 'disabled'} style="background:${ok ? '#16A34A' : '#D1D5DB'};color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:bold;">はかれたら次へ</button>
+    </div>`
+}
+
+function stagedInv(delta, cardId) {
+  const st = window._stagedLesson
+  if (!st || st.cardId !== cardId) return
+  const c = st.cfg.concrete
+  const idx = Math.max(0, Math.min(c.xValues.length - 1, inverseIndex(c, st.pos) + delta))
+  st.pos = c.xValues[idx]
   try { TactileSounds.play('tap') } catch (_) {}
   renderStagedStep(cardId)
 }
@@ -10936,6 +11535,7 @@ function stagedCheck(cardId) {
 
 window.stagedBalance = stagedBalance
 window.stagedProp = stagedProp
+window.stagedInv = stagedInv
 
 window.stagedPour = stagedPour
 window.stagedNext = stagedNext
