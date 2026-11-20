@@ -15658,9 +15658,9 @@ async function teacherSpeakSongLyrics(btn, encodedLyrics) {
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 再生中...'
   btn.disabled = true
   try {
-    const res = await axios.post('/api/ai/tts', { text: cleanText, voice: 'Achird', speed: 1.1 })
-    if (res.data && res.data.audio_url) {
-      const audio = new Audio(res.data.audio_url)
+    const res = await axios.post('/api/ai/tts', { text: cleanText, voiceType: 'male-friendly' })
+    if (res.data && res.data.success && res.data.audioContent) {
+      const audio = new Audio('data:audio/wav;base64,' + res.data.audioContent)
       audio.play()
       audio.onended = () => { btn.innerHTML = '<i class="fas fa-play"></i> もう一度聴く'; btn.disabled = false }
       btn.innerHTML = '<i class="fas fa-pause"></i> 再生中...'
@@ -15904,9 +15904,9 @@ async function groupPlaySong(btn, encodedLyrics) {
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 読込中...'
   btn.disabled = true
   try {
-    const res = await axios.post('/api/ai/tts', { text: cleanText, voice: 'Achird', speed: 1.1 })
-    if (res.data && res.data.audio_url) {
-      const audio = new Audio(res.data.audio_url)
+    const res = await axios.post('/api/ai/tts', { text: cleanText, voiceType: 'male-friendly' })
+    if (res.data && res.data.success && res.data.audioContent) {
+      const audio = new Audio('data:audio/wav;base64,' + res.data.audioContent)
       audio.play()
       btn.innerHTML = '<i class="fas fa-pause"></i> 再生中...'
       btn.onclick = () => { audio.paused ? audio.play() : audio.pause(); btn.innerHTML = audio.paused ? '<i class="fas fa-play"></i> 歌を聴く' : '<i class="fas fa-pause"></i> 再生中...' }
@@ -44382,7 +44382,7 @@ window.speakNB2NarrationAI = async function(page, source) {
           body: JSON.stringify({ text: speechText.substring(0, 300), voiceType: voiceType, mood: '' })
         })
         var retryData = await retryResp.json()
-        if (retryData.success && retryData.audioContent && retryData.audioFormat === 'pcm') {
+        if (retryData.success && retryData.audioContent && (retryData.audioFormat === 'pcm' || retryData.audioFormat === 'wav')) {
           _globalTtsPlaying = true
           if (btn) { btn.innerHTML = '<i class="fas fa-stop" style="margin-right:3px;"></i>\u23F9 停止'; btn.style.background = 'linear-gradient(135deg,#EF4444,#DC2626)' }
           playPcmGlobal(retryData.audioContent, retryData.sampleRate || 24000, function() {

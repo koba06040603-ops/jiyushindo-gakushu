@@ -9139,6 +9139,11 @@ app.put('/api/evaluations/non-cognitive/:id', async (c) => {
 // APIルート：学習環境デザイン取得
 app.get('/api/environment/design/:curriculumId', async (c) => {
   const { env } = c
+  // 学習環境は教師・管理者のみ閲覧可（生徒には返さない）
+  const authUser = c.get('user') as any
+  if (!authUser || !['teacher', 'admin'].includes(authUser.role)) {
+    return c.json({ error: '教師のみ閲覧できます', success: false }, 403)
+  }
   const curriculumId = c.req.param('curriculumId')
   
   try {
@@ -14121,8 +14126,8 @@ app.get('/guide/:curriculumId', async (c) => {
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      if (data && data.audio_url) {
-        var audio = new Audio(data.audio_url);
+      if (data && data.success && data.audioContent) {
+        var audio = new Audio('data:audio/wav;base64,' + data.audioContent);
         audio.play();
         btn.innerHTML = '<i class="fas fa-pause"></i> 再生中...';
         btn.onclick = function() { if (audio.paused) { audio.play(); btn.innerHTML = '<i class="fas fa-pause"></i> 再生中...'; } else { audio.pause(); btn.innerHTML = '<i class="fas fa-play"></i> 🎵 歌を聴く'; } };
