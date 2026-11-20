@@ -20319,10 +20319,11 @@ function renderEnvDesignGuide(curriculumId, design) {
 
 // 1項目の表示（児童向け一文、教室にないもの、具体操作、掲示の上の問い、学習カード、先生向け説明）
 function renderEnvItemCard(curriculumId, it, g) {
-  const cards = (it.card_numbers || []).map(n => {
-    const labels = (it.cards || []).filter(c => c.card_number === n).map(c => escapeHtmlSafe(c.label))
-    return labels.length ? `<li><span class="font-bold">${n}：</span>${labels.join(' ／ ')}</li>` : ''
-  }).join('')
+  // 「次の駅」の問いの項目（比 A-1）だけ、環境の説明文を出す（学習カードの列記はしない）
+  const ENV_DESCRIPTION_A1 = '床に長い帯（比の道）を敷き、10個の「駅」にカード1〜10を並べます。単元の流れを床で見せ、できた子が自分の駅にシールを貼りに行きます。'
+  const description = (it.slot === 'A-1' && String(it.question || '').includes('次の駅'))
+    ? `<div class="text-sm text-gray-800 bg-white border border-gray-200 rounded-lg p-3 mb-2"><p class="font-bold mb-1">この環境の説明</p><p class="leading-relaxed">${escapeHtmlSafe(ENV_DESCRIPTION_A1)}</p></div>`
+    : ''
   return `
     <article class="border-2 ${g.border} bg-gradient-to-br ${g.bg} to-white rounded-xl p-4 hover:shadow-lg transition">
       <p class="text-xs font-bold text-gray-500 mb-1">${escapeHtmlSafe(it.slot)}：${escapeHtmlSafe(it.case)}</p>
@@ -20330,10 +20331,7 @@ function renderEnvItemCard(curriculumId, it, g) {
       <p class="text-sm text-gray-700 mb-1"><span class="font-bold">教室にないもの：</span>${escapeHtmlSafe(it.not_in_classroom)}</p>
       <p class="text-sm text-gray-700 mb-2"><span class="font-bold">具体操作：</span>${escapeHtmlSafe(it.operation)}</p>
       <p class="text-base font-bold text-blue-900 bg-white border border-blue-200 rounded-lg p-2 mb-2"><i class="fas fa-question-circle mr-1 text-blue-600"></i>${escapeHtmlSafe(it.question)}</p>
-      <div class="text-sm text-gray-700 mb-2">
-        <p class="font-bold">学習カード（カード番号 ${(it.card_numbers || []).join('・')}）</p>
-        <ul class="list-none pl-0 space-y-1">${cards}</ul>
-      </div>
+      ${description}
       <p class="text-sm text-gray-600"><span class="font-bold">先生向け説明：</span>${escapeHtmlSafe(it.teacher_note)}</p>
       ${canEditEnvironmentItems() ? envDesignRegenButton(curriculumId, it.slot) : ''}
     </article>`
