@@ -9202,44 +9202,6 @@ async function loadEnvCardLinesForPrompt(db: any, curriculum: any): Promise<stri
     .join('\n')
 }
 
-// APIルート：学習環境デザイン保存
-app.post('/api/environment/design', async (c) => {
-  const { env } = c
-  const body = await c.req.json()
-  
-  try {
-    const result = await env.DB.prepare(`
-      INSERT INTO learning_environment_designs (
-        curriculum_id,
-        expression_creative, expression_creative_enabled,
-        research_fieldwork, research_fieldwork_enabled,
-        critical_thinking, critical_thinking_enabled,
-        social_contribution, social_contribution_enabled,
-        metacognition_reflection, metacognition_reflection_enabled,
-        question_generation, question_generation_enabled
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      body.curriculum_id,
-      body.expression_creative || '',
-      body.expression_creative_enabled ? 1 : 0,
-      body.research_fieldwork || '',
-      body.research_fieldwork_enabled ? 1 : 0,
-      body.critical_thinking || '',
-      body.critical_thinking_enabled ? 1 : 0,
-      body.social_contribution || '',
-      body.social_contribution_enabled ? 1 : 0,
-      body.metacognition_reflection || '',
-      body.metacognition_reflection_enabled ? 1 : 0,
-      body.question_generation || '',
-      body.question_generation_enabled ? 1 : 0
-    ).run()
-    
-    return c.json({ success: true, id: result.meta.last_row_id })
-  } catch (error) {
-    return c.json({ error: 'Database error' }, 500)
-  }
-})
-
 // APIルート：学習環境デザインをAIで自動生成（比の単元のみ・3機能×6事例・design_json に保存）
 // ===== 学習環境デザイン：3機能×6事例 =====
 // 機能は「雰囲気・動機付け・見通し」「学習材・情報提供」「学習履歴・成果の可視化」の3つ。各機能に2事例ずつ置く。
@@ -9577,51 +9539,6 @@ app.post('/api/environment/design/regenerate/:curriculumId/:key', async (c) => {
   } catch (error: any) {
     console.error('Environment design item regeneration error:', error)
     return c.json({ error: error.message }, 500)
-  }
-})
-
-// APIルート：学習環境デザイン更新
-app.put('/api/environment/design/:id', async (c) => {
-  const { env } = c
-  const id = c.req.param('id')
-  const body = await c.req.json()
-  
-  try {
-    await env.DB.prepare(`
-      UPDATE learning_environment_designs SET
-        expression_creative = ?,
-        expression_creative_enabled = ?,
-        research_fieldwork = ?,
-        research_fieldwork_enabled = ?,
-        critical_thinking = ?,
-        critical_thinking_enabled = ?,
-        social_contribution = ?,
-        social_contribution_enabled = ?,
-        metacognition_reflection = ?,
-        metacognition_reflection_enabled = ?,
-        question_generation = ?,
-        question_generation_enabled = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).bind(
-      body.expression_creative || '',
-      body.expression_creative_enabled ? 1 : 0,
-      body.research_fieldwork || '',
-      body.research_fieldwork_enabled ? 1 : 0,
-      body.critical_thinking || '',
-      body.critical_thinking_enabled ? 1 : 0,
-      body.social_contribution || '',
-      body.social_contribution_enabled ? 1 : 0,
-      body.metacognition_reflection || '',
-      body.metacognition_reflection_enabled ? 1 : 0,
-      body.question_generation || '',
-      body.question_generation_enabled ? 1 : 0,
-      id
-    ).run()
-    
-    return c.json({ success: true })
-  } catch (error) {
-    return c.json({ error: 'Database error' }, 500)
   }
 })
 
