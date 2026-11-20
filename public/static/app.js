@@ -10446,9 +10446,7 @@ function initTactileWidgets() {
 // 五感（触覚・体験）を残しつつ、操作結果を答えと結びつけて正誤を返す。
 // 対象は STAGED_LESSON_CARD_IDS のカードのみ。DBの問題文・答えは変更しない。
 // concrete.type: 省略時＝計量（2カップ）、'balance'＝板のつり合い
-const STAGED_LESSON_CARD_IDS = [2810, 2857, 2867, 2868]
-
-// 段階式レッスンの設定（カードごと）
+// 段階式レッスンの設定（カードごと）。対象カード ID は下の STAGED_LESSON_CARD_IDS で設定から自動取得する。
 const STAGED_LESSON_CONFIG = {
   // 図工「感じたことを形に（未来の私）」: 重心（2810）
   2810: {
@@ -10555,8 +10553,89 @@ const STAGED_LESSON_CONFIG = {
     ],
     // 答えの後の「内省」
     reflectionPrompt: 'コーヒーが牛乳の何倍かを、ことばで一言書いてみよう。'
+  },
+  // 比例（じっくり1「比例の表を読もう」、ID 2888）: 時間を動かすと深さがどう変わるか
+  2888: {
+    concrete: {
+      type: 'proportion',
+      xLabel: '水を入れた時間 x', xUnit: '分', yLabel: '水の深さ y', yUnit: 'cm',
+      rate: 3, max: 3, start: 0, target: 2,
+      intro: '水そうに一定の割合で水を入れます。時間 x を 1分、2分、3分と動かして、深さ y がどう変わるか見てみよう。まずは 2分にしてみよう。'
+    },
+    step2Question: '時間が2倍、3倍になると、深さはどうなっていますか。',
+    formulaChoices: ['2倍、3倍になる', 'かわらない'],
+    formulaCorrect: '2倍、3倍になる',
+    formulaOkText: '○ せいかい！ 時間が2倍、3倍になると、深さも2倍、3倍になるね。このような関係を比例といいます。',
+    formulaNgText: '× ちがうよ。時間を 2分、3分にしたときの深さを見比べよう。',
+    step3ButtonLabel: '次へ（数で答える）',
+    step3Question: '時間を2倍にすると、深さは何倍になりますか。数で書こう。',
+    placeholder: '数字で入力',
+    answerAccepted: ['2', '2倍'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 深さも2倍になるね。答えは「ア（2倍、3倍になる）」だよ。',
+    hints: [
+      '時間が 1分のときと 2分のときの深さを比べてみよう。',
+      '深さは 3cm から何 cm になったかな？',
+      '深さは 3cm から 6cm になったね。6 ÷ 3 を計算すると、何倍かがわかるよ。'
+    ],
+    reflectionPrompt: '時間が3倍になると深さが3倍になるのはなぜか、ことばで一言書いてみよう。'
+  },
+  // 比例の式（しっかり4「比例の式からxを求めよう」、ID 2901）: 道のりから時間を求める
+  2901: {
+    concrete: {
+      type: 'proportion',
+      xLabel: '歩く時間 x', xUnit: '分', yLabel: '道のり y', yUnit: 'm',
+      rate: 70, max: 25, start: 0, target: 20,
+      intro: '分速70mで歩きます。歩く時間 x を動かして、道のり y が 1400m になるところを探そう。'
+    },
+    step2Question: '道のりが 1400m のとき、x（分）を求める式はどれですか。',
+    formulaChoices: ['x＝1400÷70', 'x＝1400×70', 'x＝1400－70', 'x＝1400＋70'],
+    formulaCorrect: 'x＝1400÷70',
+    formulaOkText: '○ せいかい！ 1400＝70×x だから、1400 を 70 でわると x が求められるね。',
+    formulaNgText: '× ちがうよ。70×x＝1400 の x を求めるには、かけ算の逆のわり算を使うよ。',
+    step3ButtonLabel: '次へ（単位をつけて答える）',
+    step3Question: '歩いた時間は何分ですか。単位をつけて書こう。',
+    placeholder: '例：〇分',
+    answerAccepted: ['20分', '20'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 答えは 20分だね。',
+    hints: [
+      '道のり y は、時間 x の何倍になっているかな？ y＝70×x の式にあてはめよう。',
+      '1400＝70×x だから、x は 70 でわると求められるよ。',
+      '1400 ÷ 70 を計算してみよう。'
+    ],
+    reflectionPrompt: '式の 70 は、1分間に何 m 進むことを表しているか、ことばで一言書いてみよう。'
+  },
+  // 比例（ぐんぐん1「太陽光発電と時間の関係」、ID 2908）: 発電時間と発電量
+  2908: {
+    concrete: {
+      type: 'proportion',
+      xLabel: '発電時間 x', xUnit: '時間', yLabel: '発電量 y', yUnit: 'kWh',
+      rate: 3, max: 5, start: 0, target: 4,
+      intro: '晴れた日の発電量を調べます。発電時間 x を動かして、発電量 y がどう変わるか見てみよう。4時間にしてみよう。'
+    },
+    step2Question: '発電時間が1時間のときの発電量は 3kWh です。発電時間が4倍になると、発電量はどの式で求められますか。',
+    formulaChoices: ['3 × 4', '3 ÷ 4', '3 + 4', '3 − 4'],
+    formulaCorrect: '3 × 4',
+    formulaOkText: '○ せいかい！ 1時間あたり 3kWh だから、4時間なら 3 × 4 で求められるね。',
+    formulaNgText: '× ちがうよ。時間が4倍になると、発電量も 4倍になるよ。',
+    step3ButtonLabel: '次へ（単位をつけて答える）',
+    step3Question: '4時間の発電量は何 kWh ですか。単位をつけて書こう。',
+    placeholder: '例：〇kWh',
+    answerAccepted: ['12kWh', '12kwh', '12'],
+    answerAcceptedNormalize: true,
+    answerOkText: '○ せいかい！ 答えは 12kWh だね。',
+    hints: [
+      '1時間の発電量は何 kWh かな？ 観測の結果から読み取ろう。',
+      '時間が4倍になると、発電量も4倍になるね。',
+      '1時間の 3kWh を 4倍すると、いくつになるかな？'
+    ],
+    reflectionPrompt: '発電時間が2倍、3倍になると発電量も2倍、3倍になるのはなぜか、ことばで一言書いてみよう。'
   }
 }
+
+// 対象カードは設定（STAGED_LESSON_CONFIG）のキーから自動で決まる
+const STAGED_LESSON_CARD_IDS = Object.keys(STAGED_LESSON_CONFIG).map(Number)
 
 function stagedNormalize(s) {
   return (s || '')
@@ -10635,6 +10714,7 @@ function renderStagedStep(cardId) {
 function stagedStep1Html(cardId) {
   const st = window._stagedLesson
   if (st.cfg.concrete.type === 'balance') return stagedBalanceHtml(cardId)
+  if (st.cfg.concrete.type === 'proportion') return stagedProportionHtml(cardId)
   const c = st.cfg.concrete
   const cup = (key, label) => {
     const v = st.placed[key]
@@ -10698,6 +10778,46 @@ function stagedBalanceHtml(cardId) {
 }
 
 function stagedBalance(delta, cardId) {
+  const st = window._stagedLesson
+  if (!st || st.cardId !== cardId) return
+  st.pos = Math.max(0, Math.min(st.cfg.concrete.max, st.pos + delta))
+  try { TactileSounds.play('tap') } catch (_) {}
+  renderStagedStep(cardId)
+}
+
+// 比例（x を動かすと y が決まって変わる）: 水そう・道のり・発電量など。y＝rate×x で計算する
+function stagedProportionHtml(cardId) {
+  const st = window._stagedLesson
+  const c = st.cfg.concrete
+  const x = st.pos
+  const y = c.rate * x
+  const pct = (y / (c.rate * c.max)) * 100
+  const ok = x === c.target
+  return `
+    <p style="font-size:0.9rem;color:#374151;margin-bottom:8px;">${c.intro}</p>
+    <div style="display:flex;gap:24px;align-items:flex-end;justify-content:center;flex-wrap:wrap;">
+      <div style="text-align:center;">
+        <div style="font-size:0.85rem;font-weight:bold;color:#374151;margin-bottom:4px;">${c.xLabel}</div>
+        <div style="font-size:1.6rem;font-weight:bold;color:#5B21B6;">${x}${c.xUnit}</div>
+        <div style="display:flex;gap:6px;justify-content:center;margin-top:8px;">
+          <button onclick="stagedProp(-1,${cardId})" style="background:#e5e7eb;border:none;border-radius:8px;padding:6px 12px;font-weight:bold;">−1</button>
+          <button onclick="stagedProp(1,${cardId})" style="background:#7C3AED;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:bold;">＋1</button>
+        </div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:0.85rem;font-weight:bold;color:#374151;margin-bottom:4px;">${c.yLabel}</div>
+        <div style="position:relative;margin:0 auto;width:70px;height:130px;border:3px solid #111;border-radius:6px;background:#fff;overflow:hidden;">
+          <div style="position:absolute;left:0;right:0;bottom:0;height:${pct}%;background:#60A5FA;transition:height .2s;"></div>
+        </div>
+        <p style="font-size:1.1rem;font-weight:bold;margin-top:6px;color:${ok ? '#16A34A' : '#374151'};">${y}${c.yUnit}</p>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:12px;">
+      <button onclick="stagedNext(${cardId})" ${ok ? '' : 'disabled'} style="background:${ok ? '#16A34A' : '#D1D5DB'};color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:bold;">はかれたら次へ</button>
+    </div>`
+}
+
+function stagedProp(delta, cardId) {
   const st = window._stagedLesson
   if (!st || st.cardId !== cardId) return
   st.pos = Math.max(0, Math.min(st.cfg.concrete.max, st.pos + delta))
@@ -10815,6 +10935,7 @@ function stagedCheck(cardId) {
 }
 
 window.stagedBalance = stagedBalance
+window.stagedProp = stagedProp
 
 window.stagedPour = stagedPour
 window.stagedNext = stagedNext
