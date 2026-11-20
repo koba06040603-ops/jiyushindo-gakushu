@@ -82,6 +82,9 @@ export const LEARNING_CARD_SCHEMA: GeminiSchema = {
     teacher_help_keywords: { type: 'string', description: '質問用キーワード。答えを含めない' },
     hints: { type: 'array', items: HINT_SCHEMA },
     difficulty_level: { type: 'string' },
+    // 比例・反比例用（他の単元では空でよい）
+    basic_item: { type: 'string', description: '比例・反比例の必須基礎 B1〜B7 のいずれか（該当しない単元は空）' },
+    bloom_level: { type: 'string', description: 'remember/understand/apply/analyze/evaluate/create のいずれか' },
   },
   required: [
     'card_number', 'card_title', 'problem_description', 'answer',

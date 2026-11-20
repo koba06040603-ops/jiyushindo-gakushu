@@ -63,6 +63,7 @@ import { AdaptiveLearningEngine } from './adaptive-learning'
 import { SchoolManagementSystem } from './school-management'
 import { AIContentGenerator } from './ai-content-generator'
 import { buildQualityRules, buildQualityChecklist, buildReviseCardsPrompt } from './quality-rules'
+import { isProportionUnit, buildProportionSection, checkProportionCoverage } from './proportion-unit'
 import { renderCardsPrintPage, renderCardsBodyForPrint, renderCheckTestForPrint, renderOptionalForPrint, renderGuideForPrint, wrapPrintDocument, renderHintCardsPage, GUIDE_COURSE_BLURB } from './print-cards'
 import { 
   addToMistakeNotebook, 
@@ -19801,6 +19802,9 @@ app.post('/api/ai/generate-course', async (c) => {
     const textbookNotes = await loadConfirmedTextbookNotes(env.DB, { grade: String(grade || ''), subject: String(subject || ''), textbook: String(textbook || ''), unitName: String(unitName || '') })
     const textbookSection = textbookNotes ? `\n【教科書の学習内容（教師が確認済み）】\n${textbookNotes}\n→ 上記の用語・公式・例題の型・手順に沿ってカードを作成すること。教科書にない内容は増やさないこと。\n` : ''
     const selfLearningRules = buildQualityRules(qualityCtx)
+    // 比例・反比例のみ：全コース共通の必須基礎（B1〜B7）＋認知レベル（ブルーム改訂版）
+    const proportionMode = isProportionUnit(String(unitName || ''))
+    const proportionSection = proportionMode ? buildProportionSection(String(courseLevel || 'steady')) : ''
 
     const prompt = `あなたは小学校の教科指導に精通した優秀な教師です。以下の単元の学習カード${numCards}枚を生成してください。
 ${selfLearningRules}
@@ -19811,7 +19815,7 @@ ${selfLearningRules}
 - 単元名: ${unitName}
 - 単元目標: ${unitGoal || '未指定'}
 - コース: ${courseInfo.name} (${difficultyDescription})
-${textbookSection}${customInfo}${mikataSection}
+${textbookSection}${customInfo}${mikataSection}${proportionSection}
 【カード設計の方針】
 - 単元の学習内容を網羅的にカバーする（導入→基本→応用→まとめ）
 - ${numCards}枚で単元全体の主要な学習項目を漏れなく扱う
@@ -20319,12 +20323,19 @@ ${buildQualityChecklist(String(unitName || ''))}
     }
     
     console.log('✅ コース生成完了:', courseData.course_name || courseData.name)
+
+    // 比例・反比例：必須基礎 B1〜B7 の充足を確認する。不足は破棄せず、教師が見える形で返す
+    const proportionMissing: string[] = proportionMode ? checkProportionCoverage(courseData.cards) : []
+    if (proportionMissing.length > 0) {
+      console.warn('⚠️ 比例・反比例の必須基礎が不足:', proportionMissing.join(','))
+    }
     
     return c.json({
       success: true,
       course: courseData,
       cards_count: courseData.cards.length,
-      requested_cards: numCards
+      requested_cards: numCards,
+      proportion_coverage_missing: proportionMissing
     })
     
   } catch (error: any) {
