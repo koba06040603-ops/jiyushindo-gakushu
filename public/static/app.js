@@ -5186,7 +5186,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
             `}
 
             <!-- 学習環境デザイン（3機能×6事例） -->
-            ${renderEnvDesignGuide(curriculumId, environmentDesign)}
+            ${renderEnvDesignGuide(curriculumId, environmentDesign, curriculum.unit_name)}
 
             ${await generateLearningSupportSectionWithData(curriculumId)}
 
@@ -8625,7 +8625,7 @@ function readCardAloud() {
         try { TactileSounds.play('correct') } catch(e) {}
       })
     } else if (data.success && data.audioContent) {
-      const audio = new Audio('data:audio/mp3;base64,' + data.audioContent)
+      const audio = new Audio('data:audio/wav;base64,' + data.audioContent)
       audio.onended = () => { stopTtsCard(); stopGlobalTts() }
       audio.onerror = () => { stopTtsCard(); stopGlobalTts() }
       audio.play().catch(() => { stopTtsCard(); stopGlobalTts() })
@@ -14069,7 +14069,7 @@ async function speakText(text, voiceType = null, speed = 0.9) {
         })
       } else {
         // MP3フォールバック
-        const audio = new Audio('data:audio/mp3;base64,' + response.data.audioContent)
+        const audio = new Audio('data:audio/wav;base64,' + response.data.audioContent)
         audio.onended = () => { _globalTtsPlaying = false; updateFloatingTtsButton(false); resetAllTtsButtons(); showAiTeacherStopBar(false) }
         audio.onerror = () => { _globalTtsPlaying = false; updateFloatingTtsButton(false); resetAllTtsButtons(); showAiTeacherStopBar(false) }
         await audio.play()
@@ -20222,7 +20222,7 @@ async function loadEnvironmentDesignPage(curriculumId) {
             各項目の下の要望欄に書いてから「再提案」を押すと、その項目だけを作り直します。
           </p>
         </div>
-        ${renderEnvDesignGuide(curriculumId, parseEnvDesignItems(design).length ? design : null)}
+        ${renderEnvDesignGuide(curriculumId, parseEnvDesignItems(design).length ? design : null, curriculum.curriculum?.unit_name)}
         <div class="flex justify-end mt-8">
           <button type="button" onclick="loadGuidePage(${curriculumId})"
             class="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
@@ -20283,15 +20283,24 @@ function renderEnvFunctionMap() {
 }
 
 // 学習環境デザイン（3機能×6事例）の表示。対応表は常に出す
-function renderEnvDesignGuide(curriculumId, design) {
+// 学習環境デザインの作成は現在「比」の単元のみ対応（API 側も同じ条件で判定）
+function isEnvDesignSupportedUnit(unitName) {
+  return unitName === '比'
+}
+
+function renderEnvDesignGuide(curriculumId, design, unitName) {
   // 学習環境は教師・管理者のみに表示する（生徒画面には出さない）
   if (!canEditEnvironmentItems()) return ''
   const items = parseEnvDesignItems(design)
   let body = ''
   if (items.length === 0) {
-    body = `<div class="text-center py-6">
+    body = isEnvDesignSupportedUnit(unitName)
+      ? `<div class="text-center py-6">
       <p class="text-gray-600 mb-3">学習環境デザインはまだ作成されていません。</p>
       <button onclick="createEnvironmentDesign(${Number(curriculumId)})" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold"><i class="fas fa-magic mr-1"></i>学習環境デザインを作成する</button>
+    </div>`
+      : `<div class="text-center py-6">
+      <p class="text-gray-600">この単元の学習環境デザインは、まだ対応していません（現在は「比」の単元のみ）。</p>
     </div>`
   } else {
     body = ENV_FUNCTION_GROUPS.map(g => {
@@ -44348,7 +44357,7 @@ window.speakNB2NarrationAI = async function(page, source) {
         btn.innerHTML = '<i class="fas fa-stop" style="margin-right:3px;"></i>⏹ 停止'
         btn.style.background = 'linear-gradient(135deg,#EF4444,#DC2626)'
       }
-      var audio = new Audio('data:audio/mp3;base64,' + ttsData.audioContent)
+      var audio = new Audio('data:audio/wav;base64,' + ttsData.audioContent)
       audio.onended = function() {
         _globalTtsPlaying = false
         if (btn) {

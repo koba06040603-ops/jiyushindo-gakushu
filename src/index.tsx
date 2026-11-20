@@ -185,8 +185,12 @@ const GEMINI_MODEL_IMAGE_LEGACY = 'gemini-2.5-flash-image'       // 画像生成
 //   gemini-3.1-flash-image  : 個数正解 0/2, 日本語○, 品質 3/5・2/5  ← 速い(8秒)
 //   gemini-2.5-flash-image  : 個数正解 0/2, 日本語×, 品質 1/5・1/5  ← 使用非推奨
 // 結論: 「数を数える図」は AI に描かせず buildCountingSVG() で決定論的に描画する。
-// TTS（音声合成）: responseModalities:['AUDIO'] が必須。TEXT では 400 になる
-const GEMINI_MODEL_TTS = 'gemini-2.5-flash-preview-tts'
+// TTS（音声合成）: Gemini 3.8 TTS は Interactions API（/v1beta/interactions）で呼ぶ。
+// 話し方は speech_metadata.style に分離する（本文は一字一句読み上げられるため）。
+// 主: gemini-3.8-flash-tts（表現力・高忠実度）／ 副: gemini-3.8-flash-lite-tts（低遅延・低コスト）
+const GEMINI_MODEL_TTS = 'gemini-3.8-flash-tts'
+const GEMINI_MODEL_TTS_LITE = 'gemini-3.8-flash-lite-tts'
+const GEMINI_TTS_CHAIN = [GEMINI_MODEL_TTS, GEMINI_MODEL_TTS_LITE]
 
 // 【タスク別モデル解決ヘルパー】
 // 用途に応じた [プライマリ, フォールバック...] の配列を返す
@@ -222,7 +226,7 @@ const GEMINI_MODEL_REGISTRY = {
     pro: GEMINI_MODEL_IMAGE_PRO,
     legacy: GEMINI_MODEL_IMAGE_LEGACY,
   },
-  audio: { tts: GEMINI_MODEL_TTS },
+  audio: { tts: GEMINI_MODEL_TTS, ttsLite: GEMINI_MODEL_TTS_LITE },
   chains: {
     quality: getModelChain('quality'),
     balanced: getModelChain('balanced'),
@@ -15788,7 +15792,7 @@ app.get('/guide/:curriculumId', async (c) => {
         });
       } else if (data.success && data.audioContent) {
         // MP3形式のフォールバック
-        var audioSrc = 'data:audio/mp3;base64,' + data.audioContent;
+        var audioSrc = 'data:audio/wav;base64,' + data.audioContent;
         var audio = new Audio(audioSrc);
         audio.onended = function() { _ttsPlaying = false; restoreVolumeIcon(el); if (typeof window.updateFloatingTtsButton === 'function') window.updateFloatingTtsButton(false); if (window.speechSynthesis) speechSynthesis.cancel(); };
         audio.onerror = function() { _ttsPlaying = false; restoreVolumeIcon(el); if (typeof window.updateFloatingTtsButton === 'function') window.updateFloatingTtsButton(false); };
@@ -18076,13 +18080,23 @@ app.get('/api/admin/model-audit', authMiddleware, requireRole('admin'), async (c
   ]))
 
   const checks = await Promise.all(all.map(async (model) => {
+    const isTtsModel = model.includes('tts')
     const post = async (body: any) => {
       const ctrl = new AbortController()
       const timer = setTimeout(() => ctrl.abort(), 20000)
       try {
         const r = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctrl.signal }
+          isTtsModel
+            ? 'https://generativelanguage.googleapis.com/v1beta/interactions'
+            : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: isTtsModel
+              ? { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' }
+              : { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: ctrl.signal,
+          }
         )
         clearTimeout(timer)
         let message = ''
@@ -18102,8 +18116,10 @@ app.get('/api/admin/model-audit', authMiddleware, requireRole('admin'), async (c
       // TTS は「読み上げさせる文」を渡さないとモデルがテキスト応答を試みて 400 になる。
       // 単語だけだと誤検知するため、明確な読み上げ指示付きの文を渡す。
       res = await post({
-        contents: [{ parts: [{ text: '次の文を読み上げてください: こんにちは、テストです。' }] }],
-        generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } } },
+        model,
+        input: [{ type: 'user_input', content: [{ type: 'text', text: 'こんにちは、テストです。' }] }],
+        response_format: { type: 'audio' },
+        generation_config: { speech_config: [{ voice: 'Kore' }] },
       })
     } else {
       res = await post({ contents: [{ parts: [{ text: 'ping' }] }], generationConfig: { maxOutputTokens: 10 } })
@@ -19264,15 +19280,30 @@ app.post('/api/fix-all-examples', async (c) => {
   }
 })
 
-// APIルート：Gemini TTS 音声合成（Gemini 2.5 Flash Preview TTS）
-// 日本語対応・30種のボイス・感情コントロール可能
+// APIルート：Gemini TTS 音声合成（Gemini 3.8 Flash TTS → Flash-Lite TTS）
+// Interactions API を使用。話し方は speech_metadata.style に分離し、本文は読み上げ対象のみ。
+// 単位: 1回の入力は1200字まで。モデルは順に試し、失敗したら次のモデルへ進む。
+// 出力は WAV（RIFF ヘッダー付き・24kHz・mono・16bit）を base64 で返す。
+
+// Interactions API の応答から音声（base64）を取り出す
+function extractTtsAudioBase64(data: any): string {
+  if (data?.output_audio?.data) return data.output_audio.data
+  for (const step of data?.steps || []) {
+    if (step?.type !== 'model_output') continue
+    for (const part of step.content || []) {
+      if (part?.type === 'audio' && part.data) return part.data
+    }
+  }
+  return ''
+}
+
 app.post('/api/ai/tts', async (c) => {
   const { env } = c
-  const { text, voiceType = 'male-friendly', speed = 1.0, mood, style } = await c.req.json()
-  
-  const geminiApiKey = env.GEMINI_API_KEY || env.AIML_API_KEY
-  
-  if (!geminiApiKey) {
+  const { text, voiceType = 'male-friendly', mood, style } = await c.req.json()
+
+  const geminiApiKey = env.GEMINI_API_KEY
+
+  if (!geminiApiKey || geminiApiKey === 'your-gemini-api-key-here') {
     console.log('⚠️ Gemini APIキーが未設定 → Web Speech API を使用')
     return c.json({
       success: false,
@@ -19280,256 +19311,115 @@ app.post('/api/ai/tts', async (c) => {
       error: 'Gemini API キーが設定されていません'
     })
   }
-  
+
   if (!text || text.trim().length < 1) {
     return c.json({ success: false, error: 'テキストが空です' }, 400)
   }
-  
-  try {
-    const startTime = Date.now()
-    
-    // ボイスタイプに応じたGemini TTS ボイス選択
-    // Kore=Firm, Puck=Upbeat, Aoede=Breezy, Leda=Youthful, 
-    // Sulafat=Warm, Achird=Friendly, Achernar=Soft, Fenrir=Excitable
-    // Vindemiatrix=Gentle, Sadachbia=Lively
-    let voiceName = 'Puck'  // デフォルト: 元気な男性的ボイス（Upbeat）
-    switch(voiceType) {
-      case 'female-friendly':
-        voiceName = 'Leda'     // Youthful — 元気で若々しい女性的ボイス
-        break
-      case 'female-energetic':
-        voiceName = 'Sadachbia' // Lively — いきいきとした声
-        break
-      case 'male-friendly':
-        voiceName = 'Puck'     // Upbeat — 元気でスムーズな男性的ボイス
-        break
-      case 'male-energetic':
-        voiceName = 'Fenrir'   // Excitable — 興奮した声
-        break
-      case 'calm':
-        voiceName = 'Vindemiatrix' // Gentle — やさしい穏やかな声
-        break
-      case 'excited':
-        voiceName = 'Sadachbia'   // Lively — いきいきとした声
-        break
-      case 'teacher':
-        voiceName = 'Puck'    // Upbeat — 元気な先生風
-        break
-      default:
-        voiceName = 'Puck'    // Upbeat — デフォルトは男性スムーズ
-    }
-    
-    // 気分に応じたスタイル指示を構築（ボイス名は変更しない — ユーザーの男女選択を尊重）
-    let stylePrompt = ''
-    if (mood === 'tired' || mood === 'sad') {
-      stylePrompt = 'ゆっくり、やさしく、落ち着いた声で読んでください。'
-    } else if (mood === 'anxious' || mood === 'frustrated') {
-      stylePrompt = 'やさしく、ていねいに、安心できるように読んでください。'
-    } else if (mood === 'excited') {
-      stylePrompt = '明るく、楽しそうに、テンポよく読んでください。'
-    } else {
-      stylePrompt = 'やさしい先生のように、わかりやすく、自然な日本語のイントネーションで読んでください。'
-    }
-    
-    // カスタムスタイル指示がある場合は上書き
-    if (style) {
-      stylePrompt = style
-    }
-    
-    const ttsPrompt = `${stylePrompt}\n\n${text.substring(0, 5000)}`
-    
-    console.log('🎤 Gemini TTS API 呼び出し:', {
-      textLength: text.length,
-      voiceName,
-      mood: mood || 'none',
-      style: stylePrompt.substring(0, 50)
-    })
-    
-    // === Gemini 2.5 Flash Preview TTS（専用TTSモデル・最高品質日本語） ===
-    // 専用TTSモデルは自然なイントネーション・プロソディを持つ
-    // Gemini 3.1/3 FlashにはTTS機能がないため、2.5 Flash TTS を使用
-    let audioGenerated = false
-    let audioBase64 = ''
-    let audioMime = ''
-    let usedModel = ''
-    
-    // 日本語自然イントネーション用のスタイル指示（簡潔にして応答速度を向上）
-    // テキスト長を1200文字に制限してタイムアウトを回避
-    const truncatedText = text.substring(0, 1200)
-    const japaneseTtsPrompt = `${stylePrompt}
-${truncatedText}`
-    
+
+  const startTime = Date.now()
+
+  // ボイスタイプに応じた Gemini TTS ボイス選択（3.8 TTS の prebuilt voice）
+  let voiceName = 'Puck'  // デフォルト: Upbeat（男性的・スムーズ）
+  switch (voiceType) {
+    case 'female-friendly': voiceName = 'Leda'; break        // Youthful
+    case 'female-energetic': voiceName = 'Sadachbia'; break  // Lively
+    case 'male-friendly': voiceName = 'Puck'; break          // Upbeat
+    case 'male-energetic': voiceName = 'Fenrir'; break       // Excitable
+    case 'calm': voiceName = 'Vindemiatrix'; break           // Gentle
+    case 'excited': voiceName = 'Sadachbia'; break           // Lively
+    case 'teacher': voiceName = 'Puck'; break                // Upbeat
+    default: voiceName = 'Puck'
+  }
+
+  // 話し方の指示（speech_metadata.style に入れる。本文には混ぜない）
+  let stylePrompt = ''
+  if (mood === 'tired' || mood === 'sad') {
+    stylePrompt = 'ゆっくり、やさしく、落ち着いた声で読んでください。'
+  } else if (mood === 'anxious' || mood === 'frustrated') {
+    stylePrompt = 'やさしく、ていねいに、安心できるように読んでください。'
+  } else if (mood === 'excited') {
+    stylePrompt = '明るく、楽しそうに、テンポよく読んでください。'
+  } else {
+    stylePrompt = 'やさしい先生のように、わかりやすく、自然な日本語のイントネーションで読んでください。'
+  }
+  if (style) {
+    stylePrompt = style
+  }
+
+  const truncatedText = text.substring(0, 1200)
+
+  let lastError = ''
+  for (const model of GEMINI_TTS_CHAIN) {
     try {
-      // 25秒タイムアウト（長文対応）
       const ttsAbort = new AbortController()
       const ttsTimeout = setTimeout(() => ttsAbort.abort(), 25000)
-      
-      const ttsResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_TTS}:generateContent`,
-        {
-          method: 'POST',
-          headers: {
-            'x-goog-api-key': geminiApiKey,
-            'Content-Type': 'application/json',
-          },
-          signal: ttsAbort.signal,
-          body: JSON.stringify({
-            contents: [{
-              parts: [{ text: japaneseTtsPrompt }]
+
+      const ttsResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+        method: 'POST',
+        headers: {
+          'x-goog-api-key': geminiApiKey,
+          'Content-Type': 'application/json',
+        },
+        signal: ttsAbort.signal,
+        body: JSON.stringify({
+          model,
+          input: [{
+            type: 'user_input',
+            content: [{
+              type: 'text',
+              text: truncatedText,
+              annotations: [{ type: 'speech_metadata', style: stylePrompt }],
             }],
-            generationConfig: {
-              responseModalities: ['AUDIO'],
-              speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: {
-                    voiceName: voiceName
-                  }
-                }
-              }
-            }
-          })
-        }
-      )
-      
+          }],
+          response_format: { type: 'audio' },
+          generation_config: {
+            speech_config: [{ voice: voiceName }],
+          },
+        }),
+      })
       clearTimeout(ttsTimeout)
-      
-      if (ttsResponse.ok) {
-        const ttsData = await ttsResponse.json() as any
-        const audioPart = ttsData.candidates?.[0]?.content?.parts?.[0]
-        
-        if (audioPart?.inlineData?.data) {
-          audioBase64 = audioPart.inlineData.data
-          audioMime = audioPart.inlineData.mimeType || 'audio/L16;rate=24000'
-          usedModel = 'gemini-2.5-flash-preview-tts'
-          audioGenerated = true
-          console.log('✅ Gemini TTS 専用モデル生成成功（自然な日本語イントネーション）')
-        }
-      } else {
+
+      if (!ttsResponse.ok) {
         const errorText = await ttsResponse.text()
-        console.warn('⚠️ TTS専用モデル失敗:', ttsResponse.status, errorText.substring(0, 100))
+        lastError = `${model}: HTTP ${ttsResponse.status}`
+        console.warn('⚠️ TTS失敗:', model, ttsResponse.status, errorText.substring(0, 120))
+        continue
       }
-    } catch (e: any) {
-      console.warn('⚠️ TTS専用モデルエラー:', e.message)
-    }
-    
-    // === フォールバック: Gemini 2.5 Flash Native Audio ===
-    if (!audioGenerated) {
-      try {
-        const nativeAudioResp = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_QUALITY}:generateContent?key=${geminiApiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: `以下のテキストを日本語で自然に音読してください。${stylePrompt}\n\n${truncatedText}` }] }],
-              generationConfig: {
-                responseModalities: ['AUDIO'],
-                temperature: 0.4,
-                speechConfig: {
-                  voiceConfig: {
-                    prebuiltVoiceConfig: { voiceName: voiceName }
-                  }
-                }
-              }
-            })
-          }
-        )
-        
-        if (nativeAudioResp.ok) {
-          const nativeData = await nativeAudioResp.json() as any
-          const audioPart = nativeData.candidates?.[0]?.content?.parts?.[0]
-          if (audioPart?.inlineData?.data) {
-            audioBase64 = audioPart.inlineData.data
-            audioMime = audioPart.inlineData.mimeType || 'audio/L16;rate=24000'
-            usedModel = 'gemini-2.5-flash (Native Audio Fallback)'
-            audioGenerated = true
-            console.log('✅ Gemini Native Audio フォールバック成功')
-          }
-        }
-      } catch (e: any) {
-        console.warn('⚠️ Native Audio フォールバックも失敗:', e.message)
+
+      const data = await ttsResponse.json() as any
+      const audioBase64 = extractTtsAudioBase64(data)
+      if (!audioBase64) {
+        lastError = `${model}: 音声データなし`
+        console.warn('⚠️ TTS応答に音声なし:', model)
+        continue
       }
-    }
-    
-    if (audioGenerated) {
+
       const generationTime = Date.now() - startTime
-      console.log(`✅ TTS 音声生成成功 (${generationTime}ms, model=${usedModel}, voice=${voiceName})`)
-      
-      // ★ サーバー側でPCM→WAV変換（クライアント側のatob/AudioContext問題を回避）
-      try {
-        const pcmBinary = Uint8Array.from(atob(audioBase64), c => c.charCodeAt(0))
-        const sr = 24000
-        const wavHeader = new ArrayBuffer(44)
-        const v = new DataView(wavHeader)
-        v.setUint32(0, 0x52494646, false) // RIFF
-        v.setUint32(4, 36 + pcmBinary.length, true)
-        v.setUint32(8, 0x57415645, false) // WAVE
-        v.setUint32(12, 0x666d7420, false) // fmt
-        v.setUint32(16, 16, true)
-        v.setUint16(20, 1, true) // PCM
-        v.setUint16(22, 1, true) // mono
-        v.setUint32(24, sr, true)
-        v.setUint32(28, sr * 2, true)
-        v.setUint16(32, 2, true)
-        v.setUint16(34, 16, true)
-        v.setUint32(36, 0x64617461, false) // data
-        v.setUint32(40, pcmBinary.length, true)
-        
-        // WAVバイナリを結合してbase64エンコード
-        const wavBytes = new Uint8Array(44 + pcmBinary.length)
-        wavBytes.set(new Uint8Array(wavHeader), 0)
-        wavBytes.set(pcmBinary, 44)
-        
-        // Uint8Array → base64 (chunk方式でスタックオーバーフロー回避)
-        let wavBase64 = ''
-        const chunkSize = 32768
-        for (let i = 0; i < wavBytes.length; i += chunkSize) {
-          const chunk = wavBytes.subarray(i, Math.min(i + chunkSize, wavBytes.length))
-          wavBase64 += String.fromCharCode.apply(null, Array.from(chunk))
-        }
-        wavBase64 = btoa(wavBase64)
-        
-        console.log(`✅ サーバー側WAV変換完了 (PCM: ${pcmBinary.length} bytes → WAV: ${wavBytes.length} bytes)`)
-        
-        return c.json({
-          success: true,
-          audioContent: wavBase64,
-          audioFormat: 'wav',
-          sampleRate: 24000,
-          channels: 1,
-          bitsPerSample: 16,
-          method: usedModel,
-          voice: voiceName,
-          generation_time_ms: generationTime
-        })
-      } catch (wavConvErr: any) {
-        console.warn('⚠️ サーバーWAV変換失敗、PCMで返却:', wavConvErr.message)
-        // フォールバック: 従来のPCM形式で返却
-        return c.json({
-          success: true,
-          audioContent: audioBase64,
-          audioFormat: 'pcm',
-          sampleRate: 24000,
-          channels: 1,
-          bitsPerSample: 16,
-          method: usedModel,
-          voice: voiceName,
-          generation_time_ms: generationTime
-        })
-      }
-    } else {
-      throw new Error('音声データが生成されませんでした')
+      console.log(`✅ TTS 音声生成成功 (${generationTime}ms, model=${model}, voice=${voiceName}, mood=${mood || 'none'})`)
+
+      return c.json({
+        success: true,
+        audioContent: audioBase64,
+        audioFormat: 'wav',
+        sampleRate: 24000,
+        channels: 1,
+        bitsPerSample: 16,
+        method: model,
+        voice: voiceName,
+        generation_time_ms: generationTime,
+      })
+    } catch (e: any) {
+      lastError = `${model}: ${e?.name === 'AbortError' ? 'タイムアウト' : e?.message}`
+      console.warn('⚠️ TTSエラー:', lastError)
     }
-    
-  } catch (error: any) {
-    console.error('❌ TTSエラー:', error.message)
-    
-    return c.json({
-      success: false,
-      fallbackToWebSpeech: true,
-      error: error.message
-    }, 500)
   }
+
+  console.error('❌ TTS: 全モデル失敗', lastError)
+  return c.json({
+    success: false,
+    fallbackToWebSpeech: true,
+    error: lastError || '音声データが生成されませんでした'
+  }, 500)
 })
 
 // デバッグ用：利用可能なGeminiモデルをリスト
