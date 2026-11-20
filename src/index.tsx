@@ -2365,7 +2365,7 @@ app.get('/proposal', async (c) => {
         <div class="card-title">🤖 AI学習カード自動生成</div>
         <ul>
           <li>教科書の単元を入力するだけ</li>
-          <li>3段階コース自動作成（じっくり・しっかり・どんどん）</li>
+          <li>3段階コース自動作成（じっくり・しっかり・ぐんぐん）</li>
           <li>例題→問題→ヒントの段階的構成</li>
           <li>児童の学習特性に応じた個別化</li>
         </ul>
@@ -11540,7 +11540,7 @@ app.get('/guide/:curriculumId', async (c) => {
           <p style="font-size: 0.85rem; font-weight: bold; color: #166534;">じゅんびチェック済み</p>
           <p style="font-size: 0.75rem; color: #15803D;">
             学び方: ${{visual:'🖼️見る',auditory:'👂聞く',kinesthetic:'✋やる',read_write:'✏️読み書き',balanced:'⚖️バランス'}[diagnosticProfile?.learning_style || 'balanced'] || '⚖️バランス'}
-            ・すすめ方: ${{slow:'🐢じっくり',steady:'🐕ふつう',fast:'🐆どんどん'}[diagnosticProfile?.pace || 'steady'] || '🐕ふつう'}
+            ・すすめ方: ${{slow:'🐢じっくり',steady:'🐕ふつう',fast:'🐆ぐんぐん'}[diagnosticProfile?.pace || 'steady'] || '🐕ふつう'}
           </p>
         </div>
         <a href="/diagnostic/${curriculumId}?student_id=${studentIdParam}${studentName ? '&name=' + encodeURIComponent(studentName) : ''}&return=${encodeURIComponent('/guide/' + curriculumId + '?student_id=' + studentIdParam + (studentName ? '&name=' + encodeURIComponent(studentName) : '') + (courseId ? '&course=' + courseId : ''))}"

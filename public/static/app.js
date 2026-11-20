@@ -20284,10 +20284,11 @@ function renderEnvFunctionMap() {
 
 // 学習環境デザイン（3機能×6事例）の表示。対応表は常に出す
 function renderEnvDesignGuide(curriculumId, design) {
+  // 学習環境は教師・管理者のみに表示する（生徒画面には出さない）
+  if (!canEditEnvironmentItems()) return ''
   const items = parseEnvDesignItems(design)
   let body = ''
   if (items.length === 0) {
-    if (!canEditEnvironmentItems()) return ''
     body = `<div class="text-center py-6">
       <p class="text-gray-600 mb-3">学習環境デザインはまだ作成されていません。</p>
       <button onclick="createEnvironmentDesign(${Number(curriculumId)})" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold"><i class="fas fa-magic mr-1"></i>学習環境デザインを作成する</button>
